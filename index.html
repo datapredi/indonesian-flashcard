@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>印尼語 Flash Card</title>
+<script src="words.js"></script>
+<style>
+  :root{
+    --bg:#f5f3ef; --card:#ffffff; --text:#1f1b16; --muted:#7a7368;
+    --accent:#c1440e; --accent2:#2f6f4e; --border:#e2ddd3; --danger:#b23a2f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#181512; --card:#242019; --text:#f2ede4; --muted:#a89e8f;
+      --accent:#e07b45; --accent2:#5fae83; --border:#3a342b; --danger:#e0665a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,"Segoe UI",Helvetica,Arial,"PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:20px 16px 60px;}
+  h1{font-size:1.3rem; margin:0 0 4px;}
+  .sub{color:var(--muted); font-size:0.85rem; margin-bottom:18px;}
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+  button{
+    font-family:inherit; font-size:0.9rem; padding:9px 14px; border-radius:10px;
+    border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer;
+  }
+  button:hover{border-color:var(--accent);}
+  button.primary{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600;}
+  button.secondary{background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600;}
+  button:disabled{opacity:0.5; cursor:default;}
+  input[type=file]{display:none;}
+  input[type=text], input[type=password]{
+    font-family:inherit; font-size:0.9rem; padding:9px 12px; border-radius:10px;
+    border:1px solid var(--border); background:var(--card); color:var(--text); flex:1; min-width:200px;
+  }
+  .note{font-size:0.75rem; color:var(--muted); margin:-6px 0 12px;}
+  .list{background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:16px;}
+  .item{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border);}
+  .item:last-child{border-bottom:none;}
+  .item .id-text{font-weight:600;}
+  .item .meaning{color:var(--muted); font-size:0.82rem;}
+  .item.no-data .id-text{color:var(--muted);}
+  .item.no-data .meaning{color:var(--danger);}
+  .count{font-size:0.85rem; color:var(--muted); margin-bottom:10px;}
+  .actions{display:flex; gap:10px; flex-wrap:wrap;}
+  .hidden{display:none !important;}
+
+  .card-area{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:32px 20px; text-align:center; min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; user-select:none;}
+  .card-area .front{font-size:1.5rem; font-weight:700;}
+  .card-area .back{font-size:1.05rem; color:var(--accent2); margin-top:12px;}
+  .progress{text-align:center; color:var(--muted); font-size:0.85rem; margin:10px 0;}
+  .nav{display:flex; justify-content:center; gap:10px; margin-top:16px;}
+
+  .quiz-en{font-size:1.15rem; font-weight:600; margin:18px 0; text-align:center;}
+  .opt{display:block; width:100%; text-align:left; margin-bottom:10px; padding:12px 14px; border-radius:12px;}
+  .opt.correct{background:var(--accent2) !important; color:#fff !important; border-color:var(--accent2) !important;}
+  .opt.wrong{background:var(--danger) !important; color:#fff !important; border-color:var(--danger) !important;}
+  .score{text-align:center; font-size:1.1rem; margin:20px 0;}
+  .missed{font-size:0.85rem; color:var(--muted); margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🇮🇩 印尼語 Flash Card</h1>
+  <div class="sub">從單字清單勾選要複習的內容，開始 Flashcard 或測驗</div>
+
+  <!-- ===== 選字畫面 ===== -->
+  <div id="screen-select">
+    <div class="toolbar">
+      <button id="btnImport">匯入 / 更新單字檔 (.txt/.md)</button>
+      <input type="file" id="fileInput" accept=".txt,.md">
+      <button id="btnAll">全選</button>
+      <button id="btnNone">全不選</button>
+    </div>
+    <div class="toolbar">
+      <input type="password" id="apiKeyInput" placeholder="Anthropic API Key (sk-ant-...)">
+      <button id="btnSaveKey">儲存 Key</button>
+    </div>
+    <div class="note">Key 只會存在這台電腦的瀏覽器裡（localStorage），不會上傳到別的地方。用來讓 AI 幫新單字自動生成翻譯和測驗句。</div>
+    <div class="toolbar">
+      <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
+    </div>
+    <div class="count" id="selCount"></div>
+    <div class="list" id="wordList"></div>
+    <div class="actions">
+      <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
+      <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
+    </div>
+  </div>
+
+  <!-- ===== Flash Card 畫面 ===== -->
+  <div id="screen-cards" class="hidden">
+    <div class="progress" id="cardProgress"></div>
+    <div class="card-area" id="cardArea">
+      <div class="front" id="cardFront"></div>
+      <div class="back hidden" id="cardBack"></div>
+    </div>
+    <div class="nav">
+      <button id="btnPrev">← 上一個</button>
+      <button id="btnShuffleCards">🔀 洗牌</button>
+      <button id="btnNext">下一個 →</button>
+    </div>
+    <div class="actions" style="margin-top:16px;">
+      <button id="btnBackFromCards">返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 測驗畫面 ===== -->
+  <div id="screen-quiz" class="hidden">
+    <div class="progress" id="quizProgress"></div>
+    <div class="quiz-en" id="quizEnText"></div>
+    <div id="quizOptions"></div>
+    <div class="actions">
+      <button class="primary hidden" id="btnNextQuestion">下一題</button>
+      <button id="btnBackFromQuiz">返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 結算畫面 ===== -->
+  <div id="screen-result" class="hidden">
+    <div class="score" id="resultScore"></div>
+    <div class="missed" id="resultMissed"></div>
+    <div class="actions" style="margin-top:16px;">
+      <button class="primary" id="btnRetryMissed">重測錯誤題目</button>
+      <button id="btnBackFromResult">返回清單</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LS_KEY = "flashcard_word_list_v1";
+
+function loadWordList(){
+  const saved = localStorage.getItem(LS_KEY);
+  if(saved){
+    try{ return JSON.parse(saved); }catch(e){}
+  }
+  return DEFAULT_WORDS.slice();
+}
+function saveWordList(list){
+  localStorage.setItem(LS_KEY, JSON.stringify(list));
+}
+
+let allWords = loadWordList();
+let selected = new Set(allWords.map(w => w.id));
+
+// ---- AI 自動生成翻譯（用使用者自己的 Anthropic API Key） ----
+const API_KEY_LS = "anthropic_api_key";
+const CUSTOM_DB_LS = "custom_word_db_v1";
+
+function loadCustomDB(){
+  try{ return JSON.parse(localStorage.getItem(CUSTOM_DB_LS)) || {}; }catch(e){ return {}; }
+}
+function saveCustomDB(){ localStorage.setItem(CUSTOM_DB_LS, JSON.stringify(customDB)); }
+function getApiKey(){ return localStorage.getItem(API_KEY_LS) || ""; }
+function setApiKey(k){ localStorage.setItem(API_KEY_LS, k); }
+
+let customDB = loadCustomDB();
+
+function lookup(text){
+  return customDB[text] || WORD_DB[text] || null;
+}
+
+function chunkArr(arr, size){
+  const out = [];
+  for(let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function generateWordData(words){
+  const key = getApiKey();
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            zh: { type: "string" },
+            en: { type: "string" },
+            quizEn: { type: "string" },
+            correct: { type: "string" },
+            distractors: { type: "array", items: { type: "string" } }
+          },
+          required: ["zh", "en", "quizEn", "correct", "distractors"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
+  const prompt = `你是印尼語教材編輯，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。針對下面每一個印尼文單字或句子，依序提供：
+- zh：繁體中文意思
+- en：英文意思
+- quizEn：一句能表達這個單字/片語意思的英文例句
+- correct：quizEn 對應的、自然的印尼文翻譯句子（要用到這個目標單字/片語）
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的印尼文句子選項（長度和風格接近 correct，但意思不同）
+
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+
+單字清單：
+${list}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-8",
+      max_tokens: 4096,
+      output_config: { format: { type: "json_schema", schema } },
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+
+  if(!res.ok){
+    const errBody = await res.text();
+    throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  if(data.stop_reason === "refusal"){
+    throw new Error("Claude 拒絕回應這個請求");
+  }
+  const textBlock = (data.content || []).find(b => b.type === "text");
+  if(!textBlock){
+    throw new Error("沒有收到文字回應");
+  }
+  const parsed = JSON.parse(textBlock.text);
+  return parsed.entries;
+}
+
+document.getElementById("apiKeyInput").value = getApiKey();
+document.getElementById("btnSaveKey").onclick = () => {
+  const v = document.getElementById("apiKeyInput").value.trim();
+  if(!v){ alert("請輸入 API Key"); return; }
+  setApiKey(v);
+  alert("已儲存 Key。");
+};
+
+document.getElementById("btnGenerate").onclick = async () => {
+  if(!getApiKey()){
+    alert("請先輸入並儲存 API Key。");
+    return;
+  }
+  const missing = allWords.filter(w => !lookup(w.text));
+  if(missing.length === 0){
+    alert("目前清單裡的單字都已經有翻譯了！");
+    return;
+  }
+  const btn = document.getElementById("btnGenerate");
+  btn.disabled = true;
+  const batches = chunkArr(missing, 8);
+  let done = 0;
+  for(const batch of batches){
+    btn.textContent = `生成中... (${done}/${missing.length})`;
+    try{
+      const entries = await generateWordData(batch.map(w => w.text));
+      batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
+      saveCustomDB();
+      done += batch.length;
+      renderList();
+    }catch(e){
+      alert("生成失敗：" + e.message);
+      btn.disabled = false;
+      btn.textContent = "✨ AI 自動生成缺少的翻譯";
+      return;
+    }
+  }
+  btn.disabled = false;
+  btn.textContent = "✨ AI 自動生成缺少的翻譯";
+  renderList();
+};
+
+function renderList(){
+  const el = document.getElementById("wordList");
+  el.innerHTML = "";
+  allWords.forEach(w => {
+    const data = lookup(w.text);
+    const row = document.createElement("label");
+    row.className = "item" + (data ? "" : " no-data");
+    row.innerHTML = `
+      <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
+      <div>
+        <div class="id-text">${w.id}. ${w.text}</div>
+        <div class="meaning">${data ? (data.zh + " · " + data.en) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+      </div>
+    `;
+    row.querySelector("input").addEventListener("change", (e) => {
+      const id = Number(e.target.dataset.id);
+      if(e.target.checked) selected.add(id); else selected.delete(id);
+      updateCount();
+    });
+    el.appendChild(row);
+  });
+  updateCount();
+}
+function updateCount(){
+  document.getElementById("selCount").textContent = `已選 ${selected.size} / ${allWords.length} 個單字`;
+}
+
+document.getElementById("btnAll").onclick = () => {
+  selected = new Set(allWords.map(w => w.id));
+  renderList();
+};
+document.getElementById("btnNone").onclick = () => {
+  selected = new Set();
+  renderList();
+};
+
+// ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留印尼文） ----
+const CJK_RE = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]+/g;
+
+function extractIndonesianLine(raw){
+  let s = raw.replace(/\r/g, "").trim();
+  if(s === "") return null;
+  if(s.startsWith("[")) return null;        // [🔗 分類標題] 這種區塊標題
+  if(/^-{2,}$/.test(s)) return null;        // --- 分隔線
+  s = s.replace(/\*\*/g, "");               // 去掉 **粗體**
+  s = s.replace(/^\d+[\.\)]\s*/, "");       // 去掉「1. 」「1) 」編號
+  s = s.replace(/^[\s\-\*]+/, "");          // 去掉「- 」「* 」項目符號
+  // 從第一個箭頭（> / -> / →）開始，後面通常是注音口訣，整段丟掉
+  const arrowMatch = s.match(/-+>|→|>/);
+  if(arrowMatch) s = s.slice(0, arrowMatch.index);
+  s = s.replace(/[（(][^）)]*[）)]/g, "");   // 去掉（中文意思）這種括號
+  s = s.replace(CJK_RE, " ");               // 去掉殘留的中文字
+  s = s.replace(/\s+/g, " ");
+  s = s.replace(/[\s:\/=,\-]+$/, "").replace(/^[\s:\/=,\-]+/, "");
+  s = s.trim();
+  if(s === "") return null;
+  if(!/[a-zA-Z]/.test(s)) return null;      // 沒有拉丁字母就不是印尼文，跳過
+  return s;
+}
+
+document.getElementById("btnImport").onclick = () => document.getElementById("fileInput").click();
+document.getElementById("fileInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const lines = ev.target.result.split(/\r?\n/);
+    const parsed = [];
+    const seen = new Set();
+    let autoId = 0;
+    lines.forEach(line => {
+      const cleaned = extractIndonesianLine(line);
+      if(cleaned === null) return;
+      const key = cleaned.toLowerCase();
+      if(seen.has(key)) return;
+      seen.add(key);
+      autoId++;
+      parsed.push({ id: autoId, text: cleaned });
+    });
+    if(parsed.length === 0){
+      alert("沒有解析到任何印尼文單字，請確認檔案內容。");
+      return;
+    }
+    allWords = parsed;
+    saveWordList(allWords);
+    selected = new Set(allWords.map(w => w.id));
+    renderList();
+    alert(`已匯入 ${parsed.length} 個項目。`);
+  };
+  reader.readAsText(file, "UTF-8");
+});
+
+// ================= Flash Card =================
+let cardSession = [];
+let cardIndex = 0;
+
+document.getElementById("btnStartCards").onclick = () => {
+  const list = allWords.filter(w => selected.has(w.id));
+  if(list.length === 0){ alert("請至少選一個單字"); return; }
+  cardSession = shuffleArr(list.slice());
+  cardIndex = 0;
+  showScreen("cards");
+  renderCard();
+};
+
+function renderCard(){
+  const w = cardSession[cardIndex];
+  const data = lookup(w.text);
+  document.getElementById("cardProgress").textContent = `第 ${cardIndex+1} / ${cardSession.length} 張`;
+  document.getElementById("cardFront").textContent = w.text;
+  document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
+  document.getElementById("cardBack").classList.add("hidden");
+}
+document.getElementById("cardArea").onclick = () => {
+  document.getElementById("cardBack").classList.toggle("hidden");
+};
+document.getElementById("btnPrev").onclick = () => {
+  cardIndex = (cardIndex - 1 + cardSession.length) % cardSession.length;
+  renderCard();
+};
+document.getElementById("btnNext").onclick = () => {
+  cardIndex = (cardIndex + 1) % cardSession.length;
+  renderCard();
+};
+document.getElementById("btnShuffleCards").onclick = () => {
+  cardSession = shuffleArr(cardSession);
+  cardIndex = 0;
+  renderCard();
+};
+document.getElementById("btnBackFromCards").onclick = () => showScreen("select");
+
+// ================= 測驗 =================
+let quizSession = [];
+let quizIndex = 0;
+let quizScore = 0;
+let quizMissed = [];
+let quizRetryPool = null;
+
+document.getElementById("btnStartQuiz").onclick = () => {
+  const list = allWords.filter(w => selected.has(w.id));
+  const ready = list.filter(w => lookup(w.text) && lookup(w.text).correct);
+  const skipped = list.length - ready.length;
+  if(ready.length === 0){ alert("勾選的單字都還沒有測驗例句，請先選有翻譯資料的單字。"); return; }
+  if(skipped > 0){
+    alert(`有 ${skipped} 個單字尚無測驗例句，已略過。`);
+  }
+  quizSession = shuffleArr(ready.slice());
+  quizIndex = 0;
+  quizScore = 0;
+  quizMissed = [];
+  showScreen("quiz");
+  renderQuestion();
+};
+
+function renderQuestion(){
+  const w = quizSession[quizIndex];
+  const data = lookup(w.text);
+  document.getElementById("quizProgress").textContent = `第 ${quizIndex+1} / ${quizSession.length} 題`;
+  document.getElementById("quizEnText").textContent = data.quizEn;
+  const options = shuffleArr([data.correct, ...data.distractors]);
+  const optEl = document.getElementById("quizOptions");
+  optEl.innerHTML = "";
+  document.getElementById("btnNextQuestion").classList.add("hidden");
+  options.forEach(opt => {
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.textContent = opt;
+    b.onclick = () => answerQuestion(b, opt, data.correct, w);
+    optEl.appendChild(b);
+  });
+}
+function answerQuestion(btn, chosen, correct, word){
+  const buttons = document.querySelectorAll("#quizOptions .opt");
+  buttons.forEach(b => b.disabled = true);
+  if(chosen === correct){
+    btn.classList.add("correct");
+    quizScore++;
+  }else{
+    btn.classList.add("wrong");
+    buttons.forEach(b => { if(b.textContent === correct) b.classList.add("correct"); });
+    quizMissed.push(word);
+  }
+  document.getElementById("btnNextQuestion").classList.remove("hidden");
+}
+document.getElementById("btnNextQuestion").onclick = () => {
+  quizIndex++;
+  if(quizIndex >= quizSession.length){
+    showResult();
+  }else{
+    renderQuestion();
+  }
+};
+document.getElementById("btnBackFromQuiz").onclick = () => showScreen("select");
+
+function showResult(){
+  showScreen("result");
+  document.getElementById("resultScore").textContent = `你答對了 ${quizScore} / ${quizSession.length} 題`;
+  const missedEl = document.getElementById("resultMissed");
+  if(quizMissed.length > 0){
+    missedEl.textContent = "答錯的單字：" + quizMissed.map(w => w.text).join("、");
+    document.getElementById("btnRetryMissed").classList.remove("hidden");
+  }else{
+    missedEl.textContent = "全部答對，太厲害了！";
+    document.getElementById("btnRetryMissed").classList.add("hidden");
+  }
+}
+document.getElementById("btnRetryMissed").onclick = () => {
+  quizSession = shuffleArr(quizMissed.slice());
+  quizIndex = 0;
+  quizScore = 0;
+  quizMissed = [];
+  showScreen("quiz");
+  renderQuestion();
+};
+document.getElementById("btnBackFromResult").onclick = () => showScreen("select");
+
+// ================= 共用 =================
+function shuffleArr(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function showScreen(name){
+  ["select","cards","quiz","result"].forEach(s => {
+    document.getElementById("screen-" + s).classList.toggle("hidden", s !== name);
+  });
+  if(name === "select") renderList();
+}
+
+renderList();
+</script>
+</body>
+</html>
