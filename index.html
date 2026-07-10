@@ -52,6 +52,8 @@
 
   .card-area{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:32px 20px; text-align:center; min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; user-select:none;}
   .card-area .front{font-size:1.5rem; font-weight:700;}
+  .front-pron{font-size:0.95rem; color:var(--muted); margin-top:4px;}
+  .item .pron{color:var(--muted); font-weight:400; font-size:0.85rem;}
   .card-area .back{font-size:1.05rem; color:var(--accent2); margin-top:12px;}
   .progress{text-align:center; color:var(--muted); font-size:0.85rem; margin:10px 0;}
   .nav{display:flex; justify-content:center; gap:10px; margin-top:16px;}
@@ -98,6 +100,7 @@
     <div class="progress" id="cardProgress"></div>
     <div class="card-area" id="cardArea">
       <div class="front" id="cardFront"></div>
+      <div class="front-pron" id="cardPron"></div>
       <div class="back hidden" id="cardBack"></div>
     </div>
     <div class="nav">
@@ -184,11 +187,12 @@ async function generateWordData(words){
           properties: {
             zh: { type: "string" },
             en: { type: "string" },
+            pron: { type: "string" },
             quizEn: { type: "string" },
             correct: { type: "string" },
             distractors: { type: "array", items: { type: "string" } }
           },
-          required: ["zh", "en", "quizEn", "correct", "distractors"],
+          required: ["zh", "en", "pron", "quizEn", "correct", "distractors"],
           additionalProperties: false
         }
       }
@@ -200,6 +204,11 @@ async function generateWordData(words){
   const prompt = `你是印尼語教材編輯，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。針對下面每一個印尼文單字或句子，依序提供：
 - zh：繁體中文意思
 - en：英文意思
+- pron：這個單字/句子的發音標注，採用印尼文詞典 KBBI 的標音慣例——把每個字母 e 依照實際發音標注清楚：
+  - 央中元音 schwa（弱化、輕聲的 e，例如 "besar"、"kecil" 的第一個 e）維持寫成一般的 e，不用加符號
+  - 閉前元音 /e/（例如 "sore"、"meja" 的 e）標成 é
+  - 開前元音 /ɛ/（例如 "enak" 的 e、"apel" 的 e）標成 è
+  其餘字母照原樣，不用改；如果整個字/句子裡沒有任何 e，pron 就跟原文字一樣
 - quizEn：一句能表達這個單字/片語意思的英文例句
 - correct：quizEn 對應的、自然的印尼文翻譯句子（要用到這個目標單字/片語）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的印尼文句子選項（長度和風格接近 correct，但意思不同）
@@ -293,7 +302,7 @@ function renderList(){
     row.innerHTML = `
       <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
       <div>
-        <div class="id-text">${w.id}. ${w.text}</div>
+        <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
         <div class="meaning">${data ? (data.zh + " · " + data.en) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
       </div>
     `;
@@ -393,6 +402,7 @@ function renderCard(){
   const data = lookup(w.text);
   document.getElementById("cardProgress").textContent = `第 ${cardIndex+1} / ${cardSession.length} 張`;
   document.getElementById("cardFront").textContent = w.text;
+  document.getElementById("cardPron").textContent = (data && data.pron && data.pron !== w.text) ? `[${data.pron}]` : "";
   document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
   document.getElementById("cardBack").classList.add("hidden");
 }
