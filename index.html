@@ -105,6 +105,10 @@
       <div class="front-pron" id="cardPron"></div>
       <div class="back hidden" id="cardBack"></div>
     </div>
+    <div class="nav hidden" id="cardAssessRow">
+      <button id="btnCardWrong">✗ 還要練習</button>
+      <button class="secondary" id="btnCardRight">✓ 記得了，不再出現</button>
+    </div>
     <div class="nav">
       <button id="btnPrev">← 上一個</button>
       <button id="btnShuffleCards">🔀 洗牌</button>
@@ -451,9 +455,11 @@ function renderCard(){
   document.getElementById("cardPron").textContent = (data && data.pron && data.pron !== w.text) ? `[${data.pron}]` : "";
   document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
   document.getElementById("cardBack").classList.add("hidden");
+  document.getElementById("cardAssessRow").classList.add("hidden");
 }
 document.getElementById("cardArea").onclick = () => {
   document.getElementById("cardBack").classList.toggle("hidden");
+  document.getElementById("cardAssessRow").classList.toggle("hidden");
 };
 document.getElementById("btnPrev").onclick = () => {
   cardIndex = (cardIndex - 1 + cardSession.length) % cardSession.length;
@@ -469,6 +475,21 @@ document.getElementById("btnShuffleCards").onclick = () => {
   renderCard();
 };
 document.getElementById("btnBackFromCards").onclick = () => showScreen("select");
+
+function goToNextCard(){
+  cardIndex = (cardIndex + 1) % cardSession.length;
+  renderCard();
+}
+document.getElementById("btnCardWrong").onclick = () => {
+  goToNextCard();
+};
+document.getElementById("btnCardRight").onclick = () => {
+  const w = cardSession[cardIndex];
+  masteredIds.add(w.id);
+  selected.delete(w.id);
+  saveMastered();
+  goToNextCard();
+};
 
 // ================= 測驗 =================
 let quizSession = [];
