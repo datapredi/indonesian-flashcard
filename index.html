@@ -46,6 +46,9 @@
   .item .meaning{color:var(--muted); font-size:0.82rem;}
   .item.no-data .id-text{color:var(--muted);}
   .item.no-data .meaning{color:var(--danger);}
+  .item > div{flex:1;}
+  .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
+  .speak-btn:disabled{opacity:0.5;}
   .count{font-size:0.85rem; color:var(--muted); margin-bottom:10px;}
   .actions{display:flex; gap:10px; flex-wrap:wrap;}
   .hidden{display:none !important;}
@@ -55,11 +58,15 @@
   .front-pron{font-size:0.95rem; color:var(--muted); margin-top:4px;}
   .item .pron{color:var(--muted); font-weight:400; font-size:0.85rem;}
   .card-area .back{font-size:1.05rem; color:var(--accent2); margin-top:12px;}
+  .listen-btn{margin-top:14px; padding:9px 16px; border-radius:999px; font-weight:600;}
+  .listen-btn.speaking{opacity:0.6;}
   .progress{text-align:center; color:var(--muted); font-size:0.85rem; margin:10px 0;}
   .nav{display:flex; justify-content:center; gap:10px; margin-top:16px;}
 
   .quiz-en{font-size:1.15rem; font-weight:600; margin:18px 0; text-align:center;}
-  .opt{display:block; width:100%; text-align:left; margin-bottom:10px; padding:12px 14px; border-radius:12px;}
+  .opt-row{display:flex; gap:8px; margin-bottom:10px;}
+  .opt{display:block; width:100%; text-align:left; padding:12px 14px; border-radius:12px; flex:1; margin-bottom:0;}
+  .opt-speak{flex:0 0 auto; padding:0 14px; border-radius:12px; font-size:1rem;}
   .opt.correct{background:var(--accent2) !important; color:#fff !important; border-color:var(--accent2) !important;}
   .opt.wrong{background:var(--danger) !important; color:#fff !important; border-color:var(--danger) !important;}
   .score{text-align:center; font-size:1.1rem; margin:20px 0;}
@@ -103,6 +110,7 @@
     <div class="card-area" id="cardArea">
       <div class="front" id="cardFront"></div>
       <div class="front-pron" id="cardPron"></div>
+      <button type="button" class="listen-btn" id="cardSpeak">🔊 播放發音</button>
       <div class="back hidden" id="cardBack"></div>
     </div>
     <div class="nav hidden" id="cardAssessRow">
@@ -143,6 +151,26 @@
 </div>
 
 <script>
+// ================= 語音播放 =================
+let cachedVoices = [];
+function refreshVoices(){ cachedVoices = speechSynthesis.getVoices(); }
+if('speechSynthesis' in window){
+  refreshVoices();
+  speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+}
+function speak(text, btn){
+  if(!('speechSynthesis' in window)){ alert('這個瀏覽器不支援語音播放'); return; }
+  speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'id-ID';
+  utter.rate = 0.85;
+  const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith('id'));
+  if(voice) utter.voice = voice;
+  if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
+  utter.onend = utter.onerror = () => { if(btn){ btn.disabled = false; btn.classList.remove('speaking'); } };
+  speechSynthesis.speak(utter);
+}
+
 const LS_KEY = "flashcard_word_list_v1";
 
 function loadWordList(){
@@ -327,6 +355,13 @@ function renderList(){
       if(e.target.checked) selected.add(id); else selected.delete(id);
       updateCount();
     });
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.setAttribute("aria-label", `播放 ${w.text} 發音`);
+    speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(w.text, speakBtn); });
+    row.appendChild(speakBtn);
     el.appendChild(row);
   });
   updateCount();
@@ -461,6 +496,10 @@ document.getElementById("cardArea").onclick = () => {
   document.getElementById("cardBack").classList.toggle("hidden");
   document.getElementById("cardAssessRow").classList.toggle("hidden");
 };
+document.getElementById("cardSpeak").addEventListener("click", (e) => {
+  e.stopPropagation();
+  speak(cardSession[cardIndex].text, e.currentTarget);
+});
 document.getElementById("btnPrev").onclick = () => {
   cardIndex = (cardIndex - 1 + cardSession.length) % cardSession.length;
   renderCard();
@@ -525,11 +564,21 @@ function renderQuestion(){
   document.getElementById("btnNextQuestion").classList.add("hidden");
   document.getElementById("btnMastered").classList.add("hidden");
   options.forEach(opt => {
+    const row = document.createElement("div");
+    row.className = "opt-row";
     const b = document.createElement("button");
     b.className = "opt";
     b.textContent = opt;
     b.onclick = () => answerQuestion(b, opt, data.correct, w);
-    optEl.appendChild(b);
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "opt-speak";
+    speakBtn.textContent = "🔊";
+    speakBtn.setAttribute("aria-label", `播放「${opt}」發音`);
+    speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(opt, speakBtn); });
+    row.appendChild(b);
+    row.appendChild(speakBtn);
+    optEl.appendChild(row);
   });
 }
 function answerQuestion(btn, chosen, correct, word){
