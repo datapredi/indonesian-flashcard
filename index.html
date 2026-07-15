@@ -49,6 +49,9 @@
   .item > div{flex:1;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
   .speak-btn:disabled{opacity:0.5;}
+  .badge-row{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
+  .badge{font-size:0.72rem; padding:3px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--border); color:var(--muted);}
+  .badge:hover{border-color:var(--accent); color:var(--accent);}
   .count{font-size:0.85rem; color:var(--muted); margin-bottom:10px;}
   .actions{display:flex; gap:10px; flex-wrap:wrap;}
   .hidden{display:none !important;}
@@ -100,8 +103,6 @@
       <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
       <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
     </div>
-    <button id="masteredToggle" class="hidden" style="margin-top:14px;"></button>
-    <div class="list hidden" id="masteredList" style="margin-top:8px;"></div>
   </div>
 
   <!-- ===== Flash Card 畫面 ===== -->
@@ -184,16 +185,32 @@ function saveWordList(list){
   localStorage.setItem(LS_KEY, JSON.stringify(list));
 }
 
-// ---- 已學會的單字（答對後可標記，之後不會再出現在複習清單） ----
-const MASTERED_LS = "flashcard_mastered_v1";
-function loadMastered(){
-  try{ return new Set(JSON.parse(localStorage.getItem(MASTERED_LS)) || []); }catch(e){ return new Set(); }
+// ---- 已學會的單字（Flash Card 跟測驗分開記錄，互不影響） ----
+const MASTERED_CARDS_LS = "flashcard_mastered_cards_v1";
+const MASTERED_QUIZ_LS = "flashcard_mastered_quiz_v1";
+const MASTERED_LEGACY_LS = "flashcard_mastered_v1";
+function loadMasteredSet(key){
+  try{ return new Set(JSON.parse(localStorage.getItem(key)) || []); }catch(e){ return new Set(); }
 }
-function saveMastered(){ localStorage.setItem(MASTERED_LS, JSON.stringify([...masteredIds])); }
-let masteredIds = loadMastered();
+function saveMasteredSet(key, set){ localStorage.setItem(key, JSON.stringify([...set])); }
+
+let cardMasteredIds = loadMasteredSet(MASTERED_CARDS_LS);
+let quizMasteredIds = loadMasteredSet(MASTERED_QUIZ_LS);
+// 舊版只有一個共用清單，第一次載入時把舊資料套用到兩個新清單，不遺失既有進度
+if(!localStorage.getItem(MASTERED_CARDS_LS) && !localStorage.getItem(MASTERED_QUIZ_LS)){
+  const legacy = loadMasteredSet(MASTERED_LEGACY_LS);
+  if(legacy.size){
+    cardMasteredIds = new Set(legacy);
+    quizMasteredIds = new Set(legacy);
+    saveMasteredSet(MASTERED_CARDS_LS, cardMasteredIds);
+    saveMasteredSet(MASTERED_QUIZ_LS, quizMasteredIds);
+  }
+}
+function saveCardMastered(){ saveMasteredSet(MASTERED_CARDS_LS, cardMasteredIds); }
+function saveQuizMastered(){ saveMasteredSet(MASTERED_QUIZ_LS, quizMasteredIds); }
 
 let allWords = loadWordList();
-let selected = new Set(allWords.map(w => w.id).filter(id => !masteredIds.has(id)));
+let selected = new Set(allWords.map(w => w.id));
 
 // ---- AI 自動生成翻譯（用使用者自己的 Anthropic API Key） ----
 const API_KEY_LS = "anthropic_api_key";
@@ -338,8 +355,7 @@ document.getElementById("btnGenerate").onclick = async () => {
 function renderList(){
   const el = document.getElementById("wordList");
   el.innerHTML = "";
-  const activeWords = allWords.filter(w => !masteredIds.has(w.id));
-  activeWords.forEach(w => {
+  allWords.forEach(w => {
     const data = lookup(w.text);
     const row = document.createElement("label");
     row.className = "item" + (data ? "" : " no-data");
@@ -355,6 +371,25 @@ function renderList(){
       if(e.target.checked) selected.add(id); else selected.delete(id);
       updateCount();
     });
+    if(cardMasteredIds.has(w.id) || quizMasteredIds.has(w.id)){
+      const badgeRow = document.createElement("div");
+      badgeRow.className = "badge-row";
+      if(cardMasteredIds.has(w.id)){
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "badge";
+        b.textContent = "🎴 卡片已學會 ✕";
+        b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); cardMasteredIds.delete(w.id); saveCardMastered(); renderList(); });
+        badgeRow.appendChild(b);
+      }
+      if(quizMasteredIds.has(w.id)){
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "badge";
+        b.textContent = "📝 測驗已學會 ✕";
+        b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); quizMasteredIds.delete(w.id); saveQuizMastered(); renderList(); });
+        badgeRow.appendChild(b);
+      }
+      row.querySelector("div").appendChild(badgeRow);
+    }
     const speakBtn = document.createElement("button");
     speakBtn.type = "button";
     speakBtn.className = "speak-btn";
@@ -365,47 +400,16 @@ function renderList(){
     el.appendChild(row);
   });
   updateCount();
-  renderMasteredSection();
 }
 function updateCount(){
-  const activeCount = allWords.filter(w => !masteredIds.has(w.id)).length;
-  document.getElementById("selCount").textContent =
-    `已選 ${selected.size} / ${activeCount} 個單字` + (masteredIds.size > 0 ? `（另有 ${masteredIds.size} 個已學會）` : "");
+  const parts = [`已選 ${selected.size} / ${allWords.length} 個單字`];
+  if(cardMasteredIds.size) parts.push(`卡片已會 ${cardMasteredIds.size}`);
+  if(quizMasteredIds.size) parts.push(`測驗已會 ${quizMasteredIds.size}`);
+  document.getElementById("selCount").textContent = parts.join("・");
 }
-
-function renderMasteredSection(){
-  const masteredWords = allWords.filter(w => masteredIds.has(w.id));
-  const toggleBtn = document.getElementById("masteredToggle");
-  const listEl = document.getElementById("masteredList");
-  if(masteredWords.length === 0){
-    toggleBtn.classList.add("hidden");
-    listEl.classList.add("hidden");
-    listEl.innerHTML = "";
-    return;
-  }
-  toggleBtn.classList.remove("hidden");
-  toggleBtn.textContent = `顯示已學會的單字 (${masteredWords.length})`;
-  listEl.innerHTML = masteredWords.map(w => `
-    <div class="item">
-      <div style="flex:1">
-        <div class="id-text" style="text-decoration:line-through; color:var(--muted);">${w.id}. ${w.text}</div>
-      </div>
-      <button onclick="unmarkMastered(${w.id})">取消已學會</button>
-    </div>
-  `).join("");
-}
-function unmarkMastered(id){
-  masteredIds.delete(id);
-  saveMastered();
-  selected.add(id);
-  renderList();
-}
-document.getElementById("masteredToggle").onclick = () => {
-  document.getElementById("masteredList").classList.toggle("hidden");
-};
 
 document.getElementById("btnAll").onclick = () => {
-  selected = new Set(allWords.map(w => w.id).filter(id => !masteredIds.has(id)));
+  selected = new Set(allWords.map(w => w.id));
   renderList();
 };
 document.getElementById("btnNone").onclick = () => {
@@ -463,6 +467,10 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
     allWords = parsed;
     saveWordList(allWords);
     selected = new Set(allWords.map(w => w.id));
+    cardMasteredIds = new Set();
+    quizMasteredIds = new Set();
+    saveCardMastered();
+    saveQuizMastered();
     renderList();
     alert(`已匯入 ${parsed.length} 個項目。`);
   };
@@ -474,8 +482,8 @@ let cardSession = [];
 let cardIndex = 0;
 
 document.getElementById("btnStartCards").onclick = () => {
-  const list = allWords.filter(w => selected.has(w.id));
-  if(list.length === 0){ alert("請至少選一個單字"); return; }
+  const list = allWords.filter(w => selected.has(w.id) && !cardMasteredIds.has(w.id));
+  if(list.length === 0){ alert("請至少選一個尚未在 Flash Card 標記已學會的單字"); return; }
   cardSession = shuffleArr(list.slice());
   cardIndex = 0;
   showScreen("cards");
@@ -524,10 +532,16 @@ document.getElementById("btnCardWrong").onclick = () => {
 };
 document.getElementById("btnCardRight").onclick = () => {
   const w = cardSession[cardIndex];
-  masteredIds.add(w.id);
-  selected.delete(w.id);
-  saveMastered();
-  goToNextCard();
+  cardMasteredIds.add(w.id);
+  saveCardMastered();
+  cardSession.splice(cardIndex, 1);
+  if(cardSession.length === 0){
+    alert("這批單字都已經標記學會了！");
+    showScreen("select");
+    return;
+  }
+  cardIndex = cardIndex % cardSession.length;
+  renderCard();
 };
 
 // ================= 測驗 =================
@@ -538,10 +552,10 @@ let quizMissed = [];
 let quizRetryPool = null;
 
 document.getElementById("btnStartQuiz").onclick = () => {
-  const list = allWords.filter(w => selected.has(w.id));
+  const list = allWords.filter(w => selected.has(w.id) && !quizMasteredIds.has(w.id));
   const ready = list.filter(w => lookup(w.text) && lookup(w.text).correct);
   const skipped = list.length - ready.length;
-  if(ready.length === 0){ alert("勾選的單字都還沒有測驗例句，請先選有翻譯資料的單字。"); return; }
+  if(ready.length === 0){ alert("勾選的單字都還沒有測驗例句，或都已經在測驗標記學會了，請調整清單。"); return; }
   if(skipped > 0){
     alert(`有 ${skipped} 個單字尚無測驗例句，已略過。`);
   }
@@ -587,7 +601,7 @@ function answerQuestion(btn, chosen, correct, word){
   if(chosen === correct){
     btn.classList.add("correct");
     quizScore++;
-    if(!masteredIds.has(word.id)){
+    if(!quizMasteredIds.has(word.id)){
       document.getElementById("btnMastered").classList.remove("hidden");
     }
   }else{
@@ -608,9 +622,8 @@ function goToNextQuestion(){
 document.getElementById("btnNextQuestion").onclick = goToNextQuestion;
 document.getElementById("btnMastered").onclick = () => {
   const w = quizSession[quizIndex];
-  masteredIds.add(w.id);
-  selected.delete(w.id);
-  saveMastered();
+  quizMasteredIds.add(w.id);
+  saveQuizMastered();
   goToNextQuestion();
 };
 document.getElementById("btnBackFromQuiz").onclick = () => showScreen("select");
