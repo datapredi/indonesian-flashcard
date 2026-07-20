@@ -34,10 +34,11 @@
   button.secondary{background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600;}
   button:disabled{opacity:0.5; cursor:default;}
   input[type=file]{display:none;}
-  input[type=text], input[type=password]{
+  input[type=text], input[type=password], input[type=number], textarea{
     font-family:inherit; font-size:0.9rem; padding:9px 12px; border-radius:10px;
     border:1px solid var(--border); background:var(--card); color:var(--text); flex:1; min-width:200px;
   }
+  textarea{width:100%; resize:vertical; font-size:1rem;}
   .note{font-size:0.75rem; color:var(--muted); margin:-6px 0 12px;}
   .list{background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:16px;}
   .item{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border);}
@@ -49,6 +50,8 @@
   .item > div{flex:1;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
   .speak-btn:disabled{opacity:0.5;}
+  .delete-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
+  .delete-btn:hover{border-color:var(--danger); color:var(--danger);}
   .badge-row{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
   .badge{font-size:0.72rem; padding:3px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--border); color:var(--muted);}
   .badge:hover{border-color:var(--accent); color:var(--accent);}
@@ -74,6 +77,13 @@
   .opt.wrong{background:var(--danger) !important; color:#fff !important; border-color:var(--danger) !important;}
   .score{text-align:center; font-size:1.1rem; margin:20px 0;}
   .missed{font-size:0.85rem; color:var(--muted); margin-top:10px;}
+
+  .write-hint{color:var(--muted); font-size:0.9rem; text-align:center; margin:-8px 0 18px;}
+  .write-feedback{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; margin-top:16px;}
+  .write-feedback .verdict{font-weight:800; margin:0 0 8px;}
+  .write-feedback .verdict.ok{color:var(--accent2);}
+  .write-feedback .verdict.no{color:var(--danger);}
+  .write-feedback .ref{color:var(--muted); margin:8px 0 0;}
 </style>
 </head>
 <body>
@@ -88,6 +98,11 @@
       <input type="file" id="fileInput" accept=".txt,.md">
       <button id="btnAll">全選</button>
       <button id="btnNone">全不選</button>
+      <button id="btnClearMastered">🔄 清空所有已學會</button>
+    </div>
+    <div class="toolbar">
+      <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
+      <button id="btnRandomSelect">🎲 隨機選這麼多個來練習</button>
     </div>
     <div class="toolbar">
       <input type="password" id="apiKeyInput" placeholder="Anthropic API Key (sk-ant-...)">
@@ -97,11 +112,16 @@
     <div class="toolbar">
       <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
     </div>
+    <div class="toolbar">
+      <input type="text" id="wordSearch" placeholder="搜尋印尼文或中文...">
+      <button id="btnToggleSelectedOnly">只顯示已選取</button>
+    </div>
     <div class="count" id="selCount"></div>
     <div class="list" id="wordList"></div>
     <div class="actions">
       <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
       <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
+      <button class="secondary" id="btnStartWrite">✍️ 中翻印尼文（AI 出句、AI 批改）</button>
     </div>
   </div>
 
@@ -137,6 +157,23 @@
       <button class="primary hidden" id="btnNextQuestion">下一題</button>
       <button class="secondary hidden" id="btnMastered">✓ 已記住，不再出現</button>
       <button id="btnBackFromQuiz">返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 造句測驗畫面 ===== -->
+  <div id="screen-write" class="hidden">
+    <div class="progress" id="writeProgress"></div>
+    <div class="quiz-en" id="writeWord"></div>
+    <p class="write-hint" id="writeHint"></p>
+    <textarea id="writeInput" rows="2" placeholder="把上面這句中文翻成印尼文..."></textarea>
+    <div class="actions" style="margin-top:12px;">
+      <button class="primary" id="btnSubmitWrite">送出</button>
+      <button class="hidden" type="button" id="writeSpeak">🔊 聽範例句</button>
+    </div>
+    <div class="write-feedback hidden" id="writeFeedback"></div>
+    <div class="actions" style="margin-top:16px;">
+      <button class="primary hidden" id="btnNextWrite">下一題</button>
+      <button id="btnBackFromWrite">返回清單</button>
     </div>
   </div>
 
@@ -210,7 +247,21 @@ function saveCardMastered(){ saveMasteredSet(MASTERED_CARDS_LS, cardMasteredIds)
 function saveQuizMastered(){ saveMasteredSet(MASTERED_QUIZ_LS, quizMasteredIds); }
 
 let allWords = loadWordList();
-let selected = new Set(allWords.map(w => w.id));
+
+// ---- 已選取的單字（記住上次選取狀態，重新整理不會重置） ----
+const SELECTED_LS = "flashcard_selected_v1";
+function loadSelected(){
+  const raw = localStorage.getItem(SELECTED_LS);
+  if(raw === null) return null;
+  try{ return new Set(JSON.parse(raw)); }catch(e){ return null; }
+}
+function saveSelected(){ localStorage.setItem(SELECTED_LS, JSON.stringify([...selected])); }
+
+const savedSelected = loadSelected();
+let selected = savedSelected
+  ? new Set([...savedSelected].filter(id => allWords.some(w => w.id === id)))
+  : new Set(allWords.map(w => w.id));
+let showSelectedOnly = false;
 
 // ---- AI 自動生成翻譯（用使用者自己的 Anthropic API Key） ----
 const API_KEY_LS = "anthropic_api_key";
@@ -236,7 +287,6 @@ function chunkArr(arr, size){
 }
 
 async function generateWordData(words){
-  const key = getApiKey();
   const schema = {
     type: "object",
     properties: {
@@ -278,6 +328,12 @@ async function generateWordData(words){
 單字清單：
 ${list}`;
 
+  const parsed = await callClaude(prompt, schema, 4096);
+  return parsed.entries;
+}
+
+async function callClaude(prompt, schema, maxTokens){
+  const key = getApiKey();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -288,26 +344,93 @@ ${list}`;
     },
     body: JSON.stringify({
       model: "claude-opus-4-8",
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       output_config: { format: { type: "json_schema", schema } },
       messages: [{ role: "user", content: prompt }]
     })
   });
-
   if(!res.ok){
     const errBody = await res.text();
     throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 300)}`);
   }
-  const data = await res.json();
-  if(data.stop_reason === "refusal"){
+  const responseData = await res.json();
+  if(responseData.stop_reason === "refusal"){
     throw new Error("Claude 拒絕回應這個請求");
   }
-  const textBlock = (data.content || []).find(b => b.type === "text");
+  const textBlock = (responseData.content || []).find(b => b.type === "text");
   if(!textBlock){
     throw new Error("沒有收到文字回應");
   }
-  const parsed = JSON.parse(textBlock.text);
-  return parsed.entries;
+  return JSON.parse(textBlock.text);
+}
+
+async function generateWriteSentences(wordList){
+  const schema = {
+    type: "object",
+    properties: {
+      sentences: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            zh: { type: "string" },
+            usedWords: { type: "array", items: { type: "string" } }
+          },
+          required: ["zh", "usedWords"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["sentences"],
+    additionalProperties: false
+  };
+  const list = wordList.map(w => {
+    const data = lookup(w.text);
+    return `- ${w.text}（${data ? data.zh : "無翻譯"}）`;
+  }).join("\n");
+  const prompt = `你是印尼語老師，以下是學生正在學的一批印尼文單字/片語（含中文意思）。
+請幫學生設計「中翻印尼文」口說造句練習：把這些單字盡量自然地組合成幾句道地、口語的中文句子（像日常對話會講的那種，不要死板的教科書句），讓學生看中文練習翻成印尼文。
+
+規則：
+- 每一句盡量塞入越多目標單字越好，但只挑真的能自然放進同一句話的組合，不要為了塞字讓句子變得不自然
+- 每句最多用到約 5 個目標單字
+- 清單裡的每個單字至少要出現在其中一句
+- 句數依單字量彈性決定，不用剛好整除
+
+單字清單：
+${list}
+
+請回傳 sentences 陣列，每個元素是 { zh：中文句子, usedWords：這句實際用到的目標單字原文列表（從清單裡一字不差複製） }`;
+  const parsed = await callClaude(prompt, schema, 3072);
+  return parsed.sentences;
+}
+
+async function gradeTranslation(zhSentence, targetWords, userAnswer){
+  const schema = {
+    type: "object",
+    properties: {
+      correct: { type: "boolean" },
+      wordsUsedCorrectly: { type: "array", items: { type: "string" } },
+      feedback: { type: "string" },
+      betterSentence: { type: "string" }
+    },
+    required: ["correct", "wordsUsedCorrectly", "feedback", "betterSentence"],
+    additionalProperties: false
+  };
+  const prompt = `你是印尼語老師，學生要把這句中文口語翻成印尼文：
+「${zhSentence}」
+
+理想上應該自然地用到這些印尼文單字/片語：${targetWords.join("、")}
+（不強制每個字都要出現，但整體翻譯的意思要對、要口語自然）
+
+學生寫的答案：「${userAnswer}」
+
+請判斷：
+1. correct：整體翻譯的意思是否正確、通順自然（不要求跟目標單字的形式完全一致，同義的自然說法也算對）
+2. wordsUsedCorrectly：學生的答案裡，有正確對應到（或用同義說法對應到）的目標單字，從目標單字清單裡列出
+3. feedback：用繁體中文簡短說明哪裡對、哪裡需要調整（1-2 句就好）
+4. betterSentence：一句自然、正確、口語的印尼文參考翻譯`;
+  return callClaude(prompt, schema, 1024);
 }
 
 document.getElementById("apiKeyInput").value = getApiKey();
@@ -352,10 +475,25 @@ document.getElementById("btnGenerate").onclick = async () => {
   renderList();
 };
 
+function getVisibleWords(){
+  const query = document.getElementById("wordSearch").value.trim().toLowerCase();
+  return allWords.filter(w => {
+    if(showSelectedOnly && !selected.has(w.id)) return false;
+    if(!query) return true;
+    const data = lookup(w.text);
+    const haystack = `${w.text} ${data ? data.zh : ""} ${data ? data.en : ""}`.toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
 function renderList(){
   const el = document.getElementById("wordList");
   el.innerHTML = "";
-  allWords.forEach(w => {
+  const visibleWords = getVisibleWords();
+  if(visibleWords.length === 0){
+    el.innerHTML = `<div class="item"><div class="meaning">沒有符合的單字</div></div>`;
+  }
+  visibleWords.forEach(w => {
     const data = lookup(w.text);
     const row = document.createElement("label");
     row.className = "item" + (data ? "" : " no-data");
@@ -369,7 +507,8 @@ function renderList(){
     row.querySelector("input").addEventListener("change", (e) => {
       const id = Number(e.target.dataset.id);
       if(e.target.checked) selected.add(id); else selected.delete(id);
-      updateCount();
+      saveSelected();
+      if(showSelectedOnly) renderList(); else updateCount();
     });
     if(cardMasteredIds.has(w.id) || quizMasteredIds.has(w.id)){
       const badgeRow = document.createElement("div");
@@ -397,6 +536,13 @@ function renderList(){
     speakBtn.setAttribute("aria-label", `播放 ${w.text} 發音`);
     speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(w.text, speakBtn); });
     row.appendChild(speakBtn);
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "delete-btn";
+    deleteBtn.textContent = "🗑️";
+    deleteBtn.setAttribute("aria-label", `刪除 ${w.text}`);
+    deleteBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); deleteWord(w.id); });
+    row.appendChild(deleteBtn);
     el.appendChild(row);
   });
   updateCount();
@@ -407,15 +553,50 @@ function updateCount(){
   if(quizMasteredIds.size) parts.push(`測驗已會 ${quizMasteredIds.size}`);
   document.getElementById("selCount").textContent = parts.join("・");
 }
+function deleteWord(id){
+  allWords = allWords.filter(w => w.id !== id);
+  saveWordList(allWords);
+  selected.delete(id);
+  saveSelected();
+  cardMasteredIds.delete(id);
+  quizMasteredIds.delete(id);
+  saveCardMastered();
+  saveQuizMastered();
+  renderList();
+}
 
 document.getElementById("btnAll").onclick = () => {
   selected = new Set(allWords.map(w => w.id));
+  saveSelected();
   renderList();
 };
 document.getElementById("btnNone").onclick = () => {
   selected = new Set();
+  saveSelected();
   renderList();
 };
+document.getElementById("btnClearMastered").onclick = () => {
+  cardMasteredIds = new Set();
+  quizMasteredIds = new Set();
+  saveCardMastered();
+  saveQuizMastered();
+  renderList();
+};
+document.getElementById("btnRandomSelect").onclick = () => {
+  const raw = Number(document.getElementById("randomCount").value);
+  const n = Math.max(1, Math.min(allWords.length, Math.floor(raw) || 0));
+  if(!n){ alert("請輸入大於 0 的數字"); return; }
+  selected = new Set(shuffleArr(allWords.map(w => w.id)).slice(0, n));
+  saveSelected();
+  renderList();
+};
+document.getElementById("wordSearch").addEventListener("input", renderList);
+document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) => {
+  showSelectedOnly = !showSelectedOnly;
+  e.currentTarget.textContent = showSelectedOnly ? "顯示全部單字" : "只顯示已選取";
+  e.currentTarget.classList.toggle("primary", showSelectedOnly);
+  renderList();
+});
 
 // ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留印尼文） ----
 const CJK_RE = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]+/g;
@@ -467,6 +648,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
     allWords = parsed;
     saveWordList(allWords);
     selected = new Set(allWords.map(w => w.id));
+    saveSelected();
     cardMasteredIds = new Set();
     quizMasteredIds = new Set();
     saveCardMastered();
@@ -628,6 +810,124 @@ document.getElementById("btnMastered").onclick = () => {
 };
 document.getElementById("btnBackFromQuiz").onclick = () => showScreen("select");
 
+// ================= 中翻印尼文（AI 出句、AI 批改） =================
+let writeSession = [];
+let writeIndex = 0;
+let writeScore = 0;
+let writeGrading = false;
+
+document.getElementById("btnStartWrite").onclick = async () => {
+  if(!getApiKey()){ alert("這個模式需要用 AI 出題跟批改，請先在上面輸入並儲存 API Key。"); return; }
+  const list = allWords.filter(w => selected.has(w.id));
+  const ready = list.filter(w => lookup(w.text));
+  const skipped = list.length - ready.length;
+  if(ready.length === 0){ alert("勾選的單字都還沒有翻譯資料，請先選有翻譯資料的單字，或用「AI 自動生成」補上。"); return; }
+  if(skipped > 0){
+    alert(`有 ${skipped} 個單字尚無翻譯資料，已略過。`);
+  }
+  const startBtn = document.getElementById("btnStartWrite");
+  startBtn.disabled = true;
+  const batches = chunkArr(ready, 12);
+  const sentences = [];
+  try{
+    for(let i = 0; i < batches.length; i++){
+      startBtn.textContent = `AI 出題中... (${i + 1}/${batches.length})`;
+      const batchSentences = await generateWriteSentences(batches[i]);
+      sentences.push(...batchSentences);
+    }
+  }catch(e){
+    startBtn.disabled = false;
+    startBtn.textContent = "✍️ 中翻印尼文（AI 出句、AI 批改）";
+    alert("出題失敗：" + e.message);
+    return;
+  }
+  startBtn.disabled = false;
+  startBtn.textContent = "✍️ 中翻印尼文（AI 出句、AI 批改）";
+  if(sentences.length === 0){ alert("沒有產生出任何句子，請再試一次。"); return; }
+  writeSession = shuffleArr(sentences);
+  writeIndex = 0;
+  writeScore = 0;
+  showScreen("write");
+  renderWriteQuestion();
+};
+
+function renderWriteQuestion(){
+  const s = writeSession[writeIndex];
+  document.getElementById("writeProgress").textContent = `第 ${writeIndex + 1} / ${writeSession.length} 題`;
+  document.getElementById("writeWord").textContent = s.zh;
+  document.getElementById("writeHint").textContent = s.usedWords && s.usedWords.length ? `可用單字參考：${s.usedWords.join("、")}` : "";
+  const input = document.getElementById("writeInput");
+  input.value = "";
+  input.disabled = false;
+  input.classList.remove("hidden");
+  const submitBtn = document.getElementById("btnSubmitWrite");
+  submitBtn.classList.remove("hidden");
+  submitBtn.disabled = false;
+  submitBtn.textContent = "送出";
+  document.getElementById("writeSpeak").classList.add("hidden");
+  document.getElementById("writeFeedback").classList.add("hidden");
+  document.getElementById("writeFeedback").innerHTML = "";
+  document.getElementById("btnNextWrite").classList.add("hidden");
+  input.focus();
+}
+
+document.getElementById("btnSubmitWrite").addEventListener("click", async () => {
+  if(writeGrading) return;
+  const input = document.getElementById("writeInput");
+  const answer = input.value.trim();
+  if(!answer){ alert("請先輸入句子"); return; }
+  const s = writeSession[writeIndex];
+  const submitBtn = document.getElementById("btnSubmitWrite");
+  writeGrading = true;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "批改中...";
+  try{
+    const result = await gradeTranslation(s.zh, s.usedWords || [], answer);
+    writeGrading = false;
+    input.disabled = true;
+    submitBtn.classList.add("hidden");
+    if(result.correct) writeScore++;
+    const fb = document.getElementById("writeFeedback");
+    fb.classList.remove("hidden");
+    fb.innerHTML = `
+      <p class="verdict ${result.correct ? "ok" : "no"}">${result.correct ? "✓ 不錯！" : "還需要調整"}</p>
+      <p>${result.feedback}</p>
+      ${result.wordsUsedCorrectly && result.wordsUsedCorrectly.length ? `<p>有正確用到：${result.wordsUsedCorrectly.join("、")}</p>` : ""}
+      <p class="ref">參考翻譯：${result.betterSentence}</p>
+    `;
+    const speakBtn = document.getElementById("writeSpeak");
+    speakBtn.classList.remove("hidden");
+    speakBtn.onclick = () => speak(result.betterSentence, speakBtn);
+    document.getElementById("btnNextWrite").classList.remove("hidden");
+  }catch(e){
+    writeGrading = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = "送出";
+    alert("批改失敗：" + e.message);
+  }
+});
+
+document.getElementById("btnNextWrite").onclick = () => {
+  writeIndex++;
+  if(writeIndex >= writeSession.length){
+    finishWriteSession();
+  }else{
+    renderWriteQuestion();
+  }
+};
+document.getElementById("btnBackFromWrite").onclick = () => showScreen("select");
+
+function finishWriteSession(){
+  document.getElementById("writeProgress").textContent = "完成";
+  document.getElementById("writeWord").textContent = `你答對了 ${writeScore} / ${writeSession.length} 題`;
+  document.getElementById("writeHint").textContent = "";
+  document.getElementById("writeInput").classList.add("hidden");
+  document.getElementById("btnSubmitWrite").classList.add("hidden");
+  document.getElementById("writeSpeak").classList.add("hidden");
+  document.getElementById("writeFeedback").classList.add("hidden");
+  document.getElementById("btnNextWrite").classList.add("hidden");
+}
+
 function showResult(){
   showScreen("result");
   document.getElementById("resultScore").textContent = `你答對了 ${quizScore} / ${quizSession.length} 題`;
@@ -660,7 +960,7 @@ function shuffleArr(arr){
   return a;
 }
 function showScreen(name){
-  ["select","cards","quiz","result"].forEach(s => {
+  ["select","cards","quiz","write","result"].forEach(s => {
     document.getElementById("screen-" + s).classList.toggle("hidden", s !== name);
   });
   if(name === "select") renderList();
