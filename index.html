@@ -120,6 +120,7 @@
     <div class="list" id="wordList"></div>
     <div class="actions">
       <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
+      <button id="btnCardDirection"></button>
       <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
       <button class="secondary" id="btnStartWrite">✍️ 中翻印尼文（AI 出句、AI 批改）</button>
     </div>
@@ -663,6 +664,22 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 let cardSession = [];
 let cardIndex = 0;
 
+const CARD_DIRECTION_LS = "flashcard_direction_v1";
+let cardDirection = localStorage.getItem(CARD_DIRECTION_LS) === "zh-id" ? "zh-id" : "id-zh";
+
+function updateCardDirectionLabel(){
+  document.getElementById("btnCardDirection").textContent = cardDirection === "id-zh"
+    ? "🔄 正面：印尼文 → 背面：中文"
+    : "🔄 正面：中文 → 背面：印尼文";
+}
+updateCardDirectionLabel();
+document.getElementById("btnCardDirection").addEventListener("click", () => {
+  cardDirection = cardDirection === "id-zh" ? "zh-id" : "id-zh";
+  localStorage.setItem(CARD_DIRECTION_LS, cardDirection);
+  updateCardDirectionLabel();
+  if(cardSession.length) renderCard();
+});
+
 document.getElementById("btnStartCards").onclick = () => {
   const list = allWords.filter(w => selected.has(w.id) && !cardMasteredIds.has(w.id));
   if(list.length === 0){ alert("請至少選一個尚未在 Flash Card 標記已學會的單字"); return; }
@@ -676,9 +693,16 @@ function renderCard(){
   const w = cardSession[cardIndex];
   const data = lookup(w.text);
   document.getElementById("cardProgress").textContent = `第 ${cardIndex+1} / ${cardSession.length} 張`;
-  document.getElementById("cardFront").textContent = w.text;
-  document.getElementById("cardPron").textContent = (data && data.pron && data.pron !== w.text) ? `[${data.pron}]` : "";
-  document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
+  const pronText = (data && data.pron && data.pron !== w.text) ? ` [${data.pron}]` : "";
+  if(cardDirection === "id-zh"){
+    document.getElementById("cardFront").textContent = w.text;
+    document.getElementById("cardPron").textContent = pronText.trim();
+    document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
+  } else {
+    document.getElementById("cardFront").textContent = data ? data.zh : "尚無翻譯資料";
+    document.getElementById("cardPron").textContent = "";
+    document.getElementById("cardBack").textContent = w.text + pronText;
+  }
   document.getElementById("cardBack").classList.add("hidden");
   document.getElementById("cardAssessRow").classList.add("hidden");
 }
