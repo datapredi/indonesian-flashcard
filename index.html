@@ -1168,7 +1168,12 @@ async function runListenLoop(){
         await speakAsync(data.zh, "zh-TW");
       }
     }catch(e){
-      alert("語音播放失敗：" + e.message);
+      // 錯誤同時寫進畫面文字，不要只靠 alert()——Safari 在同一頁密集跳出多次
+      // alert 之後可能會被使用者或系統靜音掉，之後的 alert() 呼叫會完全沒反應。
+      document.getElementById("listenProgress").textContent = "❌ 發生錯誤，已停止";
+      document.getElementById("listenWord").textContent = e.message;
+      document.getElementById("listenZh").textContent = "";
+      try{ alert("語音播放失敗：" + e.message); }catch(alertErr){}
       listenRunning = false;
       break;
     }
