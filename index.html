@@ -325,6 +325,16 @@ async function getTTSAudioBlob(text, instructions){
   return blob;
 }
 
+// 有些手機瀏覽器（觀察到的案例：iOS Safari）在呼叫 OpenAI API 或存取 IndexedDB 時
+// 偶爾會整個卡住、既不成功也不報錯，導致畫面停在「生成語音中」不動。用逾時保護，
+// 超過時間就丟出明確的錯誤，至少會跳出訊息，不會無聲無息卡住。
+function withTimeout(promise, ms, message){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
+  ]);
+}
+
 function playAudioBlob(blob){
   return new Promise((resolve, reject) => {
     const audioEl = document.getElementById("listenAudio");
@@ -1127,8 +1137,8 @@ async function runListenLoop(){
     try{
       if(voiceSource === "gpt"){
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（生成語音中...）`;
-        const idBlob = await getTTSAudioBlob(w.text, TTS_INSTRUCTIONS_ID);
-        const zhBlob = await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
+        const idBlob = await withTimeout(getTTSAudioBlob(w.text, TTS_INSTRUCTIONS_ID), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+        const zhBlob = await withTimeout(getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
 
         for(let i = 0; i < 3 && listenRunning; i++){
