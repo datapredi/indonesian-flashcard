@@ -118,11 +118,16 @@
     </div>
     <div class="count" id="selCount"></div>
     <div class="list" id="wordList"></div>
+    <div class="toolbar">
+      <label for="thinkPause" style="align-self:center;">思考停頓秒數</label>
+      <input type="number" id="thinkPause" min="1" max="15" value="3" style="max-width:70px; flex:0 0 auto;">
+    </div>
     <div class="actions">
       <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
       <button id="btnCardDirection"></button>
       <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
       <button class="secondary" id="btnStartWrite">✍️ 中翻印尼文（AI 出句、AI 批改）</button>
+      <button class="secondary" id="btnStartListen">🏃 跑步聽力模式</button>
     </div>
   </div>
 
@@ -178,6 +183,16 @@
     </div>
   </div>
 
+  <!-- ===== 跑步聽力模式畫面 ===== -->
+  <div id="screen-listen" class="hidden">
+    <div class="progress" id="listenProgress"></div>
+    <div class="quiz-en" id="listenWord"></div>
+    <p class="write-hint" id="listenZh"></p>
+    <div class="actions" style="margin-top:24px; justify-content:center;">
+      <button id="btnBackFromListen">停止並返回清單</button>
+    </div>
+  </div>
+
   <!-- ===== 結算畫面 ===== -->
   <div id="screen-result" class="hidden">
     <div class="score" id="resultScore"></div>
@@ -208,6 +223,24 @@ function speak(text, btn){
   if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
   utter.onend = utter.onerror = () => { if(btn){ btn.disabled = false; btn.classList.remove('speaking'); } };
   speechSynthesis.speak(utter);
+}
+
+// Promise-based speak for sequencing utterances (跑步聽力模式用)
+function speakAsync(text, lang){
+  return new Promise((resolve) => {
+    if(!('speechSynthesis' in window) || !text){ resolve(); return; }
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang;
+    utter.rate = 0.85;
+    const prefix = lang.slice(0, 2).toLowerCase();
+    const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
+    if(voice) utter.voice = voice;
+    utter.onend = utter.onerror = () => resolve();
+    speechSynthesis.speak(utter);
+  });
+}
+function waitMs(ms){
+  return new Promise((resolve) => { listenTimeoutId = setTimeout(resolve, ms); });
 }
 
 const LS_KEY = "flashcard_word_list_v1";
@@ -949,6 +982,57 @@ function finishWriteSession(){
   document.getElementById("btnNextWrite").classList.add("hidden");
 }
 
+// ================= 跑步聽力模式（唸印尼文x3 + 中文x1，一直循環） =================
+let listenSession = [];
+let listenIndex = 0;
+let listenRunning = false;
+let listenTimeoutId = null;
+
+document.getElementById("btnStartListen").onclick = () => {
+  const list = allWords.filter(w => selected.has(w.id) && lookup(w.text));
+  if(list.length === 0){ alert("請先選有翻譯資料的單字"); return; }
+  listenSession = shuffleArr(list.slice());
+  listenIndex = 0;
+  listenRunning = true;
+  showScreen("listen");
+  runListenLoop();
+};
+
+async function runListenLoop(){
+  const thinkMs = Math.max(500, (Number(document.getElementById("thinkPause").value) || 3) * 1000);
+  while(listenRunning){
+    const w = listenSession[listenIndex];
+    const data = lookup(w.text);
+    document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
+    document.getElementById("listenWord").textContent = w.text;
+    document.getElementById("listenZh").textContent = "";
+
+    for(let i = 0; i < 3 && listenRunning; i++){
+      await speakAsync(w.text, "id-ID");
+      if(!listenRunning) break;
+      await waitMs(400);
+    }
+    if(!listenRunning) break;
+
+    await waitMs(thinkMs);
+    if(!listenRunning) break;
+
+    document.getElementById("listenZh").textContent = data.zh;
+    await speakAsync(data.zh, "zh-TW");
+    if(!listenRunning) break;
+
+    await waitMs(800);
+    listenIndex = (listenIndex + 1) % listenSession.length;
+  }
+}
+
+document.getElementById("btnBackFromListen").onclick = () => {
+  listenRunning = false;
+  if(listenTimeoutId) clearTimeout(listenTimeoutId);
+  speechSynthesis.cancel();
+  showScreen("select");
+};
+
 function showResult(){
   showScreen("result");
   document.getElementById("resultScore").textContent = `你答對了 ${quizScore} / ${quizSession.length} 題`;
@@ -981,7 +1065,7 @@ function shuffleArr(arr){
   return a;
 }
 function showScreen(name){
-  ["select","cards","quiz","write","result"].forEach(s => {
+  ["select","cards","quiz","write","listen","result"].forEach(s => {
     document.getElementById("screen-" + s).classList.toggle("hidden", s !== name);
   });
   if(name === "select") renderList();
