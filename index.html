@@ -127,6 +127,13 @@
       <label for="thinkPause" style="align-self:center;">思考停頓秒數</label>
       <input type="number" id="thinkPause" min="1" max="15" value="3" style="max-width:70px; flex:0 0 auto;">
     </div>
+    <div class="toolbar">
+      <label for="voiceSource" style="align-self:center;">跑步模式發音</label>
+      <select id="voiceSource">
+        <option value="system" selected>電腦內建語音（免費）</option>
+        <option value="gpt">GPT 語音（OpenAI TTS，需要 API Key）</option>
+      </select>
+    </div>
     <div class="actions">
       <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
       <button id="btnCardDirection"></button>
@@ -235,11 +242,32 @@ function waitMs(ms){
   return new Promise((resolve) => { listenTimeoutId = setTimeout(resolve, ms); });
 }
 
+// Promise-based speak for sequencing utterances (跑步聽力模式：電腦內建語音)
+function speakAsync(text, lang){
+  return new Promise((resolve) => {
+    if(!('speechSynthesis' in window) || !text){ resolve(); return; }
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang;
+    utter.rate = 0.85;
+    const prefix = lang.slice(0, 2).toLowerCase();
+    const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
+    if(voice) utter.voice = voice;
+    utter.onend = utter.onerror = () => resolve();
+    speechSynthesis.speak(utter);
+  });
+}
+
 // ================= 跑步聽力模式的真實音檔（OpenAI TTS + IndexedDB 快取） =================
 // 同一段文字只會呼叫一次 OpenAI API，之後都是從本機快取直接播放，不會重複收費。
 const TTS_DB_NAME = "flashcard_tts_cache";
 const TTS_STORE_NAME = "audio";
-const TTS_MODEL = "tts-1";
+// gpt-4o-mini-tts (not tts-1/tts-1-hd) supports an "instructions" field to steer
+// language/accent explicitly, which matters a lot for a non-English language like
+// Indonesian - without it the model just guesses from the text and can default
+// to an English-accented reading.
+const TTS_MODEL = "gpt-4o-mini-tts";
+const TTS_INSTRUCTIONS_ID = "Speak in authentic Bahasa Indonesia with natural Indonesian pronunciation and intonation, as a native Indonesian speaker would.";
+const TTS_INSTRUCTIONS_ZH = "Speak in natural Traditional Chinese (Taiwanese Mandarin) pronunciation and intonation, as a native speaker would.";
 
 function openTTSDB(){
   return new Promise((resolve, reject) => {
@@ -268,16 +296,18 @@ async function setCachedAudio(key, blob){
   });
 }
 
-async function fetchTTSAudio(text){
+async function fetchTTSAudio(text, instructions){
   const key = getOpenaiKey();
   if(!key) throw new Error("請先輸入並儲存 OpenAI API Key");
+  const body = { model: TTS_MODEL, voice: "alloy", input: text };
+  if(instructions) body.instructions = instructions;
   const res = await fetch("https://api.openai.com/v1/audio/speech", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${key}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ model: TTS_MODEL, voice: "alloy", input: text })
+    body: JSON.stringify(body)
   });
   if(!res.ok){
     const errText = await res.text();
@@ -286,11 +316,11 @@ async function fetchTTSAudio(text){
   return await res.blob();
 }
 
-async function getTTSAudioBlob(text){
-  const cacheKey = `${TTS_MODEL}::${text}`;
+async function getTTSAudioBlob(text, instructions){
+  const cacheKey = `${TTS_MODEL}::${instructions || ""}::${text}`;
   const cached = await getCachedAudio(cacheKey);
   if(cached) return cached;
-  const blob = await fetchTTSAudio(text);
+  const blob = await fetchTTSAudio(text, instructions);
   await setCachedAudio(cacheKey, blob);
   return blob;
 }
@@ -1084,6 +1114,7 @@ document.getElementById("btnStartListen").onclick = () => {
 
 async function runListenLoop(){
   const thinkMs = Math.max(500, (Number(document.getElementById("thinkPause").value) || 3) * 1000);
+  const voiceSource = document.getElementById("voiceSource").value;
   while(listenRunning){
     const w = listenSession[listenIndex];
     const data = lookup(w.text);
@@ -1092,21 +1123,36 @@ async function runListenLoop(){
     document.getElementById("listenZh").textContent = "";
 
     try{
-      const idBlob = await getTTSAudioBlob(w.text);
-      const zhBlob = await getTTSAudioBlob(data.zh);
+      if(voiceSource === "gpt"){
+        const idBlob = await getTTSAudioBlob(w.text, TTS_INSTRUCTIONS_ID);
+        const zhBlob = await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
 
-      for(let i = 0; i < 3 && listenRunning; i++){
-        await playAudioBlob(idBlob);
+        for(let i = 0; i < 3 && listenRunning; i++){
+          await playAudioBlob(idBlob);
+          if(!listenRunning) break;
+          await waitMs(400);
+        }
         if(!listenRunning) break;
-        await waitMs(400);
+
+        await waitMs(thinkMs);
+        if(!listenRunning) break;
+
+        document.getElementById("listenZh").textContent = data.zh;
+        await playAudioBlob(zhBlob);
+      } else {
+        for(let i = 0; i < 3 && listenRunning; i++){
+          await speakAsync(w.text, "id-ID");
+          if(!listenRunning) break;
+          await waitMs(400);
+        }
+        if(!listenRunning) break;
+
+        await waitMs(thinkMs);
+        if(!listenRunning) break;
+
+        document.getElementById("listenZh").textContent = data.zh;
+        await speakAsync(data.zh, "zh-TW");
       }
-      if(!listenRunning) break;
-
-      await waitMs(thinkMs);
-      if(!listenRunning) break;
-
-      document.getElementById("listenZh").textContent = data.zh;
-      await playAudioBlob(zhBlob);
     }catch(e){
       alert("語音播放失敗：" + e.message);
       listenRunning = false;
