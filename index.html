@@ -110,6 +110,11 @@
     </div>
     <div class="note">Key 只會存在這台電腦的瀏覽器裡（localStorage），不會上傳到別的地方。用來讓 AI 幫新單字自動生成翻譯和測驗句。</div>
     <div class="toolbar">
+      <input type="password" id="openaiKeyInput" placeholder="OpenAI API Key (sk-...)">
+      <button id="btnSaveOpenaiKey">儲存 Key</button>
+    </div>
+    <div class="note">用於「跑步聽力模式」把單字轉成真正的音檔（存在這台電腦，同一個字只會生成一次，之後重播不再花錢）。</div>
+    <div class="toolbar">
       <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
     </div>
     <div class="toolbar">
@@ -188,6 +193,7 @@
     <div class="progress" id="listenProgress"></div>
     <div class="quiz-en" id="listenWord"></div>
     <p class="write-hint" id="listenZh"></p>
+    <audio id="listenAudio"></audio>
     <div class="actions" style="margin-top:24px; justify-content:center;">
       <button id="btnBackFromListen">停止並返回清單</button>
     </div>
@@ -225,22 +231,79 @@ function speak(text, btn){
   speechSynthesis.speak(utter);
 }
 
-// Promise-based speak for sequencing utterances (跑步聽力模式用)
-function speakAsync(text, lang){
-  return new Promise((resolve) => {
-    if(!('speechSynthesis' in window) || !text){ resolve(); return; }
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = lang;
-    utter.rate = 0.85;
-    const prefix = lang.slice(0, 2).toLowerCase();
-    const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
-    if(voice) utter.voice = voice;
-    utter.onend = utter.onerror = () => resolve();
-    speechSynthesis.speak(utter);
-  });
-}
 function waitMs(ms){
   return new Promise((resolve) => { listenTimeoutId = setTimeout(resolve, ms); });
+}
+
+// ================= 跑步聽力模式的真實音檔（OpenAI TTS + IndexedDB 快取） =================
+// 同一段文字只會呼叫一次 OpenAI API，之後都是從本機快取直接播放，不會重複收費。
+const TTS_DB_NAME = "flashcard_tts_cache";
+const TTS_STORE_NAME = "audio";
+const TTS_MODEL = "tts-1";
+
+function openTTSDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(TTS_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(TTS_STORE_NAME); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function getCachedAudio(key){
+  const db = await openTTSDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(TTS_STORE_NAME, "readonly");
+    const req = tx.objectStore(TTS_STORE_NAME).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function setCachedAudio(key, blob){
+  const db = await openTTSDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(TTS_STORE_NAME, "readwrite");
+    tx.objectStore(TTS_STORE_NAME).put(blob, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function fetchTTSAudio(text){
+  const key = getOpenaiKey();
+  if(!key) throw new Error("請先輸入並儲存 OpenAI API Key");
+  const res = await fetch("https://api.openai.com/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${key}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ model: TTS_MODEL, voice: "alloy", input: text })
+  });
+  if(!res.ok){
+    const errText = await res.text();
+    throw new Error(`HTTP ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  return await res.blob();
+}
+
+async function getTTSAudioBlob(text){
+  const cacheKey = `${TTS_MODEL}::${text}`;
+  const cached = await getCachedAudio(cacheKey);
+  if(cached) return cached;
+  const blob = await fetchTTSAudio(text);
+  await setCachedAudio(cacheKey, blob);
+  return blob;
+}
+
+function playAudioBlob(blob){
+  return new Promise((resolve, reject) => {
+    const audioEl = document.getElementById("listenAudio");
+    const url = URL.createObjectURL(blob);
+    audioEl.src = url;
+    audioEl.onended = () => { URL.revokeObjectURL(url); resolve(); };
+    audioEl.onerror = () => { URL.revokeObjectURL(url); reject(new Error("播放失敗")); };
+    audioEl.play().catch(reject);
+  });
 }
 
 const LS_KEY = "flashcard_word_list_v1";
@@ -307,6 +370,11 @@ function loadCustomDB(){
 function saveCustomDB(){ localStorage.setItem(CUSTOM_DB_LS, JSON.stringify(customDB)); }
 function getApiKey(){ return localStorage.getItem(API_KEY_LS) || ""; }
 function setApiKey(k){ localStorage.setItem(API_KEY_LS, k); }
+
+// ---- 跑步聽力模式用的 OpenAI TTS Key ----
+const OPENAI_KEY_LS = "openai_api_key";
+function getOpenaiKey(){ return localStorage.getItem(OPENAI_KEY_LS) || ""; }
+function setOpenaiKey(k){ localStorage.setItem(OPENAI_KEY_LS, k); }
 
 let customDB = loadCustomDB();
 
@@ -472,6 +540,14 @@ document.getElementById("btnSaveKey").onclick = () => {
   const v = document.getElementById("apiKeyInput").value.trim();
   if(!v){ alert("請輸入 API Key"); return; }
   setApiKey(v);
+  alert("已儲存 Key。");
+};
+
+document.getElementById("openaiKeyInput").value = getOpenaiKey();
+document.getElementById("btnSaveOpenaiKey").onclick = () => {
+  const v = document.getElementById("openaiKeyInput").value.trim();
+  if(!v){ alert("請輸入 API Key"); return; }
+  setOpenaiKey(v);
   alert("已儲存 Key。");
 };
 
@@ -1007,8 +1083,19 @@ async function runListenLoop(){
     document.getElementById("listenWord").textContent = w.text;
     document.getElementById("listenZh").textContent = "";
 
+    let idBlob, zhBlob;
+    try{
+      idBlob = await getTTSAudioBlob(w.text);
+      zhBlob = await getTTSAudioBlob(data.zh);
+    }catch(e){
+      alert("語音生成失敗：" + e.message);
+      listenRunning = false;
+      break;
+    }
+    if(!listenRunning) break;
+
     for(let i = 0; i < 3 && listenRunning; i++){
-      await speakAsync(w.text, "id-ID");
+      await playAudioBlob(idBlob);
       if(!listenRunning) break;
       await waitMs(400);
     }
@@ -1018,7 +1105,7 @@ async function runListenLoop(){
     if(!listenRunning) break;
 
     document.getElementById("listenZh").textContent = data.zh;
-    await speakAsync(data.zh, "zh-TW");
+    await playAudioBlob(zhBlob);
     if(!listenRunning) break;
 
     await waitMs(800);
@@ -1029,7 +1116,7 @@ async function runListenLoop(){
 document.getElementById("btnBackFromListen").onclick = () => {
   listenRunning = false;
   if(listenTimeoutId) clearTimeout(listenTimeoutId);
-  speechSynthesis.cancel();
+  document.getElementById("listenAudio").pause();
   showScreen("select");
 };
 
