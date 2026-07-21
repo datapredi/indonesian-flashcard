@@ -610,8 +610,8 @@ function extractIndonesianLine(raw){
   s = s.replace(/\*\*/g, "");               // 去掉 **粗體**
   s = s.replace(/^\d+[\.\)]\s*/, "");       // 去掉「1. 」「1) 」編號
   s = s.replace(/^[\s\-\*]+/, "");          // 去掉「- 」「* 」項目符號
-  // 從第一個箭頭（> / -> / →）開始，後面通常是注音口訣，整段丟掉
-  const arrowMatch = s.match(/-+>|→|>/);
+  // 從第一個箭頭（> / -> / →）或兩個以上的減號（--）開始，後面通常是中文意思/注音口訣，整段丟掉
+  const arrowMatch = s.match(/-+>|-{2,}|→|>/);
   if(arrowMatch) s = s.slice(0, arrowMatch.index);
   s = s.replace(/[（(][^）)]*[）)]/g, "");   // 去掉（中文意思）這種括號
   s = s.replace(CJK_RE, " ");               // 去掉殘留的中文字
