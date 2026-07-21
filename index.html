@@ -600,7 +600,7 @@ document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) =
 });
 
 // ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留印尼文） ----
-const CJK_RE = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]+/g;
+const NON_INDONESIAN_RE = /[^A-Za-z0-9\s.,!?'"\u2018\u2019\u201c\u201d-]/;
 
 function extractIndonesianLine(raw){
   let s = raw.replace(/\r/g, "").trim();
@@ -610,11 +610,8 @@ function extractIndonesianLine(raw){
   s = s.replace(/\*\*/g, "");               // 去掉 **粗體**
   s = s.replace(/^\d+[\.\)]\s*/, "");       // 去掉「1. 」「1) 」編號
   s = s.replace(/^[\s\-\*]+/, "");          // 去掉「- 」「* 」項目符號
-  // 從第一個箭頭（> / -> / →）或兩個以上的減號（--）開始，後面通常是中文意思/注音口訣，整段丟掉
-  const arrowMatch = s.match(/-+>|-{2,}|→|>/);
-  if(arrowMatch) s = s.slice(0, arrowMatch.index);
-  s = s.replace(/[（(][^）)]*[）)]/g, "");   // 去掉（中文意思）這種括號
-  s = s.replace(CJK_RE, " ");               // 去掉殘留的中文字
+  const cutMatch = s.match(NON_INDONESIAN_RE);
+  if(cutMatch) s = s.slice(0, cutMatch.index);
   s = s.replace(/\s+/g, " ");
   s = s.replace(/[\s:\/=,\-]+$/, "").replace(/^[\s:\/=,\-]+/, "");
   s = s.trim();
