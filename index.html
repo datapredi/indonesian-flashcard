@@ -1064,6 +1064,11 @@ let listenIndex = 0;
 let listenRunning = false;
 let listenTimeoutId = null;
 
+// 1 秒無聲音檔，用來在使用者點擊當下「解鎖」<audio> 元素。手機/桌面瀏覽器要求播放
+// 動作要緊接著使用者手勢；跑步模式裡真正的語音要等 TTS API 回來才能播，中間的等待
+// 會讓瀏覽器認定播放跟這次點擊無關而擋掉，所以要在點擊當下先同步播一次來解鎖。
+const SILENT_AUDIO_DATA_URI = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
 document.getElementById("btnStartListen").onclick = () => {
   const list = allWords.filter(w => selected.has(w.id) && lookup(w.text));
   if(list.length === 0){ alert("請先選有翻譯資料的單字"); return; }
@@ -1071,6 +1076,9 @@ document.getElementById("btnStartListen").onclick = () => {
   listenIndex = 0;
   listenRunning = true;
   showScreen("listen");
+  const audioEl = document.getElementById("listenAudio");
+  audioEl.src = SILENT_AUDIO_DATA_URI;
+  audioEl.play().catch(() => {});
   runListenLoop();
 };
 
@@ -1083,29 +1091,27 @@ async function runListenLoop(){
     document.getElementById("listenWord").textContent = w.text;
     document.getElementById("listenZh").textContent = "";
 
-    let idBlob, zhBlob;
     try{
-      idBlob = await getTTSAudioBlob(w.text);
-      zhBlob = await getTTSAudioBlob(data.zh);
+      const idBlob = await getTTSAudioBlob(w.text);
+      const zhBlob = await getTTSAudioBlob(data.zh);
+
+      for(let i = 0; i < 3 && listenRunning; i++){
+        await playAudioBlob(idBlob);
+        if(!listenRunning) break;
+        await waitMs(400);
+      }
+      if(!listenRunning) break;
+
+      await waitMs(thinkMs);
+      if(!listenRunning) break;
+
+      document.getElementById("listenZh").textContent = data.zh;
+      await playAudioBlob(zhBlob);
     }catch(e){
-      alert("語音生成失敗：" + e.message);
+      alert("語音播放失敗：" + e.message);
       listenRunning = false;
       break;
     }
-    if(!listenRunning) break;
-
-    for(let i = 0; i < 3 && listenRunning; i++){
-      await playAudioBlob(idBlob);
-      if(!listenRunning) break;
-      await waitMs(400);
-    }
-    if(!listenRunning) break;
-
-    await waitMs(thinkMs);
-    if(!listenRunning) break;
-
-    document.getElementById("listenZh").textContent = data.zh;
-    await playAudioBlob(zhBlob);
     if(!listenRunning) break;
 
     await waitMs(800);
