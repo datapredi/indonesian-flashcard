@@ -659,7 +659,6 @@ function addWordToList(text){
     const { row, usagePanel } = createWordItem(newWord);
     el.insertBefore(usagePanel, el.firstChild);
     el.insertBefore(row, usagePanel);
-    row.scrollIntoView({ block: "nearest" });
   }
   updateCount();
   updatePendingSyncBar();
