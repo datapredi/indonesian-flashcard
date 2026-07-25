@@ -590,7 +590,7 @@ async function gradeTranslation(zhSentence, targetWords, userAnswer){
   return callClaude(prompt, schema, 1024);
 }
 
-const USAGE_CACHE_LS = "flashcard_usage_cache";
+const USAGE_CACHE_LS = "flashcard_usage_cache_v2"; // v2: added A1-A2 level constraint to the prompt
 let usageCache = {};
 try{ usageCache = JSON.parse(localStorage.getItem(USAGE_CACHE_LS)) || {}; }catch(e){ usageCache = {}; }
 function saveUsageCache(){ localStorage.setItem(USAGE_CACHE_LS, JSON.stringify(usageCache)); }
@@ -618,6 +618,8 @@ async function getUsageExamples(text, zh){
     additionalProperties: false
   };
   const prompt = `你是印尼語老師。請針對這個印尼文單字/片語，提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
+
+程度限制：學生是印尼語初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
 
 單字/片語：${text}${zh ? `（中文意思：${zh}）` : ""}
 
