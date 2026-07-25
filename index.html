@@ -318,10 +318,17 @@ async function fetchTTSAudio(text, instructions){
 
 async function getTTSAudioBlob(text, instructions){
   const cacheKey = `${TTS_MODEL}::${instructions || ""}::${text}`;
-  const cached = await getCachedAudio(cacheKey);
+  // IndexedDB can fail outright on some mobile browsers (e.g. Safari Private
+  // Browsing blocks it, sometimes with an unhelpfully blank error message).
+  // Caching is just an optimization, so never let a cache failure take down
+  // the whole TTS flow - fall back to fetching without caching instead.
+  let cached = null;
+  try{ cached = await getCachedAudio(cacheKey); }
+  catch(e){ console.warn("TTS cache read failed, skipping cache:", e); }
   if(cached) return cached;
   const blob = await fetchTTSAudio(text, instructions);
-  await setCachedAudio(cacheKey, blob);
+  try{ await setCachedAudio(cacheKey, blob); }
+  catch(e){ console.warn("TTS cache write failed, skipping cache:", e); }
   return blob;
 }
 
@@ -1170,10 +1177,12 @@ async function runListenLoop(){
     }catch(e){
       // 錯誤同時寫進畫面文字，不要只靠 alert()——Safari 在同一頁密集跳出多次
       // alert 之後可能會被使用者或系統靜音掉，之後的 alert() 呼叫會完全沒反應。
+      // 有些錯誤（例如某些 DOMException）message 是空字串，保底顯示 name 或整個物件字串化。
+      const errMsg = (e && (e.message || e.name)) || String(e) || "未知錯誤（沒有錯誤訊息）";
       document.getElementById("listenProgress").textContent = "❌ 發生錯誤，已停止";
-      document.getElementById("listenWord").textContent = e.message;
+      document.getElementById("listenWord").textContent = errMsg;
       document.getElementById("listenZh").textContent = "";
-      try{ alert("語音播放失敗：" + e.message); }catch(alertErr){}
+      try{ alert("語音播放失敗：" + errMsg); }catch(alertErr){}
       listenRunning = false;
       break;
     }
