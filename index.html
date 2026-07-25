@@ -55,6 +55,14 @@
   .badge-row{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
   .badge{font-size:0.72rem; padding:3px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--border); color:var(--muted);}
   .badge:hover{border-color:var(--accent); color:var(--accent);}
+  .usage-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
+  .usage-panel{padding:10px 14px 14px; border-bottom:1px solid var(--border); background:var(--bg); font-size:0.88rem;}
+  .usage-panel.hidden{display:none;}
+  .usage-example{margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--border);}
+  .usage-example:last-child{margin-bottom:0; padding-bottom:0; border-bottom:none;}
+  .usage-id{font-weight:600; display:flex; align-items:center; gap:8px;}
+  .usage-zh{color:var(--muted); margin-top:2px;}
+  .usage-note{color:var(--muted); font-size:0.8rem; margin-top:4px; font-style:italic;}
   .count{font-size:0.85rem; color:var(--muted); margin-bottom:10px;}
   .actions{display:flex; gap:10px; flex-wrap:wrap;}
   .hidden{display:none !important;}
@@ -582,6 +590,78 @@ async function gradeTranslation(zhSentence, targetWords, userAnswer){
   return callClaude(prompt, schema, 1024);
 }
 
+const USAGE_CACHE_LS = "flashcard_usage_cache";
+let usageCache = {};
+try{ usageCache = JSON.parse(localStorage.getItem(USAGE_CACHE_LS)) || {}; }catch(e){ usageCache = {}; }
+function saveUsageCache(){ localStorage.setItem(USAGE_CACHE_LS, JSON.stringify(usageCache)); }
+
+async function getUsageExamples(text, zh){
+  if(usageCache[text]) return usageCache[text];
+  const schema = {
+    type: "object",
+    properties: {
+      examples: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            zh: { type: "string" },
+            note: { type: "string" }
+          },
+          required: ["id", "zh", "note"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["examples"],
+    additionalProperties: false
+  };
+  const prompt = `你是印尼語老師。請針對這個印尼文單字/片語，提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
+
+單字/片語：${text}${zh ? `（中文意思：${zh}）` : ""}
+
+請回傳 examples 陣列，每個元素是：
+{ id：一句自然口語的印尼文例句（要用到這個單字/片語）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }`;
+  const parsed = await callClaude(prompt, schema, 1024);
+  usageCache[text] = parsed.examples;
+  saveUsageCache();
+  return parsed.examples;
+}
+
+function renderUsagePanel(panel, examples){
+  panel.innerHTML = "";
+  examples.forEach(ex => {
+    const item = document.createElement("div");
+    item.className = "usage-example";
+
+    const idLine = document.createElement("div");
+    idLine.className = "usage-id";
+    const idText = document.createElement("span");
+    idText.textContent = ex.id;
+    idLine.appendChild(idText);
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(ex.id, speakBtn); });
+    idLine.appendChild(speakBtn);
+
+    const zhLine = document.createElement("div");
+    zhLine.className = "usage-zh";
+    zhLine.textContent = ex.zh;
+
+    const noteLine = document.createElement("div");
+    noteLine.className = "usage-note";
+    noteLine.textContent = ex.note;
+
+    item.appendChild(idLine);
+    item.appendChild(zhLine);
+    item.appendChild(noteLine);
+    panel.appendChild(item);
+  });
+}
+
 document.getElementById("apiKeyInput").value = getApiKey();
 document.getElementById("btnSaveKey").onclick = () => {
   const v = document.getElementById("apiKeyInput").value.trim();
@@ -700,7 +780,37 @@ function renderList(){
     deleteBtn.setAttribute("aria-label", `刪除 ${w.text}`);
     deleteBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); deleteWord(w.id); });
     row.appendChild(deleteBtn);
+
+    const usagePanel = document.createElement("div");
+    usagePanel.className = "usage-panel hidden";
+
+    const usageBtn = document.createElement("button");
+    usageBtn.type = "button";
+    usageBtn.className = "usage-btn";
+    usageBtn.textContent = "💬";
+    usageBtn.setAttribute("aria-label", `AI 補充 ${w.text} 的口語用法`);
+    usageBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!usagePanel.classList.contains("hidden")){
+        usagePanel.classList.add("hidden");
+        return;
+      }
+      usagePanel.classList.remove("hidden");
+      if(usagePanel.dataset.loaded === "1") return;
+      if(!getApiKey()){ usagePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+      usagePanel.textContent = "生成中...";
+      try{
+        const examples = await getUsageExamples(w.text, data ? data.zh : "");
+        renderUsagePanel(usagePanel, examples);
+        usagePanel.dataset.loaded = "1";
+      }catch(err){
+        usagePanel.textContent = "生成失敗：" + err.message;
+      }
+    });
+    row.appendChild(usageBtn);
+
     el.appendChild(row);
+    el.appendChild(usagePanel);
   });
   updateCount();
 }
