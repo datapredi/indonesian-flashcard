@@ -111,6 +111,9 @@
       <button id="btnNone">全不選</button>
       <button id="btnClearMastered">🔄 清空所有已學會</button>
     </div>
+    <div class="toolbar hidden" id="pendingSyncBar">
+      <button id="btnCopyPending">📋 複製句子新增、還沒同步進 Obsidian 的單字</button>
+    </div>
     <div class="toolbar">
       <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
       <button id="btnRandomSelect">🎲 隨機選這麼多個來練習</button>
@@ -639,7 +642,9 @@ function addWordToList(text){
   if(!clean) return false;
   if(allWords.some(w => w.text.toLowerCase() === clean.toLowerCase())) return false;
   const nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) + 1 : 1;
-  const newWord = { id: nextId, text: clean };
+  // source 標記這個字是從例句加的、還沒進到 Obsidian 那邊的主清單，
+  // 下次從 Obsidian 匯入（整批取代）時要特別保留，避免被沖掉。
+  const newWord = { id: nextId, text: clean, source: "sentence" };
   allWords.push(newWord);
   saveWordList(allWords);
   selected.add(nextId);
@@ -657,6 +662,7 @@ function addWordToList(text){
     row.scrollIntoView({ block: "nearest" });
   }
   updateCount();
+  updatePendingSyncBar();
   return true;
 }
 
@@ -866,6 +872,29 @@ function createWordItem(w){
   return { row, usagePanel };
 }
 
+function updatePendingSyncBar(){
+  const pending = allWords.filter(w => w.source === "sentence");
+  const bar = document.getElementById("pendingSyncBar");
+  const btn = document.getElementById("btnCopyPending");
+  if(pending.length === 0){
+    bar.classList.add("hidden");
+    return;
+  }
+  bar.classList.remove("hidden");
+  btn.textContent = `📋 複製句子新增、還沒同步進 Obsidian 的單字 (${pending.length})`;
+}
+
+document.getElementById("btnCopyPending").addEventListener("click", async () => {
+  const text = allWords.filter(w => w.source === "sentence").map(w => w.text).join("\n");
+  if(!text){ return; }
+  try{
+    await navigator.clipboard.writeText(text);
+    alert(`已複製 ${text.split("\n").length} 個單字，貼到 Obsidian 就好。`);
+  }catch(e){
+    prompt("自動複製失敗，請手動全選複製以下內容：", text);
+  }
+});
+
 function renderList(){
   const el = document.getElementById("wordList");
   el.innerHTML = "";
@@ -879,6 +908,7 @@ function renderList(){
     el.appendChild(usagePanel);
   });
   updateCount();
+  updatePendingSyncBar();
 }
 function updateCount(){
   const parts = [`已選 ${selected.size} / ${allWords.length} 個單字`];
@@ -975,6 +1005,16 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
       alert("沒有解析到任何印尼文單字，請確認檔案內容。");
       return;
     }
+    // 從例句加的字（source: "sentence"）只存在 App 本機、還沒被加進 Obsidian，
+    // 如果這次匯入的內容裡沒有它們，就自動保留下來，不要被整批取代沖掉。
+    // 一旦哪次匯入內容裡真的出現同一個字了（代表你已手動加回 Obsidian），
+    // 就會走一般匯入路徑、不再帶 source 標記，自動視為「已同步」。
+    const pendingSentenceWords = allWords.filter(w => w.source === "sentence" && !seen.has(w.text.toLowerCase()));
+    let nextId = parsed.length;
+    pendingSentenceWords.forEach(w => {
+      nextId++;
+      parsed.push({ id: nextId, text: w.text, source: "sentence" });
+    });
     allWords = parsed;
     saveWordList(allWords);
     selected = new Set(allWords.map(w => w.id));
@@ -984,7 +1024,10 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
     saveCardMastered();
     saveQuizMastered();
     renderList();
-    alert(`已匯入 ${parsed.length} 個項目。`);
+    const pendingNote = pendingSentenceWords.length
+      ? `（其中 ${pendingSentenceWords.length} 個是之前從例句加的、還沒同步進 Obsidian，已自動保留）`
+      : "";
+    alert(`已匯入 ${parsed.length} 個項目。${pendingNote}`);
   };
   reader.readAsText(file, "UTF-8");
 });
