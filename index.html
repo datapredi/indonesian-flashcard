@@ -60,7 +60,10 @@
   .usage-panel.hidden{display:none;}
   .usage-example{margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--border);}
   .usage-example:last-child{margin-bottom:0; padding-bottom:0; border-bottom:none;}
-  .usage-id{font-weight:600; display:flex; align-items:center; gap:8px;}
+  .usage-id{font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .usage-word{cursor:pointer; border-radius:4px; padding:0 1px;}
+  .usage-word:hover{background:var(--bg);}
+  .usage-word.in-list{color:var(--accent2); text-decoration:underline; text-decoration-style:dotted;}
   .usage-zh{color:var(--muted); margin-top:2px;}
   .usage-note{color:var(--muted); font-size:0.8rem; margin-top:4px; font-style:italic;}
   .count{font-size:0.85rem; color:var(--muted); margin-bottom:10px;}
@@ -631,6 +634,54 @@ async function getUsageExamples(text, zh){
   return parsed.examples;
 }
 
+function addWordToList(text){
+  const clean = text.trim();
+  if(!clean) return false;
+  if(allWords.some(w => w.text.toLowerCase() === clean.toLowerCase())) return false;
+  const nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) + 1 : 1;
+  allWords.push({ id: nextId, text: clean });
+  saveWordList(allWords);
+  selected.add(nextId);
+  saveSelected();
+  // 不呼叫 renderList()——這個函式常常是在展開中的用法面板裡被觸發，
+  // 整個重繪列表會把使用者正在看的面板收合掉，只更新計數就好，
+  // 新單字下次重繪列表時自然會出現。
+  updateCount();
+  return true;
+}
+
+// 把例句拆成一個個可點的字，點了就把那個字加進單字表——保留原本的空白/標點原樣顯示，
+// 只有比對「已加入」跟真正要加入清單時才用去掉頭尾標點後的乾淨版本。
+function isWordInList(clean){
+  return allWords.some(w => w.text.toLowerCase() === clean.toLowerCase());
+}
+function renderTappableSentence(sentence){
+  const wrap = document.createElement("span");
+  const tokens = sentence.split(/(\s+)/);
+  tokens.forEach(tok => {
+    if(tok === "" || /^\s+$/.test(tok)){
+      wrap.appendChild(document.createTextNode(tok));
+      return;
+    }
+    const clean = tok.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+    if(!clean){
+      wrap.appendChild(document.createTextNode(tok));
+      return;
+    }
+    const wSpan = document.createElement("span");
+    wSpan.className = "usage-word" + (isWordInList(clean) ? " in-list" : "");
+    wSpan.textContent = tok;
+    wSpan.title = isWordInList(clean) ? "已在單字表裡" : "點一下加入單字表";
+    wSpan.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(wSpan.classList.contains("in-list")) return;
+      if(addWordToList(clean)) wSpan.classList.add("in-list");
+    });
+    wrap.appendChild(wSpan);
+  });
+  return wrap;
+}
+
 function renderUsagePanel(panel, examples){
   panel.innerHTML = "";
   examples.forEach(ex => {
@@ -639,9 +690,7 @@ function renderUsagePanel(panel, examples){
 
     const idLine = document.createElement("div");
     idLine.className = "usage-id";
-    const idText = document.createElement("span");
-    idText.textContent = ex.id;
-    idLine.appendChild(idText);
+    idLine.appendChild(renderTappableSentence(ex.id));
     const speakBtn = document.createElement("button");
     speakBtn.type = "button";
     speakBtn.className = "speak-btn";
