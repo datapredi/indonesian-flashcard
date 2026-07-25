@@ -639,13 +639,23 @@ function addWordToList(text){
   if(!clean) return false;
   if(allWords.some(w => w.text.toLowerCase() === clean.toLowerCase())) return false;
   const nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) + 1 : 1;
-  allWords.push({ id: nextId, text: clean });
+  const newWord = { id: nextId, text: clean };
+  allWords.push(newWord);
   saveWordList(allWords);
   selected.add(nextId);
   saveSelected();
-  // 不呼叫 renderList()——這個函式常常是在展開中的用法面板裡被觸發，
-  // 整個重繪列表會把使用者正在看的面板收合掉，只更新計數就好，
-  // 新單字下次重繪列表時自然會出現。
+  // 不呼叫 renderList()——這個函式常常是在展開中的用法面板裡被觸發，整個重繪
+  // 列表會把使用者正在看的面板收合掉。改成只把這一個新單字插到清單最前面，
+  // 這樣立刻看得到剛加的字，其他正在展開的面板不受影響。
+  if(getVisibleWords().some(w => w.id === nextId)){
+    const el = document.getElementById("wordList");
+    const emptyMsg = el.querySelector(".empty-msg");
+    if(emptyMsg) emptyMsg.remove();
+    const { row, usagePanel } = createWordItem(newWord);
+    el.insertBefore(usagePanel, el.firstChild);
+    el.insertBefore(row, usagePanel);
+    row.scrollIntoView({ block: "nearest" });
+  }
   updateCount();
   return true;
 }
@@ -774,92 +784,97 @@ function getVisibleWords(){
   });
 }
 
+function createWordItem(w){
+  const data = lookup(w.text);
+  const row = document.createElement("label");
+  row.className = "item" + (data ? "" : " no-data");
+  row.innerHTML = `
+    <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
+    <div>
+      <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
+      <div class="meaning">${data ? (data.zh + " · " + data.en) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+    </div>
+  `;
+  row.querySelector("input").addEventListener("change", (e) => {
+    const id = Number(e.target.dataset.id);
+    if(e.target.checked) selected.add(id); else selected.delete(id);
+    saveSelected();
+    if(showSelectedOnly) renderList(); else updateCount();
+  });
+  if(cardMasteredIds.has(w.id) || quizMasteredIds.has(w.id)){
+    const badgeRow = document.createElement("div");
+    badgeRow.className = "badge-row";
+    if(cardMasteredIds.has(w.id)){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "badge";
+      b.textContent = "🎴 卡片已學會 ✕";
+      b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); cardMasteredIds.delete(w.id); saveCardMastered(); renderList(); });
+      badgeRow.appendChild(b);
+    }
+    if(quizMasteredIds.has(w.id)){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "badge";
+      b.textContent = "📝 測驗已學會 ✕";
+      b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); quizMasteredIds.delete(w.id); saveQuizMastered(); renderList(); });
+      badgeRow.appendChild(b);
+    }
+    row.querySelector("div").appendChild(badgeRow);
+  }
+  const speakBtn = document.createElement("button");
+  speakBtn.type = "button";
+  speakBtn.className = "speak-btn";
+  speakBtn.textContent = "🔊";
+  speakBtn.setAttribute("aria-label", `播放 ${w.text} 發音`);
+  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(w.text, speakBtn); });
+  row.appendChild(speakBtn);
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "🗑️";
+  deleteBtn.setAttribute("aria-label", `刪除 ${w.text}`);
+  deleteBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); deleteWord(w.id); });
+  row.appendChild(deleteBtn);
+
+  const usagePanel = document.createElement("div");
+  usagePanel.className = "usage-panel hidden";
+
+  const usageBtn = document.createElement("button");
+  usageBtn.type = "button";
+  usageBtn.className = "usage-btn";
+  usageBtn.textContent = "💬";
+  usageBtn.setAttribute("aria-label", `AI 補充 ${w.text} 的口語用法`);
+  usageBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!usagePanel.classList.contains("hidden")){
+      usagePanel.classList.add("hidden");
+      return;
+    }
+    usagePanel.classList.remove("hidden");
+    if(usagePanel.dataset.loaded === "1") return;
+    if(!getApiKey()){ usagePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+    usagePanel.textContent = "生成中...";
+    try{
+      const examples = await getUsageExamples(w.text, data ? data.zh : "");
+      renderUsagePanel(usagePanel, examples);
+      usagePanel.dataset.loaded = "1";
+    }catch(err){
+      usagePanel.textContent = "生成失敗：" + err.message;
+    }
+  });
+  row.appendChild(usageBtn);
+
+  return { row, usagePanel };
+}
+
 function renderList(){
   const el = document.getElementById("wordList");
   el.innerHTML = "";
   const visibleWords = getVisibleWords();
   if(visibleWords.length === 0){
-    el.innerHTML = `<div class="item"><div class="meaning">沒有符合的單字</div></div>`;
+    el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
   }
   visibleWords.forEach(w => {
-    const data = lookup(w.text);
-    const row = document.createElement("label");
-    row.className = "item" + (data ? "" : " no-data");
-    row.innerHTML = `
-      <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
-      <div>
-        <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
-        <div class="meaning">${data ? (data.zh + " · " + data.en) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
-      </div>
-    `;
-    row.querySelector("input").addEventListener("change", (e) => {
-      const id = Number(e.target.dataset.id);
-      if(e.target.checked) selected.add(id); else selected.delete(id);
-      saveSelected();
-      if(showSelectedOnly) renderList(); else updateCount();
-    });
-    if(cardMasteredIds.has(w.id) || quizMasteredIds.has(w.id)){
-      const badgeRow = document.createElement("div");
-      badgeRow.className = "badge-row";
-      if(cardMasteredIds.has(w.id)){
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "badge";
-        b.textContent = "🎴 卡片已學會 ✕";
-        b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); cardMasteredIds.delete(w.id); saveCardMastered(); renderList(); });
-        badgeRow.appendChild(b);
-      }
-      if(quizMasteredIds.has(w.id)){
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "badge";
-        b.textContent = "📝 測驗已學會 ✕";
-        b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); quizMasteredIds.delete(w.id); saveQuizMastered(); renderList(); });
-        badgeRow.appendChild(b);
-      }
-      row.querySelector("div").appendChild(badgeRow);
-    }
-    const speakBtn = document.createElement("button");
-    speakBtn.type = "button";
-    speakBtn.className = "speak-btn";
-    speakBtn.textContent = "🔊";
-    speakBtn.setAttribute("aria-label", `播放 ${w.text} 發音`);
-    speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(w.text, speakBtn); });
-    row.appendChild(speakBtn);
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "delete-btn";
-    deleteBtn.textContent = "🗑️";
-    deleteBtn.setAttribute("aria-label", `刪除 ${w.text}`);
-    deleteBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); deleteWord(w.id); });
-    row.appendChild(deleteBtn);
-
-    const usagePanel = document.createElement("div");
-    usagePanel.className = "usage-panel hidden";
-
-    const usageBtn = document.createElement("button");
-    usageBtn.type = "button";
-    usageBtn.className = "usage-btn";
-    usageBtn.textContent = "💬";
-    usageBtn.setAttribute("aria-label", `AI 補充 ${w.text} 的口語用法`);
-    usageBtn.addEventListener("click", async (e) => {
-      e.preventDefault(); e.stopPropagation();
-      if(!usagePanel.classList.contains("hidden")){
-        usagePanel.classList.add("hidden");
-        return;
-      }
-      usagePanel.classList.remove("hidden");
-      if(usagePanel.dataset.loaded === "1") return;
-      if(!getApiKey()){ usagePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
-      usagePanel.textContent = "生成中...";
-      try{
-        const examples = await getUsageExamples(w.text, data ? data.zh : "");
-        renderUsagePanel(usagePanel, examples);
-        usagePanel.dataset.loaded = "1";
-      }catch(err){
-        usagePanel.textContent = "生成失敗：" + err.message;
-      }
-    });
-    row.appendChild(usageBtn);
-
+    const { row, usagePanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
   });
