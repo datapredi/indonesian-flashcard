@@ -125,10 +125,10 @@
       <button id="btnClearWordList">🗑️ 清空目前單字表</button>
     </div>
     <div class="toolbar hidden" id="convertBar">
-      <button id="btnImportConvertTh">🔄 匯入印尼文檔案並自動轉成泰文</button>
+      <button id="btnImportConvertTh">🔄 匯入其他語言檔案並自動轉換</button>
       <input type="file" id="fileInputConvertTh" accept=".txt,.md">
     </div>
-    <div class="note hidden" id="convertNote">會用 AI 把匯入的印尼文單字逐一轉成對應的泰文（羅馬拼音＋中英文意思），加進目前的泰文單字表，已存在的字會自動跳過，不會重複加入。</div>
+    <div class="note hidden" id="convertNote"></div>
     <div class="toolbar hidden" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製句子新增、還沒同步進 Obsidian 的單字</button>
     </div>
@@ -299,8 +299,13 @@ function updateLangButtons(){
   document.getElementById("btnStartQuiz").textContent = `開始測驗（英文選${L().label}）`;
   document.getElementById("btnStartWrite").textContent = writeBtnLabel();
   document.getElementById("writeInput").placeholder = `把上面這句中文翻成${L().label}...`;
-  document.getElementById("convertBar").classList.toggle("hidden", currentLang !== "th");
-  document.getElementById("convertNote").classList.toggle("hidden", currentLang !== "th");
+  // 印尼文是原本的預設語言，其他語言（泰文，以後可能更多）才需要「從別的語言
+  // 轉換過來」這個功能，所以用是不是印尼文來判斷要不要顯示，而不是寫死泰文，
+  // 之後加第三種語言就不用再改這裡。
+  document.getElementById("convertBar").classList.toggle("hidden", currentLang === "id");
+  document.getElementById("convertNote").classList.toggle("hidden", currentLang === "id");
+  document.getElementById("btnImportConvertTh").textContent = `🔄 匯入其他語言檔案並自動轉成${L().label}`;
+  document.getElementById("convertNote").textContent = `會用 AI 把匯入的單字（不管原本是什麼語言）逐一轉成對應的${L().label}（羅馬拼音＋中英文意思），加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入。`;
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -614,10 +619,12 @@ ${list}`;
   return parsed.entries;
 }
 
-// 泰文模式專用：把一批印尼文單字（不管有沒有翻譯資料）直接轉成對應的泰文
-// 條目（羅馬拼音 + 真泰文字 + 中英文意思 + 測驗句），用來重用既有的印尼文
-// Obsidian 檔案當作泰文單字表的起點，而不用手動重打一次。
-async function convertIndonesianToThai(indonesianWords){
+// 通用轉換：來源語言不限（AI 自己判斷這批字原本是什麼語言），一律轉成「目前
+// 選的語言」。不特別寫死印尼文，是因為以後可能還會加其他語言，來源語言越通用
+// 越好維護——直接讓 AI 判斷來源語言、轉成目標語言就好，不用先繞經中文當中介，
+// 準確度不會比較好，只是多一次沒必要的轉換。
+async function convertWordsToTargetLang(words){
+  const isTh = currentLang === "th";
   const schema = {
     type: "object",
     properties: {
@@ -625,16 +632,21 @@ async function convertIndonesianToThai(indonesianWords){
         type: "array",
         items: {
           type: "object",
-          properties: {
-            thaiRomanized: { type: "string" },
-            thaiScript: { type: "string" },
-            zh: { type: "string" },
-            en: { type: "string" },
-            quizEn: { type: "string" },
-            correct: { type: "string" },
-            distractors: { type: "array", items: { type: "string" } }
-          },
-          required: ["thaiRomanized", "thaiScript", "zh", "en", "quizEn", "correct", "distractors"],
+          properties: Object.assign(
+            { romanized: { type: "string" } },
+            isTh ? { thaiScript: { type: "string" } } : {},
+            {
+              zh: { type: "string" },
+              en: { type: "string" },
+              quizEn: { type: "string" },
+              correct: { type: "string" },
+              distractors: { type: "array", items: { type: "string" } }
+            }
+          ),
+          required: (isTh
+            ? ["romanized", "thaiScript"]
+            : ["romanized"]
+          ).concat(["zh", "en", "quizEn", "correct", "distractors"]),
           additionalProperties: false
         }
       }
@@ -642,19 +654,19 @@ async function convertIndonesianToThai(indonesianWords){
     required: ["entries"],
     additionalProperties: false
   };
-  const list = indonesianWords.map((w, i) => `${i + 1}. ${w}`).join("\n");
-  const prompt = `以下是一份印尼文單字/片語清單。學生現在要學泰文，不想學泰文字母，只想要羅馬拼音。請針對清單裡每一項，找出意思對應的泰文，並提供：
-- thaiRomanized：這個泰文單字/片語的羅馬拼音寫法（口語、常用、初學者好記的拼法，不用正式音標系統）
-- thaiScript：對應的正確泰文書寫（純粹給語音朗讀引擎用，學生不會看到）
+  const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
+  const scriptLine = isTh ? `\n- thaiScript：對應的正確泰文書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
+  const prompt = `以下是一份單字/片語清單，來源語言不限（可能是印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
+- romanized：對應的${L().label}，用羅馬拼音（英文字母）寫（口語、常用、初學者好記的拼法，不用正式音標系統）${scriptLine}
 - zh：繁體中文意思
 - en：英文意思
 - quizEn：一句能表達這個單字/片語意思的英文例句
-- correct：quizEn 對應的泰文翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語）
-- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的泰文句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
+- correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語）
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
 
 請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
 
-印尼文單字清單：
+單字清單（來源語言不限）：
 ${list}`;
   const parsed = await callClaude(prompt, schema, 4096);
   return parsed.entries;
@@ -1295,10 +1307,10 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
       // 跟原本「AI 自動生成翻譯」那個功能的做法一致。
       for(const batch of batches){
         btn.textContent = `轉換中... (${done}/${indoWords.length})`;
-        const entries = await convertIndonesianToThai(batch);
+        const entries = await convertWordsToTargetLang(batch);
         let nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
         entries.forEach(entry => {
-          const text = (entry.thaiRomanized || "").trim();
+          const text = (entry.romanized || "").trim();
           if(!text) return;
           if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())) return;
           nextId++;
@@ -1324,8 +1336,8 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     }
     btn.disabled = false;
     btn.textContent = originalLabel;
-    const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的印尼文原字` : "";
-    alert(`轉換了 ${indoWords.length} 個印尼文單字，新增了 ${addedCount} 個泰文單字（重複的已自動跳過）${staleNote}。`);
+    const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的原文字` : "";
+    alert(`轉換了 ${indoWords.length} 個單字，新增了 ${addedCount} 個${L().label}單字（重複的已自動跳過）${staleNote}。`);
   };
   reader.readAsText(file, "UTF-8");
 });
