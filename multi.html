@@ -122,6 +122,7 @@
       <button id="btnAll">全選</button>
       <button id="btnNone">全不選</button>
       <button id="btnClearMastered">🔄 清空所有已學會</button>
+      <button id="btnClearWordList">🗑️ 清空目前單字表</button>
     </div>
     <div class="toolbar hidden" id="convertBar">
       <button id="btnImportConvertTh">🔄 匯入印尼文檔案並自動轉成泰文</button>
@@ -1146,6 +1147,17 @@ document.getElementById("btnClearMastered").onclick = () => {
   saveQuizMastered();
   renderList();
 };
+document.getElementById("btnClearWordList").onclick = () => {
+  if(allWords.length === 0) return;
+  // 這個會真的刪掉單字資料（不像清空已學會只是重置一個旗標），
+  // 比較危險，值得跳一次確認，跟「清空已學會」那個不用問的情況不一樣。
+  if(!confirm(`確定要清空目前${L().label}的整份單字表嗎？（共 ${allWords.length} 個字，這個動作沒辦法復原）`)) return;
+  allWords = [];
+  saveWordList(allWords);
+  selected = new Set();
+  saveSelected();
+  renderList();
+};
 document.getElementById("btnRandomSelect").onclick = () => {
   const raw = Number(document.getElementById("randomCount").value);
   const pool = getVisibleWords(); // 篩了難度/搜尋的話，只從篩出來的裡面抽
@@ -1264,6 +1276,14 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
       alert("沒有解析到任何單字，請確認檔案內容。");
       return;
     }
+    // 如果之前不小心用「一般匯入」把這些印尼文原字直接加進了泰文清單，
+    // 這裡先把那些殘留的印尼文原字清掉，改用轉換後的泰文版本取代，
+    // 避免印尼文原字跟轉換後的泰文版本兩份都留著。
+    const indoWordSet = new Set(indoWords.map(w => w.toLowerCase()));
+    const staleCount = allWords.filter(w => indoWordSet.has(w.text.toLowerCase())).length;
+    if(staleCount > 0){
+      allWords = allWords.filter(w => !indoWordSet.has(w.text.toLowerCase()));
+    }
     const btn = document.getElementById("btnImportConvertTh");
     const originalLabel = btn.textContent;
     btn.disabled = true;
@@ -1304,7 +1324,8 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     }
     btn.disabled = false;
     btn.textContent = originalLabel;
-    alert(`轉換了 ${indoWords.length} 個印尼文單字，新增了 ${addedCount} 個泰文單字（重複的已自動跳過）。`);
+    const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的印尼文原字` : "";
+    alert(`轉換了 ${indoWords.length} 個印尼文單字，新增了 ${addedCount} 個泰文單字（重複的已自動跳過）${staleNote}。`);
   };
   reader.readAsText(file, "UTF-8");
 });
