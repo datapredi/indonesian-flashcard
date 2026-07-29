@@ -495,6 +495,17 @@ function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMaster
 
 let allWords = loadWordList();
 
+// ---- 記住哪些「來源語言原字」已經轉換過語言（給 convertWordsToTargetLang 用） ----
+// AI 生成的羅馬拼音沒有唯一標準寫法，同一個字每次轉換拼法可能不完全一樣
+// （例如 "sawadee" vs "sawatdee"），如果拿「AI 拼出來的字串是否相同」去判斷
+// 重複，同一批來源字重新匯入一次就可能因為拼法飄移產生一堆看起來不同、但其實
+// 是同一個字的重複項目。改成直接記住「這個來源原字轉換過了」，之後同一個來源
+// 字要嘛不轉、要嘛就沿用同一次轉換結果，不會每次匯入都再問一次 AI。
+const CONVERTED_SOURCES_LS = "flashcard_converted_sources_v1";
+let convertedSources = new Set();
+try{ convertedSources = new Set(JSON.parse(localStorage.getItem(lsKey(CONVERTED_SOURCES_LS))) || []); }catch(e){ convertedSources = new Set(); }
+function saveConvertedSources(){ localStorage.setItem(lsKey(CONVERTED_SOURCES_LS), JSON.stringify([...convertedSources])); }
+
 // ---- 難度標記（E簡單/M中等/H困難，用單字文字當 key，跟翻譯一樣不會被重新匯入洗掉） ----
 const DIFFICULTY_LS = "flashcard_difficulty_v1";
 let difficultyMap = {};
@@ -1168,6 +1179,10 @@ document.getElementById("btnClearWordList").onclick = () => {
   saveWordList(allWords);
   selected = new Set();
   saveSelected();
+  // 單字表清空了，「哪些來源字轉換過」的記錄也要一起清掉，不然之後重新轉換
+  // 會誤判成「都轉過了」而整批跳過、清單卻是空的。
+  convertedSources = new Set();
+  saveConvertedSources();
   renderList();
 };
 document.getElementById("btnRandomSelect").onclick = () => {
@@ -1296,17 +1311,25 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     if(staleCount > 0){
       allWords = allWords.filter(w => !indoWordSet.has(w.text.toLowerCase()));
     }
+    // 已經轉換過的來源字直接跳過，不用重新問 AI（見上面 convertedSources 的說明：
+    // AI 拼法每次可能不完全一樣，靠這個記錄才不會同一批字重新匯入又生出重複）。
+    const wordsToConvert = indoWords.filter(w => !convertedSources.has(w.toLowerCase()));
+    const alreadyDoneCount = indoWords.length - wordsToConvert.length;
+    if(wordsToConvert.length === 0){
+      alert(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。`);
+      return;
+    }
     const btn = document.getElementById("btnImportConvertTh");
     const originalLabel = btn.textContent;
     btn.disabled = true;
-    const batches = chunkArr(indoWords, 8);
+    const batches = chunkArr(wordsToConvert, 8);
     let done = 0;
     let addedCount = 0;
     try{
       // 一批（8個）轉完就馬上加進清單、重繪畫面，不用等整份檔案轉完才看到字，
       // 跟原本「AI 自動生成翻譯」那個功能的做法一致。
       for(const batch of batches){
-        btn.textContent = `轉換中... (${done}/${indoWords.length})`;
+        btn.textContent = `轉換中... (${done}/${wordsToConvert.length})`;
         const entries = await convertWordsToTargetLang(batch);
         let nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
         entries.forEach(entry => {
@@ -1321,6 +1344,8 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           };
           addedCount++;
         });
+        batch.forEach(w => convertedSources.add(w.toLowerCase()));
+        saveConvertedSources();
         saveWordList(allWords);
         saveCustomDB();
         selected = new Set(allWords.map(w => w.id));
@@ -1331,13 +1356,14 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     }catch(err){
       btn.disabled = false;
       btn.textContent = originalLabel;
-      alert(`轉換到一半失敗：${err.message}\n\n已經轉好、加進清單的 ${addedCount} 個不會不見。可以重新選同一個檔案再匯入一次，已經加過的字會自動跳過，只補剩下沒轉到的。`);
+      alert(`轉換到一半失敗：${err.message}\n\n已經轉好、加進清單的 ${addedCount} 個不會不見，也已經記住轉過了。可以重新選同一個檔案再匯入一次，只會補剩下沒轉到的。`);
       return;
     }
     btn.disabled = false;
     btn.textContent = originalLabel;
     const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的原文字` : "";
-    alert(`轉換了 ${indoWords.length} 個單字，新增了 ${addedCount} 個${L().label}單字（重複的已自動跳過）${staleNote}。`);
+    const skipNote = alreadyDoneCount > 0 ? `${alreadyDoneCount} 個之前轉換過已跳過，` : "";
+    alert(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${staleNote}。`);
   };
   reader.readAsText(file, "UTF-8");
 });
