@@ -134,6 +134,7 @@
     <div class="toolbar">
       <input type="text" id="wordSearch" placeholder="搜尋印尼文或中文...">
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
+      <button id="btnSortAZ">🔤 A→Z 排序</button>
     </div>
     <div class="count" id="selCount"></div>
     <div class="list" id="wordList"></div>
@@ -420,6 +421,7 @@ let selected = savedSelected
   ? new Set([...savedSelected].filter(id => allWords.some(w => w.id === id)))
   : new Set(allWords.map(w => w.id));
 let showSelectedOnly = false;
+let sortAZ = false;
 
 // ---- AI 自動生成翻譯（用使用者自己的 Anthropic API Key） ----
 const API_KEY_LS = "anthropic_api_key";
@@ -780,13 +782,15 @@ document.getElementById("btnGenerate").onclick = async () => {
 
 function getVisibleWords(){
   const query = document.getElementById("wordSearch").value.trim().toLowerCase();
-  return allWords.filter(w => {
+  const list = allWords.filter(w => {
     if(showSelectedOnly && !selected.has(w.id)) return false;
     if(!query) return true;
     const data = lookup(w.text);
     const haystack = `${w.text} ${data ? data.zh : ""} ${data ? data.en : ""}`.toLowerCase();
     return haystack.includes(query);
   });
+  if(sortAZ) list.sort((a, b) => a.text.localeCompare(b.text, "id"));
+  return list;
 }
 
 function createWordItem(w){
@@ -957,6 +961,11 @@ document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) =
   showSelectedOnly = !showSelectedOnly;
   e.currentTarget.textContent = showSelectedOnly ? "顯示全部單字" : "只顯示已選取";
   e.currentTarget.classList.toggle("primary", showSelectedOnly);
+  renderList();
+});
+document.getElementById("btnSortAZ").addEventListener("click", (e) => {
+  sortAZ = !sortAZ;
+  e.currentTarget.classList.toggle("primary", sortAZ);
   renderList();
 });
 
