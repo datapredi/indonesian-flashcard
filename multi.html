@@ -123,6 +123,7 @@
       <button id="btnNone">全不選</button>
       <button id="btnClearMastered">🔄 清空所有已學會</button>
       <button id="btnClearWordList">🗑️ 清空目前單字表</button>
+      <button id="btnDedupByMeaning">🧹 合併中文意思重複的單字</button>
     </div>
     <div class="toolbar hidden" id="convertBar">
       <button id="btnImportConvertTh">🔄 匯入其他語言檔案並自動轉換</button>
@@ -1184,6 +1185,39 @@ document.getElementById("btnClearWordList").onclick = () => {
   convertedSources = new Set();
   saveConvertedSources();
   renderList();
+};
+document.getElementById("btnDedupByMeaning").onclick = () => {
+  // AI 生成的羅馬拼音沒有唯一標準寫法，同一個字可能被拼成不同字串、變成看起來
+  // 不同的重複項目（例如 "sawadee" 跟 "sawatdee"）。這裡改用「中文意思是否
+  // 完全一樣」當作判斷同一個字的依據，沒有翻譯資料的字沒辦法判斷、不會被動到。
+  const groups = {};
+  allWords.forEach(w => {
+    const data = lookup(w.text);
+    if(!data || !data.zh) return;
+    (groups[data.zh] = groups[data.zh] || []).push(w);
+  });
+  const toRemove = new Set();
+  let groupCount = 0;
+  Object.values(groups).forEach(group => {
+    if(group.length <= 1) return;
+    groupCount++;
+    group.sort((a, b) => a.id - b.id);
+    group.slice(1).forEach(w => toRemove.add(w.id));
+  });
+  if(toRemove.size === 0){ alert("沒有找到中文意思重複的字。"); return; }
+  if(!confirm(`找到 ${groupCount} 組意思重複的字，總共會刪掉 ${toRemove.size} 個（每組留意思相同裡 id 最小的那個），這個動作沒辦法復原，確定要合併嗎？`)) return;
+  allWords = allWords.filter(w => !toRemove.has(w.id));
+  toRemove.forEach(id => {
+    selected.delete(id);
+    cardMasteredIds.delete(id);
+    quizMasteredIds.delete(id);
+  });
+  saveWordList(allWords);
+  saveSelected();
+  saveCardMastered();
+  saveQuizMastered();
+  renderList();
+  alert(`已合併，刪掉了 ${toRemove.size} 個重複的字。`);
 };
 document.getElementById("btnRandomSelect").onclick = () => {
   const raw = Number(document.getElementById("randomCount").value);
