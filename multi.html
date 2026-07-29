@@ -1268,44 +1268,42 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     const originalLabel = btn.textContent;
     btn.disabled = true;
     const batches = chunkArr(indoWords, 8);
-    const converted = [];
     let done = 0;
+    let addedCount = 0;
     try{
+      // 一批（8個）轉完就馬上加進清單、重繪畫面，不用等整份檔案轉完才看到字，
+      // 跟原本「AI 自動生成翻譯」那個功能的做法一致。
       for(const batch of batches){
         btn.textContent = `轉換中... (${done}/${indoWords.length})`;
         const entries = await convertIndonesianToThai(batch);
-        converted.push(...entries);
+        let nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
+        entries.forEach(entry => {
+          const text = (entry.thaiRomanized || "").trim();
+          if(!text) return;
+          if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())) return;
+          nextId++;
+          allWords.push({ id: nextId, text });
+          customDB[text] = {
+            zh: entry.zh, en: entry.en, thaiScript: entry.thaiScript,
+            quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
+          };
+          addedCount++;
+        });
+        saveWordList(allWords);
+        saveCustomDB();
+        selected = new Set(allWords.map(w => w.id));
+        saveSelected();
         done += batch.length;
+        renderList();
       }
     }catch(err){
-      alert("轉換失敗：" + err.message);
       btn.disabled = false;
       btn.textContent = originalLabel;
+      alert(`轉換到一半失敗：${err.message}\n\n已經轉好、加進清單的 ${addedCount} 個不會不見。可以重新選同一個檔案再匯入一次，已經加過的字會自動跳過，只補剩下沒轉到的。`);
       return;
     }
     btn.disabled = false;
     btn.textContent = originalLabel;
-
-    // 加進目前的泰文單字表，不覆蓋既有的，用羅馬拼音去重（已存在就跳過）
-    let nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
-    let addedCount = 0;
-    converted.forEach(entry => {
-      const text = (entry.thaiRomanized || "").trim();
-      if(!text) return;
-      if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())) return;
-      nextId++;
-      allWords.push({ id: nextId, text });
-      customDB[text] = {
-        zh: entry.zh, en: entry.en, thaiScript: entry.thaiScript,
-        quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
-      };
-      addedCount++;
-    });
-    saveWordList(allWords);
-    saveCustomDB();
-    selected = new Set(allWords.map(w => w.id));
-    saveSelected();
-    renderList();
     alert(`轉換了 ${indoWords.length} 個印尼文單字，新增了 ${addedCount} 個泰文單字（重複的已自動跳過）。`);
   };
   reader.readAsText(file, "UTF-8");
