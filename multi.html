@@ -1,0 +1,1625 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>語言 Flash Card</title>
+<script src="words.js"></script>
+<style>
+  :root{
+    --bg:#f5f3ef; --card:#ffffff; --text:#1f1b16; --muted:#7a7368;
+    --accent:#c1440e; --accent2:#2f6f4e; --border:#e2ddd3; --danger:#b23a2f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#181512; --card:#242019; --text:#f2ede4; --muted:#a89e8f;
+      --accent:#e07b45; --accent2:#5fae83; --border:#3a342b; --danger:#e0665a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,"Segoe UI",Helvetica,Arial,"PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:20px 16px 60px;}
+  h1{font-size:1.3rem; margin:0 0 4px;}
+  .sub{color:var(--muted); font-size:0.85rem; margin-bottom:18px;}
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+  button{
+    font-family:inherit; font-size:0.9rem; padding:9px 14px; border-radius:10px;
+    border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer;
+  }
+  button:hover{border-color:var(--accent);}
+  button.primary{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600;}
+  button.secondary{background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600;}
+  button:disabled{opacity:0.5; cursor:default;}
+  input[type=file]{display:none;}
+  input[type=text], input[type=password], input[type=number], textarea, select{
+    font-family:inherit; font-size:0.9rem; padding:9px 12px; border-radius:10px;
+    border:1px solid var(--border); background:var(--card); color:var(--text); flex:1; min-width:200px;
+  }
+  select{flex:0 0 auto; min-width:0;}
+  textarea{width:100%; resize:vertical; font-size:1rem;}
+  .note{font-size:0.75rem; color:var(--muted); margin:-6px 0 12px;}
+  .list{background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:16px;}
+  .item{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border);}
+  .item:last-child{border-bottom:none;}
+  .item .id-text{font-weight:600;}
+  .item .meaning{color:var(--muted); font-size:0.82rem;}
+  .item.no-data .id-text{color:var(--muted);}
+  .item.no-data .meaning{color:var(--danger);}
+  .item > div{flex:1;}
+  .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
+  .speak-btn:disabled{opacity:0.5;}
+  .delete-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
+  .delete-btn:hover{border-color:var(--danger); color:var(--danger);}
+  .badge-row{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
+  .badge{font-size:0.72rem; padding:3px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--border); color:var(--muted);}
+  .badge:hover{border-color:var(--accent); color:var(--accent);}
+  .usage-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
+  .usage-panel{padding:10px 14px 14px; border-bottom:1px solid var(--border); background:var(--bg); font-size:0.88rem;}
+  .usage-panel.hidden{display:none;}
+  .usage-example{margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--border);}
+  .usage-example:last-child{margin-bottom:0; padding-bottom:0; border-bottom:none;}
+  .usage-id{font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .usage-word{cursor:pointer; border-radius:4px; padding:0 1px;}
+  .usage-word:hover{background:var(--bg);}
+  .usage-word.in-list{color:var(--accent2); text-decoration:underline; text-decoration-style:dotted;}
+  .usage-zh{color:var(--muted); margin-top:2px;}
+  .usage-note{color:var(--muted); font-size:0.8rem; margin-top:4px; font-style:italic;}
+  .diff-chip{
+    flex:0 0 auto; width:30px; padding:0; height:30px; line-height:28px; text-align:center;
+    font-weight:700; font-size:0.8rem; color:var(--muted);
+  }
+  .diff-chip.diff-E{border-color:var(--accent2); color:var(--accent2);}
+  .diff-chip.diff-M{border-color:#c9a227; color:#c9a227;}
+  .diff-chip.diff-H{border-color:var(--danger); color:var(--danger);}
+  .count{font-size:0.85rem; color:var(--muted); margin-bottom:10px;}
+  .actions{display:flex; gap:10px; flex-wrap:wrap;}
+  .hidden{display:none !important;}
+
+  .card-area{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:32px 20px; text-align:center; min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; user-select:none;}
+  .card-area .front{font-size:1.5rem; font-weight:700;}
+  .front-pron{font-size:0.95rem; color:var(--muted); margin-top:4px;}
+  .item .pron{color:var(--muted); font-weight:400; font-size:0.85rem;}
+  .card-area .back{font-size:1.05rem; color:var(--accent2); margin-top:12px;}
+  .listen-btn{margin-top:14px; padding:9px 16px; border-radius:999px; font-weight:600;}
+  .listen-btn.speaking{opacity:0.6;}
+  .progress{text-align:center; color:var(--muted); font-size:0.85rem; margin:10px 0;}
+  .nav{display:flex; justify-content:center; gap:10px; margin-top:16px;}
+
+  .quiz-en{font-size:1.15rem; font-weight:600; margin:18px 0; text-align:center;}
+  .opt-row{display:flex; gap:8px; margin-bottom:10px;}
+  .opt{display:block; width:100%; text-align:left; padding:12px 14px; border-radius:12px; flex:1; margin-bottom:0;}
+  .opt-speak{flex:0 0 auto; padding:0 14px; border-radius:12px; font-size:1rem;}
+  .opt.correct{background:var(--accent2) !important; color:#fff !important; border-color:var(--accent2) !important;}
+  .opt.wrong{background:var(--danger) !important; color:#fff !important; border-color:var(--danger) !important;}
+  .score{text-align:center; font-size:1.1rem; margin:20px 0;}
+  .missed{font-size:0.85rem; color:var(--muted); margin-top:10px;}
+
+  .write-hint{color:var(--muted); font-size:0.9rem; text-align:center; margin:-8px 0 18px;}
+  .write-feedback{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; margin-top:16px;}
+  .write-feedback .verdict{font-weight:800; margin:0 0 8px;}
+  .write-feedback .verdict.ok{color:var(--accent2);}
+  .write-feedback .verdict.no{color:var(--danger);}
+  .write-feedback .ref{color:var(--muted); margin:8px 0 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="pageTitle">🇮🇩 印尼語 Flash Card</h1>
+  <div class="toolbar">
+    <button id="btnLangId">🇮🇩 印尼文</button>
+    <button id="btnLangTh">🇹🇭 泰文</button>
+  </div>
+  <div class="sub">從單字清單勾選要複習的內容，開始 Flashcard 或測驗</div>
+
+  <!-- ===== 選字畫面 ===== -->
+  <div id="screen-select">
+    <div class="toolbar">
+      <button id="btnImport">匯入 / 更新單字檔 (.txt/.md)</button>
+      <input type="file" id="fileInput" accept=".txt,.md">
+      <button id="btnAll">全選</button>
+      <button id="btnNone">全不選</button>
+      <button id="btnClearMastered">🔄 清空所有已學會</button>
+    </div>
+    <div class="toolbar hidden" id="pendingSyncBar">
+      <button id="btnCopyPending">📋 複製句子新增、還沒同步進 Obsidian 的單字</button>
+    </div>
+    <div class="toolbar">
+      <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
+      <button id="btnRandomSelect">🎲 隨機選這麼多個來練習</button>
+    </div>
+    <div class="toolbar">
+      <input type="password" id="apiKeyInput" placeholder="Anthropic API Key (sk-ant-...)">
+      <button id="btnSaveKey">儲存 Key</button>
+    </div>
+    <div class="note">Key 只會存在這台電腦的瀏覽器裡（localStorage），不會上傳到別的地方。用來讓 AI 幫新單字自動生成翻譯和測驗句。</div>
+    <div class="toolbar">
+      <input type="password" id="openaiKeyInput" placeholder="OpenAI API Key (sk-...)">
+      <button id="btnSaveOpenaiKey">儲存 Key</button>
+    </div>
+    <div class="note">用於「跑步聽力模式」把單字轉成真正的音檔（存在這台電腦，同一個字只會生成一次，之後重播不再花錢）。</div>
+    <div class="toolbar">
+      <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="wordSearch" placeholder="搜尋印尼文或中文...">
+      <button id="btnToggleSelectedOnly">只顯示已選取</button>
+      <button id="btnSortAZ">🔤 A→Z 排序</button>
+      <select id="difficultyFilter">
+        <option value="">全部難度</option>
+        <option value="E">E 簡單</option>
+        <option value="M">M 中等</option>
+        <option value="H">H 困難</option>
+        <option value="none">未標記</option>
+      </select>
+    </div>
+    <div class="count" id="selCount"></div>
+    <div class="list" id="wordList"></div>
+    <div class="toolbar">
+      <label for="thinkPause" style="align-self:center;">思考停頓秒數</label>
+      <input type="number" id="thinkPause" min="1" max="15" value="3" style="max-width:70px; flex:0 0 auto;">
+    </div>
+    <div class="toolbar">
+      <label for="voiceSource" style="align-self:center;">跑步模式發音</label>
+      <select id="voiceSource">
+        <option value="system" selected>電腦內建語音（免費）</option>
+        <option value="gpt">GPT 語音（OpenAI TTS，需要 API Key）</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
+      <button id="btnCardDirection"></button>
+      <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
+      <button class="secondary" id="btnStartWrite">✍️ 中翻印尼文（AI 出句、AI 批改）</button>
+      <button class="secondary" id="btnStartListen">🏃 跑步聽力模式</button>
+    </div>
+  </div>
+
+  <!-- ===== Flash Card 畫面 ===== -->
+  <div id="screen-cards" class="hidden">
+    <div class="progress" id="cardProgress"></div>
+    <div class="card-area" id="cardArea">
+      <div class="front" id="cardFront"></div>
+      <div class="front-pron" id="cardPron"></div>
+      <button type="button" class="listen-btn" id="cardSpeak">🔊 播放發音</button>
+      <div class="back hidden" id="cardBack"></div>
+    </div>
+    <div class="nav hidden" id="cardAssessRow">
+      <button id="btnCardWrong">✗ 還要練習</button>
+      <button class="secondary" id="btnCardRight">✓ 記得了，不再出現</button>
+    </div>
+    <div class="nav">
+      <button id="btnPrev">← 上一個</button>
+      <button id="btnShuffleCards">🔀 洗牌</button>
+      <button id="btnNext">下一個 →</button>
+    </div>
+    <div class="actions" style="margin-top:16px;">
+      <button id="btnBackFromCards">返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 測驗畫面 ===== -->
+  <div id="screen-quiz" class="hidden">
+    <div class="progress" id="quizProgress"></div>
+    <div class="quiz-en" id="quizEnText"></div>
+    <div id="quizOptions"></div>
+    <div class="actions">
+      <button class="primary hidden" id="btnNextQuestion">下一題</button>
+      <button class="secondary hidden" id="btnMastered">✓ 已記住，不再出現</button>
+      <button id="btnBackFromQuiz">返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 造句測驗畫面 ===== -->
+  <div id="screen-write" class="hidden">
+    <div class="progress" id="writeProgress"></div>
+    <div class="quiz-en" id="writeWord"></div>
+    <p class="write-hint" id="writeHint"></p>
+    <textarea id="writeInput" rows="2" placeholder="把上面這句中文翻成印尼文..."></textarea>
+    <div class="actions" style="margin-top:12px;">
+      <button class="primary" id="btnSubmitWrite">送出</button>
+      <button class="hidden" type="button" id="writeSpeak">🔊 聽範例句</button>
+    </div>
+    <div class="write-feedback hidden" id="writeFeedback"></div>
+    <div class="actions" style="margin-top:16px;">
+      <button class="primary hidden" id="btnNextWrite">下一題</button>
+      <button id="btnBackFromWrite">返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 跑步聽力模式畫面 ===== -->
+  <div id="screen-listen" class="hidden">
+    <div class="progress" id="listenProgress"></div>
+    <div class="quiz-en" id="listenWord"></div>
+    <p class="write-hint" id="listenZh"></p>
+    <audio id="listenAudio"></audio>
+    <div class="actions" style="margin-top:24px; justify-content:center;">
+      <button id="btnBackFromListen">停止並返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 結算畫面 ===== -->
+  <div id="screen-result" class="hidden">
+    <div class="score" id="resultScore"></div>
+    <div class="missed" id="resultMissed"></div>
+    <div class="actions" style="margin-top:16px;">
+      <button class="primary" id="btnRetryMissed">重測錯誤題目</button>
+      <button id="btnBackFromResult">返回清單</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================= 語言切換 =================
+// 印尼文維持完全不加後綴的舊 key（跟 index.html 共用同一份資料，不用搬家）。
+// 泰文所有 localStorage key 都加 "_th" 後綴，兩種語言的單字表/已學會/難度/
+// 翻譯快取/例句快取完全分開，互不干擾。切換語言時直接整頁重新載入，
+// 避免要手動重置一堆模組層級的變數狀態，風險最低。
+const LANG_LS = "flashcard_lang_v1";
+let currentLang = localStorage.getItem(LANG_LS) === "th" ? "th" : "id";
+function lsKey(base){ return currentLang === "th" ? base + "_th" : base; }
+
+const LANG_INFO = {
+  id: {
+    label: "印尼文", flag: "🇮🇩", teacher: "印尼語老師",
+    speechLang: "id-ID",
+    ttsInstructions: "Speak in authentic Bahasa Indonesia with natural Indonesian pronunciation and intonation, as a native Indonesian speaker would.",
+    hasScript: false // 印尼文本身就是拉丁字母，顯示文字就可以直接拿去發音
+  },
+  th: {
+    label: "泰文（羅馬拼音）", flag: "🇹🇭", teacher: "泰語老師",
+    speechLang: "th-TH",
+    ttsInstructions: "Speak in authentic Thai with natural Thai pronunciation, intonation, and tones, as a native Thai speaker would.",
+    hasScript: true // 顯示的是羅馬拼音，真正要發音必須用 AI 額外生成的泰文字（thaiScript）
+  }
+};
+function L(){ return LANG_INFO[currentLang]; } // 目前語言的設定物件（跟 speakAsync(text, lang) 的參數 lang 是兩回事，故意取不同名字避免混淆）
+
+function setLang(l){
+  if(l === currentLang) return;
+  localStorage.setItem(LANG_LS, l);
+  location.reload();
+}
+document.getElementById("btnLangId").addEventListener("click", () => setLang("id"));
+document.getElementById("btnLangTh").addEventListener("click", () => setLang("th"));
+function updateLangButtons(){
+  document.getElementById("btnLangId").classList.toggle("primary", currentLang === "id");
+  document.getElementById("btnLangTh").classList.toggle("primary", currentLang === "th");
+  document.getElementById("pageTitle").textContent = `${L().flag} ${L().label} Flash Card`;
+  document.title = `${L().label} Flash Card`;
+  document.getElementById("wordSearch").placeholder = `搜尋${L().label}或中文...`;
+  document.getElementById("btnStartQuiz").textContent = `開始測驗（英文選${L().label}）`;
+  document.getElementById("btnStartWrite").textContent = writeBtnLabel();
+  document.getElementById("writeInput").placeholder = `把上面這句中文翻成${L().label}...`;
+}
+function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
+updateLangButtons();
+
+// 給沒有真正泰文字可用時的 fallback：拿羅馬拼音直接唸還是比完全不唸好一點，
+// 只是在 Thai 模式下標明「可能不準」，不假裝這樣唸出來一定正確。
+function getSpeechText(w){
+  if(!L().hasScript) return w.text;
+  const data = lookup(w.text);
+  return (data && data.thaiScript) || w.text;
+}
+
+// ================= 語音播放 =================
+let cachedVoices = [];
+function refreshVoices(){ cachedVoices = speechSynthesis.getVoices(); }
+if('speechSynthesis' in window){
+  refreshVoices();
+  speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+}
+function speak(text, btn){
+  if(!('speechSynthesis' in window)){ alert('這個瀏覽器不支援語音播放'); return; }
+  speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = L().speechLang;
+  utter.rate = 0.85;
+  const prefix = L().speechLang.slice(0, 2).toLowerCase();
+  const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
+  if(voice) utter.voice = voice;
+  if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
+  utter.onend = utter.onerror = () => { if(btn){ btn.disabled = false; btn.classList.remove('speaking'); } };
+  speechSynthesis.speak(utter);
+}
+
+function waitMs(ms){
+  return new Promise((resolve) => { listenTimeoutId = setTimeout(resolve, ms); });
+}
+
+// Promise-based speak for sequencing utterances (跑步聽力模式：電腦內建語音)
+function speakAsync(text, lang){
+  return new Promise((resolve) => {
+    if(!('speechSynthesis' in window) || !text){ resolve(); return; }
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang;
+    utter.rate = 0.85;
+    const prefix = lang.slice(0, 2).toLowerCase();
+    const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
+    if(voice) utter.voice = voice;
+    utter.onend = utter.onerror = () => resolve();
+    speechSynthesis.speak(utter);
+  });
+}
+
+// ================= 跑步聽力模式的真實音檔（OpenAI TTS + IndexedDB 快取） =================
+// 同一段文字只會呼叫一次 OpenAI API，之後都是從本機快取直接播放，不會重複收費。
+const TTS_DB_NAME = "flashcard_tts_cache";
+const TTS_STORE_NAME = "audio";
+// gpt-4o-mini-tts (not tts-1/tts-1-hd) supports an "instructions" field to steer
+// language/accent explicitly, which matters a lot for a non-English language like
+// Indonesian - without it the model just guesses from the text and can default
+// to an English-accented reading.
+const TTS_MODEL = "gpt-4o-mini-tts";
+const TTS_INSTRUCTIONS_ZH = "Speak in natural Traditional Chinese (Taiwanese Mandarin) pronunciation and intonation, as a native speaker would.";
+
+function openTTSDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(TTS_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(TTS_STORE_NAME); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function getCachedAudio(key){
+  const db = await openTTSDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(TTS_STORE_NAME, "readonly");
+    const req = tx.objectStore(TTS_STORE_NAME).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function setCachedAudio(key, blob){
+  const db = await openTTSDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(TTS_STORE_NAME, "readwrite");
+    tx.objectStore(TTS_STORE_NAME).put(blob, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function fetchTTSAudio(text, instructions){
+  const key = getOpenaiKey();
+  if(!key) throw new Error("請先輸入並儲存 OpenAI API Key");
+  const body = { model: TTS_MODEL, voice: "alloy", input: text };
+  if(instructions) body.instructions = instructions;
+  const res = await fetch("https://api.openai.com/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${key}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok){
+    const errText = await res.text();
+    throw new Error(`HTTP ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  return await res.blob();
+}
+
+async function getTTSAudioBlob(text, instructions){
+  const cacheKey = `${TTS_MODEL}::${instructions || ""}::${text}`;
+  // IndexedDB can fail outright on some mobile browsers (e.g. Safari Private
+  // Browsing blocks it, sometimes with an unhelpfully blank error message).
+  // Caching is just an optimization, so never let a cache failure take down
+  // the whole TTS flow - fall back to fetching without caching instead.
+  let cached = null;
+  try{ cached = await getCachedAudio(cacheKey); }
+  catch(e){ console.warn("TTS cache read failed, skipping cache:", e); }
+  if(cached) return cached;
+  const blob = await fetchTTSAudio(text, instructions);
+  try{ await setCachedAudio(cacheKey, blob); }
+  catch(e){ console.warn("TTS cache write failed, skipping cache:", e); }
+  return blob;
+}
+
+// 有些手機瀏覽器（觀察到的案例：iOS Safari）在呼叫 OpenAI API 或存取 IndexedDB 時
+// 偶爾會整個卡住、既不成功也不報錯，導致畫面停在「生成語音中」不動。用逾時保護，
+// 超過時間就丟出明確的錯誤，至少會跳出訊息，不會無聲無息卡住。
+function withTimeout(promise, ms, message){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
+  ]);
+}
+
+function playAudioBlob(blob){
+  return new Promise((resolve, reject) => {
+    const audioEl = document.getElementById("listenAudio");
+    const url = URL.createObjectURL(blob);
+    audioEl.src = url;
+    audioEl.onended = () => { URL.revokeObjectURL(url); resolve(); };
+    audioEl.onerror = () => { URL.revokeObjectURL(url); reject(new Error("播放失敗")); };
+    audioEl.play().catch(reject);
+  });
+}
+
+const LS_KEY = "flashcard_word_list_v1";
+// 泰文先給空清單，使用者自己匯入或用例句功能慢慢累積（沒有預設泰文題庫）。
+const DEFAULT_WORDS_TH = [];
+
+function loadWordList(){
+  const saved = localStorage.getItem(lsKey(LS_KEY));
+  if(saved){
+    try{ return JSON.parse(saved); }catch(e){}
+  }
+  return (currentLang === "th" ? DEFAULT_WORDS_TH : DEFAULT_WORDS).slice();
+}
+function saveWordList(list){
+  localStorage.setItem(lsKey(LS_KEY), JSON.stringify(list));
+}
+
+// ---- 已學會的單字（Flash Card 跟測驗分開記錄，互不影響） ----
+const MASTERED_CARDS_LS = "flashcard_mastered_cards_v1";
+const MASTERED_QUIZ_LS = "flashcard_mastered_quiz_v1";
+const MASTERED_LEGACY_LS = "flashcard_mastered_v1";
+function loadMasteredSet(key){
+  try{ return new Set(JSON.parse(localStorage.getItem(key)) || []); }catch(e){ return new Set(); }
+}
+function saveMasteredSet(key, set){ localStorage.setItem(key, JSON.stringify([...set])); }
+
+let cardMasteredIds = loadMasteredSet(lsKey(MASTERED_CARDS_LS));
+let quizMasteredIds = loadMasteredSet(lsKey(MASTERED_QUIZ_LS));
+// 舊版只有一個共用清單，第一次載入時把舊資料套用到兩個新清單，不遺失既有進度
+// （這個舊資料遷移只跟印尼文有關，泰文從一開始就是新版格式，不需要遷移）
+if(currentLang === "id" && !localStorage.getItem(lsKey(MASTERED_CARDS_LS)) && !localStorage.getItem(lsKey(MASTERED_QUIZ_LS))){
+  const legacy = loadMasteredSet(MASTERED_LEGACY_LS);
+  if(legacy.size){
+    cardMasteredIds = new Set(legacy);
+    quizMasteredIds = new Set(legacy);
+    saveMasteredSet(lsKey(MASTERED_CARDS_LS), cardMasteredIds);
+    saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMasteredIds);
+  }
+}
+function saveCardMastered(){ saveMasteredSet(lsKey(MASTERED_CARDS_LS), cardMasteredIds); }
+function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMasteredIds); }
+
+let allWords = loadWordList();
+
+// ---- 難度標記（E簡單/M中等/H困難，用單字文字當 key，跟翻譯一樣不會被重新匯入洗掉） ----
+const DIFFICULTY_LS = "flashcard_difficulty_v1";
+let difficultyMap = {};
+try{ difficultyMap = JSON.parse(localStorage.getItem(lsKey(DIFFICULTY_LS))) || {}; }catch(e){ difficultyMap = {}; }
+function saveDifficultyMap(){ localStorage.setItem(lsKey(DIFFICULTY_LS), JSON.stringify(difficultyMap)); }
+function getDifficulty(text){ return difficultyMap[text.toLowerCase()] || null; }
+function setDifficulty(text, level){
+  const key = text.toLowerCase();
+  if(level) difficultyMap[key] = level; else delete difficultyMap[key];
+  saveDifficultyMap();
+}
+
+// ---- 已選取的單字（記住上次選取狀態，重新整理不會重置） ----
+const SELECTED_LS = "flashcard_selected_v1";
+function loadSelected(){
+  const raw = localStorage.getItem(lsKey(SELECTED_LS));
+  if(raw === null) return null;
+  try{ return new Set(JSON.parse(raw)); }catch(e){ return null; }
+}
+function saveSelected(){ localStorage.setItem(lsKey(SELECTED_LS), JSON.stringify([...selected])); }
+
+const savedSelected = loadSelected();
+let selected = savedSelected
+  ? new Set([...savedSelected].filter(id => allWords.some(w => w.id === id)))
+  : new Set(allWords.map(w => w.id));
+let showSelectedOnly = false;
+let sortAZ = false;
+
+// ---- AI 自動生成翻譯（用使用者自己的 Anthropic API Key） ----
+const API_KEY_LS = "anthropic_api_key";
+const CUSTOM_DB_LS = "custom_word_db_v1";
+
+function loadCustomDB(){
+  try{ return JSON.parse(localStorage.getItem(lsKey(CUSTOM_DB_LS))) || {}; }catch(e){ return {}; }
+}
+function saveCustomDB(){ localStorage.setItem(lsKey(CUSTOM_DB_LS), JSON.stringify(customDB)); }
+// API Key 兩種語言共用同一把（不是資料，是憑證），故意不加語言後綴。
+function getApiKey(){ return localStorage.getItem(API_KEY_LS) || ""; }
+function setApiKey(k){ localStorage.setItem(API_KEY_LS, k); }
+
+// ---- 跑步聽力模式用的 OpenAI TTS Key ----
+const OPENAI_KEY_LS = "openai_api_key";
+function getOpenaiKey(){ return localStorage.getItem(OPENAI_KEY_LS) || ""; }
+function setOpenaiKey(k){ localStorage.setItem(OPENAI_KEY_LS, k); }
+
+let customDB = loadCustomDB();
+
+// 泰文先給空題庫，翻譯/發音/例句都是靠 AI 生成、存進 customDB（跟印尼文的
+// customDB 已經是同一套機制了，只是泰文完全沒有內建 WORD_DB_TH 資料）。
+const WORD_DB_TH = {};
+function lookup(text){
+  const db = currentLang === "th" ? WORD_DB_TH : WORD_DB;
+  return customDB[text] || db[text] || null;
+}
+
+function chunkArr(arr, size){
+  const out = [];
+  for(let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function generateWordData(words){
+  const isTh = currentLang === "th";
+  // 泰文用 thaiScript（真正泰文字，給語音朗讀用）取代印尼文的 pron（KBBI 標音）
+  // 欄位——泰文顯示的本來就是羅馬拼音，不需要另外標音，但需要真正的泰文字才能唸對。
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: Object.assign(
+            { zh: { type: "string" }, en: { type: "string" } },
+            isTh ? { thaiScript: { type: "string" } } : { pron: { type: "string" } },
+            {
+              quizEn: { type: "string" },
+              correct: { type: "string" },
+              distractors: { type: "array", items: { type: "string" } }
+            }
+          ),
+          required: isTh
+            ? ["zh", "en", "thaiScript", "quizEn", "correct", "distractors"]
+            : ["zh", "en", "pron", "quizEn", "correct", "distractors"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
+  const prompt = isTh ? `你是泰語教材編輯，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。學生不想學泰文字母，下面每一項是他自己用英文字母寫下的泰文單字/片語羅馬拼音（拼法可能不標準、不一致，請你自行判斷他實際想表達的泰文是什麼）。針對每一項依序提供：
+- zh：繁體中文意思
+- en：英文意思
+- thaiScript：這個字/句子對應、最正確常用的泰文書寫（純粹給語音朗讀引擎用，學生不會看到）
+- quizEn：一句能表達這個單字/片語意思的英文例句
+- correct：quizEn 對應的泰文翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語）
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的泰文句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
+
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+
+單字清單（羅馬拼音）：
+${list}` : `你是印尼語教材編輯，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。針對下面每一個印尼文單字或句子，依序提供：
+- zh：繁體中文意思
+- en：英文意思
+- pron：這個單字/句子的發音標注，採用印尼文詞典 KBBI 的標音慣例——把每個字母 e 依照實際發音標注清楚：
+  - 央中元音 schwa（弱化、輕聲的 e，例如 "besar"、"kecil" 的第一個 e）維持寫成一般的 e，不用加符號
+  - 閉前元音 /e/（例如 "sore"、"meja" 的 e）標成 é
+  - 開前元音 /ɛ/（例如 "enak" 的 e、"apel" 的 e）標成 è
+  其餘字母照原樣，不用改；如果整個字/句子裡沒有任何 e，pron 就跟原文字一樣
+- quizEn：一句能表達這個單字/片語意思的英文例句
+- correct：quizEn 對應的、自然的印尼文翻譯句子（要用到這個目標單字/片語）
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的印尼文句子選項（長度和風格接近 correct，但意思不同）
+
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+
+單字清單：
+${list}`;
+
+  const parsed = await callClaude(prompt, schema, 4096);
+  return parsed.entries;
+}
+
+async function callClaude(prompt, schema, maxTokens){
+  const key = getApiKey();
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-8",
+      max_tokens: maxTokens,
+      output_config: { format: { type: "json_schema", schema } },
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+  if(!res.ok){
+    const errBody = await res.text();
+    throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 300)}`);
+  }
+  const responseData = await res.json();
+  if(responseData.stop_reason === "refusal"){
+    throw new Error("Claude 拒絕回應這個請求");
+  }
+  const textBlock = (responseData.content || []).find(b => b.type === "text");
+  if(!textBlock){
+    throw new Error("沒有收到文字回應");
+  }
+  return JSON.parse(textBlock.text);
+}
+
+async function generateWriteSentences(wordList){
+  const schema = {
+    type: "object",
+    properties: {
+      sentences: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            zh: { type: "string" },
+            usedWords: { type: "array", items: { type: "string" } }
+          },
+          required: ["zh", "usedWords"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["sentences"],
+    additionalProperties: false
+  };
+  const list = wordList.map(w => {
+    const data = lookup(w.text);
+    return `- ${w.text}（${data ? data.zh : "無翻譯"}）`;
+  }).join("\n");
+  const prompt = `你是${L().teacher}，以下是學生正在學的一批${L().label}單字/片語（含中文意思）。
+請幫學生設計「中翻${L().label}」口說造句練習：把這些單字盡量自然地組合成幾句道地、口語的中文句子（像日常對話會講的那種，不要死板的教科書句），讓學生看中文練習翻成${L().label}。
+
+規則：
+- 每一句盡量塞入越多目標單字越好，但只挑真的能自然放進同一句話的組合，不要為了塞字讓句子變得不自然
+- 每句最多用到約 5 個目標單字
+- 清單裡的每個單字至少要出現在其中一句
+- 句數依單字量彈性決定，不用剛好整除
+
+單字清單：
+${list}
+
+請回傳 sentences 陣列，每個元素是 { zh：中文句子, usedWords：這句實際用到的目標單字原文列表（從清單裡一字不差複製） }`;
+  const parsed = await callClaude(prompt, schema, 3072);
+  return parsed.sentences;
+}
+
+async function gradeTranslation(zhSentence, targetWords, userAnswer){
+  const schema = {
+    type: "object",
+    properties: {
+      correct: { type: "boolean" },
+      wordsUsedCorrectly: { type: "array", items: { type: "string" } },
+      feedback: { type: "string" },
+      betterSentence: { type: "string" }
+    },
+    required: ["correct", "wordsUsedCorrectly", "feedback", "betterSentence"],
+    additionalProperties: false
+  };
+  const prompt = `你是${L().teacher}，學生要把這句中文口語翻成${L().label}：
+「${zhSentence}」
+
+理想上應該自然地用到這些${L().label}單字/片語：${targetWords.join("、")}
+（不強制每個字都要出現，但整體翻譯的意思要對、要口語自然）
+
+學生寫的答案：「${userAnswer}」
+
+請判斷：
+1. correct：整體翻譯的意思是否正確、通順自然（不要求跟目標單字的形式完全一致，同義的自然說法也算對）
+2. wordsUsedCorrectly：學生的答案裡，有正確對應到（或用同義說法對應到）的目標單字，從目標單字清單裡列出
+3. feedback：用繁體中文簡短說明哪裡對、哪裡需要調整（1-2 句就好）
+4. betterSentence：一句自然、正確、口語的${L().label}參考翻譯`;
+  return callClaude(prompt, schema, 1024);
+}
+
+const USAGE_CACHE_LS = "flashcard_usage_cache_v2"; // v2: added A1-A2 level constraint to the prompt
+let usageCache = {};
+try{ usageCache = JSON.parse(localStorage.getItem(lsKey(USAGE_CACHE_LS))) || {}; }catch(e){ usageCache = {}; }
+function saveUsageCache(){ localStorage.setItem(lsKey(USAGE_CACHE_LS), JSON.stringify(usageCache)); }
+
+async function getUsageExamples(text, zh){
+  if(usageCache[text]) return usageCache[text];
+  const isTh = currentLang === "th";
+  // 泰文例句多一個 thaiScript 欄位（真正泰文字），例句面板的 🔊 才唸得準；
+  // 印尼文本身就是拉丁字母，例句文字直接拿去唸就好，不需要這個欄位。
+  const schema = {
+    type: "object",
+    properties: {
+      examples: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: Object.assign(
+            { id: { type: "string" } },
+            isTh ? { thaiScript: { type: "string" } } : {},
+            { zh: { type: "string" }, note: { type: "string" } }
+          ),
+          required: isTh ? ["id", "thaiScript", "zh", "note"] : ["id", "zh", "note"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["examples"],
+    additionalProperties: false
+  };
+  const prompt = isTh ? `你是泰語老師。學生不學泰文字母，只用羅馬拼音。請針對這個泰文單字/片語（羅馬拼音），提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
+
+程度限制：學生是泰語初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
+
+單字/片語（羅馬拼音）：${text}${zh ? `（中文意思：${zh}）` : ""}
+
+請回傳 examples 陣列，每個元素是：
+{ id：一句自然口語的泰文例句，用羅馬拼音寫（要用到這個單字/片語）, thaiScript：這句話對應的正確泰文書寫（純粹給語音朗讀用）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }` : `你是印尼語老師。請針對這個印尼文單字/片語，提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
+
+程度限制：學生是印尼語初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
+
+單字/片語：${text}${zh ? `（中文意思：${zh}）` : ""}
+
+請回傳 examples 陣列，每個元素是：
+{ id：一句自然口語的印尼文例句（要用到這個單字/片語）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }`;
+  const parsed = await callClaude(prompt, schema, 1024);
+  usageCache[text] = parsed.examples;
+  saveUsageCache();
+  return parsed.examples;
+}
+
+function addWordToList(text){
+  const clean = text.trim();
+  if(!clean) return false;
+  if(allWords.some(w => w.text.toLowerCase() === clean.toLowerCase())) return false;
+  const nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) + 1 : 1;
+  // source 標記這個字是從例句加的、還沒進到 Obsidian 那邊的主清單，
+  // 下次從 Obsidian 匯入（整批取代）時要特別保留，避免被沖掉。
+  const newWord = { id: nextId, text: clean, source: "sentence" };
+  allWords.push(newWord);
+  saveWordList(allWords);
+  selected.add(nextId);
+  saveSelected();
+  // 不呼叫 renderList()——這個函式常常是在展開中的用法面板裡被觸發，整個重繪
+  // 列表會把使用者正在看的面板收合掉。改成只把這一個新單字插到清單最前面，
+  // 這樣立刻看得到剛加的字，其他正在展開的面板不受影響。
+  if(getVisibleWords().some(w => w.id === nextId)){
+    const el = document.getElementById("wordList");
+    const emptyMsg = el.querySelector(".empty-msg");
+    if(emptyMsg) emptyMsg.remove();
+    const { row, usagePanel } = createWordItem(newWord);
+    el.insertBefore(usagePanel, el.firstChild);
+    el.insertBefore(row, usagePanel);
+  }
+  updateCount();
+  updatePendingSyncBar();
+  return true;
+}
+
+// 把例句拆成一個個可點的字，點了就把那個字加進單字表——保留原本的空白/標點原樣顯示，
+// 只有比對「已加入」跟真正要加入清單時才用去掉頭尾標點後的乾淨版本。
+function isWordInList(clean){
+  return allWords.some(w => w.text.toLowerCase() === clean.toLowerCase());
+}
+function renderTappableSentence(sentence){
+  const wrap = document.createElement("span");
+  const tokens = sentence.split(/(\s+)/);
+  tokens.forEach(tok => {
+    if(tok === "" || /^\s+$/.test(tok)){
+      wrap.appendChild(document.createTextNode(tok));
+      return;
+    }
+    const clean = tok.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+    if(!clean){
+      wrap.appendChild(document.createTextNode(tok));
+      return;
+    }
+    const wSpan = document.createElement("span");
+    wSpan.className = "usage-word" + (isWordInList(clean) ? " in-list" : "");
+    wSpan.textContent = tok;
+    wSpan.title = isWordInList(clean) ? "已在單字表裡" : "點一下加入單字表";
+    wSpan.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(wSpan.classList.contains("in-list")) return;
+      if(addWordToList(clean)) wSpan.classList.add("in-list");
+    });
+    wrap.appendChild(wSpan);
+  });
+  return wrap;
+}
+
+function renderUsagePanel(panel, examples){
+  panel.innerHTML = "";
+  examples.forEach(ex => {
+    const item = document.createElement("div");
+    item.className = "usage-example";
+
+    const idLine = document.createElement("div");
+    idLine.className = "usage-id";
+    idLine.appendChild(renderTappableSentence(ex.id));
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak((L().hasScript && ex.thaiScript) || ex.id, speakBtn); });
+    idLine.appendChild(speakBtn);
+
+    const zhLine = document.createElement("div");
+    zhLine.className = "usage-zh";
+    zhLine.textContent = ex.zh;
+
+    const noteLine = document.createElement("div");
+    noteLine.className = "usage-note";
+    noteLine.textContent = ex.note;
+
+    item.appendChild(idLine);
+    item.appendChild(zhLine);
+    item.appendChild(noteLine);
+    panel.appendChild(item);
+  });
+}
+
+document.getElementById("apiKeyInput").value = getApiKey();
+document.getElementById("btnSaveKey").onclick = () => {
+  const v = document.getElementById("apiKeyInput").value.trim();
+  if(!v){ alert("請輸入 API Key"); return; }
+  setApiKey(v);
+  alert("已儲存 Key。");
+};
+
+document.getElementById("openaiKeyInput").value = getOpenaiKey();
+document.getElementById("btnSaveOpenaiKey").onclick = () => {
+  const v = document.getElementById("openaiKeyInput").value.trim();
+  if(!v){ alert("請輸入 API Key"); return; }
+  setOpenaiKey(v);
+  alert("已儲存 Key。");
+};
+
+document.getElementById("btnGenerate").onclick = async () => {
+  if(!getApiKey()){
+    alert("請先輸入並儲存 API Key。");
+    return;
+  }
+  const missing = allWords.filter(w => !lookup(w.text));
+  if(missing.length === 0){
+    alert("目前清單裡的單字都已經有翻譯了！");
+    return;
+  }
+  const btn = document.getElementById("btnGenerate");
+  btn.disabled = true;
+  const batches = chunkArr(missing, 8);
+  let done = 0;
+  for(const batch of batches){
+    btn.textContent = `生成中... (${done}/${missing.length})`;
+    try{
+      const entries = await generateWordData(batch.map(w => w.text));
+      batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
+      saveCustomDB();
+      done += batch.length;
+      renderList();
+    }catch(e){
+      alert("生成失敗：" + e.message);
+      btn.disabled = false;
+      btn.textContent = "✨ AI 自動生成缺少的翻譯";
+      return;
+    }
+  }
+  btn.disabled = false;
+  btn.textContent = "✨ AI 自動生成缺少的翻譯";
+  renderList();
+};
+
+function getVisibleWords(){
+  const query = document.getElementById("wordSearch").value.trim().toLowerCase();
+  const diffFilter = document.getElementById("difficultyFilter").value;
+  const list = allWords.filter(w => {
+    if(showSelectedOnly && !selected.has(w.id)) return false;
+    if(diffFilter){
+      const d = getDifficulty(w.text);
+      if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
+    }
+    if(!query) return true;
+    const data = lookup(w.text);
+    const haystack = `${w.text} ${data ? data.zh : ""} ${data ? data.en : ""}`.toLowerCase();
+    return haystack.includes(query);
+  });
+  if(sortAZ) list.sort((a, b) => a.text.localeCompare(b.text, "id"));
+  return list;
+}
+
+function createWordItem(w){
+  const data = lookup(w.text);
+  const row = document.createElement("label");
+  row.className = "item" + (data ? "" : " no-data");
+  row.innerHTML = `
+    <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
+    <div>
+      <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
+      <div class="meaning">${data ? (data.zh + " · " + data.en) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+    </div>
+  `;
+  row.querySelector("input").addEventListener("change", (e) => {
+    const id = Number(e.target.dataset.id);
+    if(e.target.checked) selected.add(id); else selected.delete(id);
+    saveSelected();
+    if(showSelectedOnly) renderList(); else updateCount();
+  });
+  if(cardMasteredIds.has(w.id) || quizMasteredIds.has(w.id)){
+    const badgeRow = document.createElement("div");
+    badgeRow.className = "badge-row";
+    if(cardMasteredIds.has(w.id)){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "badge";
+      b.textContent = "🎴 卡片已學會 ✕";
+      b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); cardMasteredIds.delete(w.id); saveCardMastered(); renderList(); });
+      badgeRow.appendChild(b);
+    }
+    if(quizMasteredIds.has(w.id)){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "badge";
+      b.textContent = "📝 測驗已學會 ✕";
+      b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); quizMasteredIds.delete(w.id); saveQuizMastered(); renderList(); });
+      badgeRow.appendChild(b);
+    }
+    row.querySelector("div").appendChild(badgeRow);
+  }
+  const speakBtn = document.createElement("button");
+  speakBtn.type = "button";
+  speakBtn.className = "speak-btn";
+  speakBtn.textContent = "🔊";
+  speakBtn.setAttribute("aria-label", `播放 ${w.text} 發音`);
+  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(getSpeechText(w), speakBtn); });
+  row.appendChild(speakBtn);
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "delete-btn";
+  deleteBtn.textContent = "🗑️";
+  deleteBtn.setAttribute("aria-label", `刪除 ${w.text}`);
+  deleteBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); deleteWord(w.id); });
+  row.appendChild(deleteBtn);
+
+  const usagePanel = document.createElement("div");
+  usagePanel.className = "usage-panel hidden";
+
+  const usageBtn = document.createElement("button");
+  usageBtn.type = "button";
+  usageBtn.className = "usage-btn";
+  usageBtn.textContent = "💬";
+  usageBtn.setAttribute("aria-label", `AI 補充 ${w.text} 的口語用法`);
+  usageBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!usagePanel.classList.contains("hidden")){
+      usagePanel.classList.add("hidden");
+      return;
+    }
+    usagePanel.classList.remove("hidden");
+    if(usagePanel.dataset.loaded === "1") return;
+    if(!getApiKey()){ usagePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+    usagePanel.textContent = "生成中...";
+    try{
+      const examples = await getUsageExamples(w.text, data ? data.zh : "");
+      renderUsagePanel(usagePanel, examples);
+      usagePanel.dataset.loaded = "1";
+    }catch(err){
+      usagePanel.textContent = "生成失敗：" + err.message;
+    }
+  });
+  row.appendChild(usageBtn);
+
+  const diffOrder = [null, "E", "M", "H"];
+  const diffChip = document.createElement("button");
+  diffChip.type = "button";
+  function refreshDiffChip(){
+    const cur = getDifficulty(w.text);
+    diffChip.className = "diff-chip" + (cur ? " diff-" + cur : "");
+    diffChip.textContent = cur || "–";
+    diffChip.setAttribute("aria-label", `${w.text} 難度：${cur || "未標記"}（點一下切換）`);
+  }
+  diffChip.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const cur = getDifficulty(w.text);
+    const next = diffOrder[(diffOrder.indexOf(cur) + 1) % diffOrder.length];
+    setDifficulty(w.text, next);
+    refreshDiffChip();
+  });
+  refreshDiffChip();
+  row.appendChild(diffChip);
+
+  return { row, usagePanel };
+}
+
+function updatePendingSyncBar(){
+  const pending = allWords.filter(w => w.source === "sentence");
+  const bar = document.getElementById("pendingSyncBar");
+  const btn = document.getElementById("btnCopyPending");
+  if(pending.length === 0){
+    bar.classList.add("hidden");
+    return;
+  }
+  bar.classList.remove("hidden");
+  btn.textContent = `📋 複製句子新增、還沒同步進 Obsidian 的單字 (${pending.length})`;
+}
+
+document.getElementById("btnCopyPending").addEventListener("click", async () => {
+  const text = allWords.filter(w => w.source === "sentence").map(w => w.text).join("\n");
+  if(!text){ return; }
+  try{
+    await navigator.clipboard.writeText(text);
+    alert(`已複製 ${text.split("\n").length} 個單字，貼到 Obsidian 就好。`);
+  }catch(e){
+    prompt("自動複製失敗，請手動全選複製以下內容：", text);
+  }
+});
+
+function renderList(){
+  const el = document.getElementById("wordList");
+  el.innerHTML = "";
+  const visibleWords = getVisibleWords();
+  if(visibleWords.length === 0){
+    el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
+  }
+  visibleWords.forEach(w => {
+    const { row, usagePanel } = createWordItem(w);
+    el.appendChild(row);
+    el.appendChild(usagePanel);
+  });
+  updateCount();
+  updatePendingSyncBar();
+}
+function updateCount(){
+  const parts = [`已選 ${selected.size} / ${allWords.length} 個單字`];
+  if(cardMasteredIds.size) parts.push(`卡片已會 ${cardMasteredIds.size}`);
+  if(quizMasteredIds.size) parts.push(`測驗已會 ${quizMasteredIds.size}`);
+  document.getElementById("selCount").textContent = parts.join("・");
+}
+function deleteWord(id){
+  allWords = allWords.filter(w => w.id !== id);
+  saveWordList(allWords);
+  selected.delete(id);
+  saveSelected();
+  cardMasteredIds.delete(id);
+  quizMasteredIds.delete(id);
+  saveCardMastered();
+  saveQuizMastered();
+  renderList();
+}
+
+document.getElementById("btnAll").onclick = () => {
+  // 只加選目前篩選/搜尋出來看得到的（例如篩了「困難」再按全選，只會選困難的），
+  // 沒被篩掉的其他已選字不會被動到。
+  getVisibleWords().forEach(w => selected.add(w.id));
+  saveSelected();
+  renderList();
+};
+document.getElementById("btnNone").onclick = () => {
+  getVisibleWords().forEach(w => selected.delete(w.id));
+  saveSelected();
+  renderList();
+};
+document.getElementById("btnClearMastered").onclick = () => {
+  cardMasteredIds = new Set();
+  quizMasteredIds = new Set();
+  saveCardMastered();
+  saveQuizMastered();
+  renderList();
+};
+document.getElementById("btnRandomSelect").onclick = () => {
+  const raw = Number(document.getElementById("randomCount").value);
+  const pool = getVisibleWords(); // 篩了難度/搜尋的話，只從篩出來的裡面抽
+  const n = Math.max(1, Math.min(pool.length, Math.floor(raw) || 0));
+  if(!n){ alert("請輸入大於 0 的數字"); return; }
+  selected = new Set(shuffleArr(pool.map(w => w.id)).slice(0, n));
+  saveSelected();
+  renderList();
+};
+document.getElementById("wordSearch").addEventListener("input", renderList);
+document.getElementById("difficultyFilter").addEventListener("change", renderList);
+document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) => {
+  showSelectedOnly = !showSelectedOnly;
+  e.currentTarget.textContent = showSelectedOnly ? "顯示全部單字" : "只顯示已選取";
+  e.currentTarget.classList.toggle("primary", showSelectedOnly);
+  renderList();
+});
+document.getElementById("btnSortAZ").addEventListener("click", (e) => {
+  sortAZ = !sortAZ;
+  e.currentTarget.classList.toggle("primary", sortAZ);
+  renderList();
+});
+
+// ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留印尼文） ----
+const NON_INDONESIAN_RE = /[^A-Za-z0-9\s.,!?'"\u2018\u2019\u201c\u201d-]/;
+
+function extractIndonesianLine(raw){
+  let s = raw.replace(/\r/g, "").trim();
+  if(s === "") return null;
+  if(s.startsWith("[")) return null;        // [🔗 分類標題] 這種區塊標題
+  if(/^-{2,}$/.test(s)) return null;        // --- 分隔線
+  s = s.replace(/\*\*/g, "");               // 去掉 **粗體**
+  s = s.replace(/^\d+[\.\)]\s*/, "");       // 去掉「1. 」「1) 」編號
+  s = s.replace(/^[\s\-\*]+/, "");          // 去掉「- 」「* 」項目符號
+  const cutMatch = s.match(NON_INDONESIAN_RE);
+  if(cutMatch) s = s.slice(0, cutMatch.index);
+  s = s.replace(/\s+/g, " ");
+  s = s.replace(/[\s:\/=,\-]+$/, "").replace(/^[\s:\/=,\-]+/, "");
+  s = s.trim();
+  if(s === "") return null;
+  if(!/[a-zA-Z]/.test(s)) return null;      // 沒有拉丁字母就不是印尼文，跳過
+  return s;
+}
+
+document.getElementById("btnImport").onclick = () => document.getElementById("fileInput").click();
+document.getElementById("fileInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const lines = ev.target.result.split(/\r?\n/);
+    const parsed = [];
+    const seen = new Set();
+    let autoId = 0;
+    lines.forEach(line => {
+      const cleaned = extractIndonesianLine(line);
+      if(cleaned === null) return;
+      const key = cleaned.toLowerCase();
+      if(seen.has(key)) return;
+      seen.add(key);
+      autoId++;
+      parsed.push({ id: autoId, text: cleaned });
+    });
+    if(parsed.length === 0){
+      alert(`沒有解析到任何${L().label}單字，請確認檔案內容。`);
+      return;
+    }
+    // 從例句加的字（source: "sentence"）只存在 App 本機、還沒被加進 Obsidian，
+    // 如果這次匯入的內容裡沒有它們，就自動保留下來，不要被整批取代沖掉。
+    // 一旦哪次匯入內容裡真的出現同一個字了（代表你已手動加回 Obsidian），
+    // 就會走一般匯入路徑、不再帶 source 標記，自動視為「已同步」。
+    const pendingSentenceWords = allWords.filter(w => w.source === "sentence" && !seen.has(w.text.toLowerCase()));
+    let nextId = parsed.length;
+    pendingSentenceWords.forEach(w => {
+      nextId++;
+      parsed.push({ id: nextId, text: w.text, source: "sentence" });
+    });
+    allWords = parsed;
+    saveWordList(allWords);
+    selected = new Set(allWords.map(w => w.id));
+    saveSelected();
+    cardMasteredIds = new Set();
+    quizMasteredIds = new Set();
+    saveCardMastered();
+    saveQuizMastered();
+    renderList();
+    const pendingNote = pendingSentenceWords.length
+      ? `（其中 ${pendingSentenceWords.length} 個是之前從例句加的、還沒同步進 Obsidian，已自動保留）`
+      : "";
+    alert(`已匯入 ${parsed.length} 個項目。${pendingNote}`);
+  };
+  reader.readAsText(file, "UTF-8");
+});
+
+// ================= Flash Card =================
+let cardSession = [];
+let cardIndex = 0;
+
+const CARD_DIRECTION_LS = "flashcard_direction_v1";
+let cardDirection = localStorage.getItem(lsKey(CARD_DIRECTION_LS)) === "zh-id" ? "zh-id" : "id-zh";
+
+function updateCardDirectionLabel(){
+  document.getElementById("btnCardDirection").textContent = cardDirection === "id-zh"
+    ? `🔄 正面：${L().label} → 背面：中文`
+    : `🔄 正面：中文 → 背面：${L().label}`;
+}
+updateCardDirectionLabel();
+document.getElementById("btnCardDirection").addEventListener("click", () => {
+  cardDirection = cardDirection === "id-zh" ? "zh-id" : "id-zh";
+  localStorage.setItem(lsKey(CARD_DIRECTION_LS), cardDirection);
+  updateCardDirectionLabel();
+  if(cardSession.length) renderCard();
+});
+
+document.getElementById("btnStartCards").onclick = () => {
+  const list = allWords.filter(w => selected.has(w.id) && !cardMasteredIds.has(w.id));
+  if(list.length === 0){ alert("請至少選一個尚未在 Flash Card 標記已學會的單字"); return; }
+  cardSession = shuffleArr(list.slice());
+  cardIndex = 0;
+  showScreen("cards");
+  renderCard();
+};
+
+function renderCard(){
+  const w = cardSession[cardIndex];
+  const data = lookup(w.text);
+  document.getElementById("cardProgress").textContent = `第 ${cardIndex+1} / ${cardSession.length} 張`;
+  const pronText = (data && data.pron && data.pron !== w.text) ? ` [${data.pron}]` : "";
+  if(cardDirection === "id-zh"){
+    document.getElementById("cardFront").textContent = w.text;
+    document.getElementById("cardPron").textContent = pronText.trim();
+    document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
+  } else {
+    document.getElementById("cardFront").textContent = data ? data.zh : "尚無翻譯資料";
+    document.getElementById("cardPron").textContent = "";
+    document.getElementById("cardBack").textContent = w.text + pronText;
+  }
+  document.getElementById("cardBack").classList.add("hidden");
+  document.getElementById("cardAssessRow").classList.add("hidden");
+}
+document.getElementById("cardArea").onclick = () => {
+  document.getElementById("cardBack").classList.toggle("hidden");
+  document.getElementById("cardAssessRow").classList.toggle("hidden");
+};
+document.getElementById("cardSpeak").addEventListener("click", (e) => {
+  e.stopPropagation();
+  speak(getSpeechText(cardSession[cardIndex]), e.currentTarget);
+});
+document.getElementById("btnPrev").onclick = () => {
+  cardIndex = (cardIndex - 1 + cardSession.length) % cardSession.length;
+  renderCard();
+};
+document.getElementById("btnNext").onclick = () => {
+  cardIndex = (cardIndex + 1) % cardSession.length;
+  renderCard();
+};
+document.getElementById("btnShuffleCards").onclick = () => {
+  cardSession = shuffleArr(cardSession);
+  cardIndex = 0;
+  renderCard();
+};
+document.getElementById("btnBackFromCards").onclick = () => showScreen("select");
+
+function goToNextCard(){
+  cardIndex = (cardIndex + 1) % cardSession.length;
+  renderCard();
+}
+document.getElementById("btnCardWrong").onclick = () => {
+  goToNextCard();
+};
+document.getElementById("btnCardRight").onclick = () => {
+  const w = cardSession[cardIndex];
+  cardMasteredIds.add(w.id);
+  saveCardMastered();
+  cardSession.splice(cardIndex, 1);
+  if(cardSession.length === 0){
+    alert("這批單字都已經標記學會了！");
+    showScreen("select");
+    return;
+  }
+  cardIndex = cardIndex % cardSession.length;
+  renderCard();
+};
+
+// ================= 測驗 =================
+let quizSession = [];
+let quizIndex = 0;
+let quizScore = 0;
+let quizMissed = [];
+let quizRetryPool = null;
+
+document.getElementById("btnStartQuiz").onclick = () => {
+  const list = allWords.filter(w => selected.has(w.id) && !quizMasteredIds.has(w.id));
+  const ready = list.filter(w => lookup(w.text) && lookup(w.text).correct);
+  const skipped = list.length - ready.length;
+  if(ready.length === 0){ alert("勾選的單字都還沒有測驗例句，或都已經在測驗標記學會了，請調整清單。"); return; }
+  if(skipped > 0){
+    alert(`有 ${skipped} 個單字尚無測驗例句，已略過。`);
+  }
+  quizSession = shuffleArr(ready.slice());
+  quizIndex = 0;
+  quizScore = 0;
+  quizMissed = [];
+  showScreen("quiz");
+  renderQuestion();
+};
+
+function renderQuestion(){
+  const w = quizSession[quizIndex];
+  const data = lookup(w.text);
+  document.getElementById("quizProgress").textContent = `第 ${quizIndex+1} / ${quizSession.length} 題`;
+  document.getElementById("quizEnText").textContent = data.quizEn;
+  const options = shuffleArr([data.correct, ...data.distractors]);
+  const optEl = document.getElementById("quizOptions");
+  optEl.innerHTML = "";
+  document.getElementById("btnNextQuestion").classList.add("hidden");
+  document.getElementById("btnMastered").classList.add("hidden");
+  options.forEach(opt => {
+    const row = document.createElement("div");
+    row.className = "opt-row";
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.textContent = opt;
+    b.onclick = () => answerQuestion(b, opt, data.correct, w);
+    row.appendChild(b);
+    // 泰文模式下這些測驗選項只有羅馬拼音、沒有對應的真泰文字，硬要唸羅馬拼音
+    // 容易唸錯誤導學生，乾脆不放發音按鈕，比唸錯還誠實。
+    if(!L().hasScript){
+      const speakBtn = document.createElement("button");
+      speakBtn.type = "button";
+      speakBtn.className = "opt-speak";
+      speakBtn.textContent = "🔊";
+      speakBtn.setAttribute("aria-label", `播放「${opt}」發音`);
+      speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(opt, speakBtn); });
+      row.appendChild(speakBtn);
+    }
+    optEl.appendChild(row);
+  });
+}
+function answerQuestion(btn, chosen, correct, word){
+  const buttons = document.querySelectorAll("#quizOptions .opt");
+  buttons.forEach(b => b.disabled = true);
+  if(chosen === correct){
+    btn.classList.add("correct");
+    quizScore++;
+    if(!quizMasteredIds.has(word.id)){
+      document.getElementById("btnMastered").classList.remove("hidden");
+    }
+  }else{
+    btn.classList.add("wrong");
+    buttons.forEach(b => { if(b.textContent === correct) b.classList.add("correct"); });
+    quizMissed.push(word);
+  }
+  document.getElementById("btnNextQuestion").classList.remove("hidden");
+}
+function goToNextQuestion(){
+  quizIndex++;
+  if(quizIndex >= quizSession.length){
+    showResult();
+  }else{
+    renderQuestion();
+  }
+}
+document.getElementById("btnNextQuestion").onclick = goToNextQuestion;
+document.getElementById("btnMastered").onclick = () => {
+  const w = quizSession[quizIndex];
+  quizMasteredIds.add(w.id);
+  saveQuizMastered();
+  goToNextQuestion();
+};
+document.getElementById("btnBackFromQuiz").onclick = () => showScreen("select");
+
+// ================= 中翻印尼文（AI 出句、AI 批改） =================
+let writeSession = [];
+let writeIndex = 0;
+let writeScore = 0;
+let writeGrading = false;
+
+document.getElementById("btnStartWrite").onclick = async () => {
+  if(!getApiKey()){ alert("這個模式需要用 AI 出題跟批改，請先在上面輸入並儲存 API Key。"); return; }
+  const list = allWords.filter(w => selected.has(w.id));
+  const ready = list.filter(w => lookup(w.text));
+  const skipped = list.length - ready.length;
+  if(ready.length === 0){ alert("勾選的單字都還沒有翻譯資料，請先選有翻譯資料的單字，或用「AI 自動生成」補上。"); return; }
+  if(skipped > 0){
+    alert(`有 ${skipped} 個單字尚無翻譯資料，已略過。`);
+  }
+  const startBtn = document.getElementById("btnStartWrite");
+  startBtn.disabled = true;
+  const batches = chunkArr(ready, 12);
+  const sentences = [];
+  try{
+    for(let i = 0; i < batches.length; i++){
+      startBtn.textContent = `AI 出題中... (${i + 1}/${batches.length})`;
+      const batchSentences = await generateWriteSentences(batches[i]);
+      sentences.push(...batchSentences);
+    }
+  }catch(e){
+    startBtn.disabled = false;
+    startBtn.textContent = writeBtnLabel();
+    alert("出題失敗：" + e.message);
+    return;
+  }
+  startBtn.disabled = false;
+  startBtn.textContent = "✍️ 中翻印尼文（AI 出句、AI 批改）";
+  if(sentences.length === 0){ alert("沒有產生出任何句子，請再試一次。"); return; }
+  writeSession = shuffleArr(sentences);
+  writeIndex = 0;
+  writeScore = 0;
+  showScreen("write");
+  renderWriteQuestion();
+};
+
+function renderWriteQuestion(){
+  const s = writeSession[writeIndex];
+  document.getElementById("writeProgress").textContent = `第 ${writeIndex + 1} / ${writeSession.length} 題`;
+  document.getElementById("writeWord").textContent = s.zh;
+  document.getElementById("writeHint").textContent = s.usedWords && s.usedWords.length ? `可用單字參考：${s.usedWords.join("、")}` : "";
+  const input = document.getElementById("writeInput");
+  input.value = "";
+  input.disabled = false;
+  input.classList.remove("hidden");
+  const submitBtn = document.getElementById("btnSubmitWrite");
+  submitBtn.classList.remove("hidden");
+  submitBtn.disabled = false;
+  submitBtn.textContent = "送出";
+  document.getElementById("writeSpeak").classList.add("hidden");
+  document.getElementById("writeFeedback").classList.add("hidden");
+  document.getElementById("writeFeedback").innerHTML = "";
+  document.getElementById("btnNextWrite").classList.add("hidden");
+  input.focus();
+}
+
+document.getElementById("btnSubmitWrite").addEventListener("click", async () => {
+  if(writeGrading) return;
+  const input = document.getElementById("writeInput");
+  const answer = input.value.trim();
+  if(!answer){ alert("請先輸入句子"); return; }
+  const s = writeSession[writeIndex];
+  const submitBtn = document.getElementById("btnSubmitWrite");
+  writeGrading = true;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "批改中...";
+  try{
+    const result = await gradeTranslation(s.zh, s.usedWords || [], answer);
+    writeGrading = false;
+    input.disabled = true;
+    submitBtn.classList.add("hidden");
+    if(result.correct) writeScore++;
+    const fb = document.getElementById("writeFeedback");
+    fb.classList.remove("hidden");
+    fb.innerHTML = `
+      <p class="verdict ${result.correct ? "ok" : "no"}">${result.correct ? "✓ 不錯！" : "還需要調整"}</p>
+      <p>${result.feedback}</p>
+      ${result.wordsUsedCorrectly && result.wordsUsedCorrectly.length ? `<p>有正確用到：${result.wordsUsedCorrectly.join("、")}</p>` : ""}
+      <p class="ref">參考翻譯：${result.betterSentence}</p>
+    `;
+    const speakBtn = document.getElementById("writeSpeak");
+    // 泰文模式沒有這句參考翻譯對應的真泰文字，唸羅馬拼音容易誤導，就不顯示按鈕。
+    if(!L().hasScript){
+      speakBtn.classList.remove("hidden");
+      speakBtn.onclick = () => speak(result.betterSentence, speakBtn);
+    }
+    document.getElementById("btnNextWrite").classList.remove("hidden");
+  }catch(e){
+    writeGrading = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = "送出";
+    alert("批改失敗：" + e.message);
+  }
+});
+
+document.getElementById("btnNextWrite").onclick = () => {
+  writeIndex++;
+  if(writeIndex >= writeSession.length){
+    finishWriteSession();
+  }else{
+    renderWriteQuestion();
+  }
+};
+document.getElementById("btnBackFromWrite").onclick = () => showScreen("select");
+
+function finishWriteSession(){
+  document.getElementById("writeProgress").textContent = "完成";
+  document.getElementById("writeWord").textContent = `你答對了 ${writeScore} / ${writeSession.length} 題`;
+  document.getElementById("writeHint").textContent = "";
+  document.getElementById("writeInput").classList.add("hidden");
+  document.getElementById("btnSubmitWrite").classList.add("hidden");
+  document.getElementById("writeSpeak").classList.add("hidden");
+  document.getElementById("writeFeedback").classList.add("hidden");
+  document.getElementById("btnNextWrite").classList.add("hidden");
+}
+
+// ================= 跑步聽力模式（唸印尼文x3 + 中文x1，一直循環） =================
+let listenSession = [];
+let listenIndex = 0;
+let listenRunning = false;
+let listenTimeoutId = null;
+
+// 0.3 秒的真實無聲 WAV（8-bit/8kHz），用來在使用者點擊當下「解鎖」<audio> 元素。
+// 手機瀏覽器（尤其 iOS Safari）要求播放動作緊接著使用者手勢才會放行；跑步模式的
+// 真正語音要等 TTS API 回來才能播，中間的等待會讓瀏覽器認定這次播放跟點擊無關而
+// 擋掉。0 長度的音檔在 iOS 上可能來不及真的播放、解鎖不會生效，所以改用有實際
+// 長度、確定會觸發播放的無聲檔案。
+const SILENT_AUDIO_DATA_URI = "data:audio/wav;base64,UklGRoQJAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWAJAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA=";
+
+document.getElementById("btnStartListen").onclick = () => {
+  const list = allWords.filter(w => selected.has(w.id) && lookup(w.text));
+  if(list.length === 0){ alert("請先選有翻譯資料的單字"); return; }
+  listenSession = shuffleArr(list.slice());
+  listenIndex = 0;
+  listenRunning = true;
+  showScreen("listen");
+  const audioEl = document.getElementById("listenAudio");
+  audioEl.src = SILENT_AUDIO_DATA_URI;
+  audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
+  runListenLoop();
+};
+
+async function runListenLoop(){
+  const thinkMs = Math.max(500, (Number(document.getElementById("thinkPause").value) || 3) * 1000);
+  const voiceSource = document.getElementById("voiceSource").value;
+  while(listenRunning){
+    const w = listenSession[listenIndex];
+    const data = lookup(w.text);
+    document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
+    document.getElementById("listenWord").textContent = w.text;
+    document.getElementById("listenZh").textContent = "";
+
+    try{
+      if(voiceSource === "gpt"){
+        document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（生成語音中...）`;
+        const idBlob = await withTimeout(getTTSAudioBlob(getSpeechText(w), L().ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+        const zhBlob = await withTimeout(getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+        document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
+
+        for(let i = 0; i < 3 && listenRunning; i++){
+          await playAudioBlob(idBlob);
+          if(!listenRunning) break;
+          await waitMs(400);
+        }
+        if(!listenRunning) break;
+
+        await waitMs(thinkMs);
+        if(!listenRunning) break;
+
+        document.getElementById("listenZh").textContent = data.zh;
+        await playAudioBlob(zhBlob);
+      } else {
+        for(let i = 0; i < 3 && listenRunning; i++){
+          await speakAsync(getSpeechText(w), L().speechLang);
+          if(!listenRunning) break;
+          await waitMs(400);
+        }
+        if(!listenRunning) break;
+
+        await waitMs(thinkMs);
+        if(!listenRunning) break;
+
+        document.getElementById("listenZh").textContent = data.zh;
+        await speakAsync(data.zh, "zh-TW");
+      }
+    }catch(e){
+      // 錯誤同時寫進畫面文字，不要只靠 alert()——Safari 在同一頁密集跳出多次
+      // alert 之後可能會被使用者或系統靜音掉，之後的 alert() 呼叫會完全沒反應。
+      // 有些錯誤（例如某些 DOMException）message 是空字串，保底顯示 name 或整個物件字串化。
+      const errMsg = (e && (e.message || e.name)) || String(e) || "未知錯誤（沒有錯誤訊息）";
+      document.getElementById("listenProgress").textContent = "❌ 發生錯誤，已停止";
+      document.getElementById("listenWord").textContent = errMsg;
+      document.getElementById("listenZh").textContent = "";
+      try{ alert("語音播放失敗：" + errMsg); }catch(alertErr){}
+      listenRunning = false;
+      break;
+    }
+    if(!listenRunning) break;
+
+    await waitMs(800);
+    listenIndex = (listenIndex + 1) % listenSession.length;
+  }
+}
+
+document.getElementById("btnBackFromListen").onclick = () => {
+  listenRunning = false;
+  if(listenTimeoutId) clearTimeout(listenTimeoutId);
+  document.getElementById("listenAudio").pause();
+  showScreen("select");
+};
+
+function showResult(){
+  showScreen("result");
+  document.getElementById("resultScore").textContent = `你答對了 ${quizScore} / ${quizSession.length} 題`;
+  const missedEl = document.getElementById("resultMissed");
+  if(quizMissed.length > 0){
+    missedEl.textContent = "答錯的單字：" + quizMissed.map(w => w.text).join("、");
+    document.getElementById("btnRetryMissed").classList.remove("hidden");
+  }else{
+    missedEl.textContent = "全部答對，太厲害了！";
+    document.getElementById("btnRetryMissed").classList.add("hidden");
+  }
+}
+document.getElementById("btnRetryMissed").onclick = () => {
+  quizSession = shuffleArr(quizMissed.slice());
+  quizIndex = 0;
+  quizScore = 0;
+  quizMissed = [];
+  showScreen("quiz");
+  renderQuestion();
+};
+document.getElementById("btnBackFromResult").onclick = () => showScreen("select");
+
+// ================= 共用 =================
+function shuffleArr(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function showScreen(name){
+  ["select","cards","quiz","write","listen","result"].forEach(s => {
+    document.getElementById("screen-" + s).classList.toggle("hidden", s !== name);
+  });
+  if(name === "select") renderList();
+}
+
+renderList();
+</script>
+</body>
+</html>
