@@ -1313,8 +1313,26 @@ document.getElementById("btnSortAZ").addEventListener("click", (e) => {
   renderList();
 });
 
-// ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留印尼文） ----
-const NON_INDONESIAN_RE = /[^A-Za-z0-9\s.,!?'"\u2018\u2019\u201c\u201d-]/;
+// ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留目標語言文字） ----
+// 允許的文字腳本依目前的目標語言而定：任何語言的羅馬拼音都是拉丁字母，一律
+// 允許；如果使用者匯入的其實是真正的原生文字（不是羅馬拼音），再依語言額外
+// 允許該語言自己的原生文字腳本。中文（Han）不算進允許範圍——中文通常是同一行
+// 後面貼的意思註解，要被切掉；日文例外，因為漢字本來就是日文的一部分。這樣
+// 泰文字母、日文假名漢字、韓文諺文、越南文重音都認得出來，不會像只認拉丁字母
+// 的舊規則一樣把使用者打的原生文字整行濾掉。
+function scriptsForLang(){
+  const scripts = ["Latin"];
+  if(currentLang === "th") scripts.push("Thai");
+  if(currentLang === "ja") scripts.push("Hiragana", "Katakana", "Han");
+  if(currentLang === "ko") scripts.push("Hangul");
+  return scripts.map(s => `\p{Script=${s}}`).join("");
+}
+function nonWordCharRe(){
+  return new RegExp(`[^${scriptsForLang()}0-9\s.,!?'"‘’“”-]`, "u");
+}
+function hasWordCharRe(){
+  return new RegExp(`[${scriptsForLang()}]`, "u");
+}
 
 function extractIndonesianLine(raw){
   let s = raw.replace(/\r/g, "").trim();
@@ -1324,13 +1342,13 @@ function extractIndonesianLine(raw){
   s = s.replace(/\*\*/g, "");               // 去掉 **粗體**
   s = s.replace(/^\d+[\.\)]\s*/, "");       // 去掉「1. 」「1) 」編號
   s = s.replace(/^[\s\-\*]+/, "");          // 去掉「- 」「* 」項目符號
-  const cutMatch = s.match(NON_INDONESIAN_RE);
+  const cutMatch = s.match(nonWordCharRe());
   if(cutMatch) s = s.slice(0, cutMatch.index);
   s = s.replace(/\s+/g, " ");
   s = s.replace(/[\s:\/=,\-]+$/, "").replace(/^[\s:\/=,\-]+/, "");
   s = s.trim();
   if(s === "") return null;
-  if(!/[a-zA-Z]/.test(s)) return null;      // 沒有拉丁字母就不是印尼文，跳過
+  if(!hasWordCharRe().test(s)) return null; // 沒有目標語言的文字就跳過
   return s;
 }
 
