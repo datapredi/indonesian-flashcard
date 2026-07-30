@@ -1254,6 +1254,18 @@ function createWordItem(w){
   row.appendChild(recBtn);
   row.appendChild(playRecBtn);
 
+  const forvoBtn = document.createElement("button");
+  forvoBtn.type = "button";
+  forvoBtn.className = "speak-btn";
+  forvoBtn.textContent = "🔎";
+  forvoBtn.title = "在 Forvo 查真人發音（開新分頁）";
+  forvoBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const query = getSpeechText(w); // hasScript 語言用背後的原生文字查，Forvo 是照各語言原生文字收錄的
+    window.open(`https://forvo.com/search/${encodeURIComponent(query)}/`, "_blank", "noopener");
+  });
+  row.appendChild(forvoBtn);
+
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
   deleteBtn.className = "delete-btn";
