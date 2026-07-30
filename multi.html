@@ -136,7 +136,7 @@
       <button id="btnDedupByMeaning">🧹 合併中文意思重複的單字</button>
     </div>
     <div class="toolbar hidden" id="convertBar">
-      <button id="btnImportConvertTh">🔄 匯入其他語言檔案並自動轉換</button>
+      <button id="btnImportConvertTh">📥 匯入並自動生成資料（新增不覆蓋）</button>
       <input type="file" id="fileInputConvertTh" accept=".txt,.md">
     </div>
     <div class="note hidden" id="convertNote"></div>
@@ -349,8 +349,8 @@ function updateLangButtons(){
   // 所以用是不是印尼文來判斷要不要顯示，之後加第四種語言也不用再改這裡。
   document.getElementById("convertBar").classList.toggle("hidden", currentLang === "id");
   document.getElementById("convertNote").classList.toggle("hidden", currentLang === "id");
-  document.getElementById("btnImportConvertTh").textContent = `🔄 匯入其他語言檔案並自動轉成${L().label}`;
-  document.getElementById("convertNote").textContent = `會用 AI 把匯入的單字（不管原本是什麼語言）逐一轉成對應的${L().label}（羅馬拼音＋中英文意思），加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入。`;
+  document.getElementById("btnImportConvertTh").textContent = `📥 匯入並自動生成${L().label}資料（新增不覆蓋）`;
+  document.getElementById("convertNote").textContent = `不管你匯入的檔案原本是${L().label}羅馬拼音、${L().label}原生文字、還是其他語言，都會用 AI 判斷意思，補上羅馬拼音＋中英文意思＋發音用的原生文字，加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入、也不會覆蓋掉原本的清單。`;
   document.getElementById("viDialectBar").classList.toggle("hidden", currentLang !== "vi");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
