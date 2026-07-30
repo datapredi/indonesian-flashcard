@@ -138,7 +138,6 @@
     <div class="toolbar hidden" id="convertBar">
       <button id="btnImportConvertTh">🔄 匯入其他語言檔案並自動轉換</button>
       <input type="file" id="fileInputConvertTh" accept=".txt,.md">
-      <button id="btnResetConverted">♻️ 重置轉換記錄（不刪單字）</button>
     </div>
     <div class="note hidden" id="convertNote"></div>
     <div class="toolbar hidden" id="pendingSyncBar">
@@ -565,16 +564,17 @@ function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMaster
 
 let allWords = loadWordList();
 
-// ---- 記住哪些「來源語言原字」已經轉換過語言（給 convertWordsToTargetLang 用） ----
-// AI 生成的羅馬拼音沒有唯一標準寫法，同一個字每次轉換拼法可能不完全一樣
-// （例如 "sawadee" vs "sawatdee"），如果拿「AI 拼出來的字串是否相同」去判斷
-// 重複，同一批來源字重新匯入一次就可能因為拼法飄移產生一堆看起來不同、但其實
-// 是同一個字的重複項目。改成直接記住「這個來源原字轉換過了」，之後同一個來源
-// 字要嘛不轉、要嘛就沿用同一次轉換結果，不會每次匯入都再問一次 AI。
-const CONVERTED_SOURCES_LS = "flashcard_converted_sources_v1";
-let convertedSources = new Set();
-try{ convertedSources = new Set(JSON.parse(localStorage.getItem(lsKey(CONVERTED_SOURCES_LS))) || []); }catch(e){ convertedSources = new Set(); }
-function saveConvertedSources(){ localStorage.setItem(lsKey(CONVERTED_SOURCES_LS), JSON.stringify([...convertedSources])); }
+// ---- 記住「來源語言原字」轉換後對應到清單裡的哪個字（給 convertWordsToTargetLang 用） ----
+// v1 只記「這個原字轉過了」（一個 Set），但沒記轉成了哪個字——如果那次轉換其實
+// 沒成功（AI 少回傳、或後來那個字被刪掉/合併掉了），就沒辦法知道要不要重補，
+// 只能整批重置、逼全部重轉一次，結果因為 AI 拼法不是每次都一樣，好端端的字也
+// 被拼出新版本、變成一堆新重複。v2 改記「原字 → 轉換後對應到的字」這個對應
+// 關係，每次匯入時檢查那個對應的字是不是「真的還在清單裡」：還在就跳過，不在
+// 就自動只補這一個，其他沒問題的字完全不會被動到，不用整批重轉。
+const CONVERTED_MAP_LS = "flashcard_converted_map_v2";
+let convertedMap = {};
+try{ convertedMap = JSON.parse(localStorage.getItem(lsKey(CONVERTED_MAP_LS))) || {}; }catch(e){ convertedMap = {}; }
+function saveConvertedMap(){ localStorage.setItem(lsKey(CONVERTED_MAP_LS), JSON.stringify(convertedMap)); }
 
 // ---- 難度標記（E簡單/M中等/H困難，用單字文字當 key，跟翻譯一樣不會被重新匯入洗掉） ----
 const DIFFICULTY_LS = "flashcard_difficulty_v1";
@@ -1251,23 +1251,11 @@ document.getElementById("btnClearWordList").onclick = () => {
   saveWordList(allWords);
   selected = new Set();
   saveSelected();
-  // 單字表清空了，「哪些來源字轉換過」的記錄也要一起清掉，不然之後重新轉換
-  // 會誤判成「都轉過了」而整批跳過、清單卻是空的。
-  convertedSources = new Set();
-  saveConvertedSources();
+  // 單字表清空了，「原字轉換後對應到哪個字」的記錄也要一起清掉，不然之後
+  // 重新轉換會誤判成「對應的字還在」而跳過、但清單其實是空的。
+  convertedMap = {};
+  saveConvertedMap();
   renderList();
-};
-document.getElementById("btnResetConverted").onclick = () => {
-  // 修過的 bug：以前整批標記已轉換，沒真的對應到結果的字也會被誤標，之後
-  // 永遠被跳過、補不回來。這個按鈕只重置「哪些字轉換過」的記錄，不會動到
-  // 已經在單字表裡的字——重新匯入來源檔案時，全部的字都會再檢查一次，
-  // 已經存在的字因為羅馬拼音字串通常會比對到而自動跳過，但如果 AI 這次
-  // 拼法不同，可能會產生新的重複，用「🧹 合併中文意思重複的單字」清一下就好。
-  if(convertedSources.size === 0){ alert("目前沒有轉換記錄可以重置。"); return; }
-  if(!confirm(`確定要重置轉換記錄嗎？（不會刪除任何單字，只是讓下次匯入時全部重新檢查一次）`)) return;
-  convertedSources = new Set();
-  saveConvertedSources();
-  alert("已重置。現在可以重新匯入來源檔案，之前沒真的轉成功的字會被找出來補上，轉完建議再點一次「🧹 合併中文意思重複的單字」清掉可能產生的重複。");
 };
 document.getElementById("btnDedupByMeaning").onclick = () => {
   // AI 生成的羅馬拼音沒有唯一標準寫法，同一個字可能被拼成不同字串、變成看起來
@@ -1428,9 +1416,14 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     if(staleCount > 0){
       allWords = allWords.filter(w => !indoWordSet.has(w.text.toLowerCase()));
     }
-    // 已經轉換過的來源字直接跳過，不用重新問 AI（見上面 convertedSources 的說明：
-    // AI 拼法每次可能不完全一樣，靠這個記錄才不會同一批字重新匯入又生出重複）。
-    const wordsToConvert = indoWords.filter(w => !convertedSources.has(w.toLowerCase()));
+    // 只轉「還沒轉過」或「轉過但對應的字後來不見了（被刪掉/合併掉/當初其實
+    // 沒轉成功）」的來源字，已經轉過而且結果還在清單裡的完全不會被動到，
+    // 不用整批重轉、也不會因為 AI 拼法飄移產生新的重複。
+    const wordsToConvert = indoWords.filter(w => {
+      const mapped = convertedMap[w.toLowerCase()];
+      if(!mapped) return true;
+      return !allWords.some(x => x.text.toLowerCase() === mapped.toLowerCase());
+    });
     const alreadyDoneCount = indoWords.length - wordsToConvert.length;
     if(wordsToConvert.length === 0){
       alert(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。`);
@@ -1460,6 +1453,9 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           const sourceKey = (entry.source || "").trim().toLowerCase();
           if(!text || !sourceKey || !batchWordSet.has(sourceKey)) return;
           matchedThisBatch.add(sourceKey);
+          // 不管這個字是新加的還是本來就存在（同字重複），都記住這個原字對應
+          // 到哪個結果字，下次匯入才有辦法確認「這個結果字是不是還在」。
+          convertedMap[sourceKey] = text;
           if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())) return;
           nextId++;
           allWords.push({ id: nextId, text });
@@ -1469,9 +1465,8 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           };
           addedCount++;
         });
-        matchedThisBatch.forEach(w => convertedSources.add(w));
         unmatchedCount += batch.length - matchedThisBatch.size;
-        saveConvertedSources();
+        saveConvertedMap();
         saveWordList(allWords);
         saveCustomDB();
         selected = new Set(allWords.map(w => w.id));
