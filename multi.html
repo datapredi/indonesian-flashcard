@@ -50,6 +50,7 @@
   .item.no-data .meaning{color:var(--danger);}
   .item > div{flex:1;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
+  .speak-btn.recording{background:var(--danger); color:#fff; border-color:var(--danger);}
   .speak-btn:disabled{opacity:0.5;}
   .delete-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
   .delete-btn:hover{border-color:var(--danger); color:var(--danger);}
@@ -542,6 +543,75 @@ function playAudioBlob(blob){
     audioEl.onerror = () => { URL.revokeObjectURL(url); reject(new Error("播放失敗")); };
     audioEl.play().catch(reject);
   });
+}
+
+// ================= 錄自己的發音，跟 AI/真人發音來回比較 =================
+// 不做自動評分（AI 對聲調準不準沒辦法給可靠的分數，見前面討論），單純錄下來
+// 存住，讓使用者自己在「🔊 標準發音」跟「🎙️ 我的錄音」之間來回切著聽，用自己
+// 的耳朵判斷差在哪。用 key（語言+文字）分開存，跟 TTS 快取是各自獨立的
+// IndexedDB store。
+const REC_DB_NAME = "flashcard_user_recordings";
+const REC_STORE_NAME = "recordings";
+function openRecDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(REC_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(REC_STORE_NAME); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function getUserRecording(key){
+  const db = await openRecDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(REC_STORE_NAME, "readonly");
+    const req = tx.objectStore(REC_STORE_NAME).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function setUserRecording(key, blob){
+  const db = await openRecDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(REC_STORE_NAME, "readwrite");
+    tx.objectStore(REC_STORE_NAME).put(blob, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function recKeyFor(text){ return `${currentLang}::${text.toLowerCase()}`; }
+
+let activeRecorder = null;
+const MAX_RECORD_MS = 8000; // 保險用的自動停止上限，避免忘記按停止一直錄
+
+function startRecording(text, onDone, onError){
+  if(activeRecorder) return;
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const chunks = [];
+    const mimeType = (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("audio/webm"))
+      ? "audio/webm" : "";
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    activeRecorder = recorder;
+    recorder.ondataavailable = (e) => { if(e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      activeRecorder = null;
+      try{
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        await setUserRecording(recKeyFor(text), blob);
+        onDone();
+      }catch(e){
+        onError(e);
+      }
+    };
+    recorder.start();
+    setTimeout(() => { if(activeRecorder === recorder) recorder.stop(); }, MAX_RECORD_MS);
+  }).catch((e) => {
+    activeRecorder = null;
+    onError(e);
+  });
+}
+function stopRecording(){
+  if(activeRecorder && activeRecorder.state !== "inactive") activeRecorder.stop();
 }
 
 const LS_KEY = "flashcard_word_list_v1";
@@ -1134,6 +1204,55 @@ function createWordItem(w){
   speakBtn.setAttribute("aria-label", `播放 ${w.text} 發音`);
   speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(getSpeechText(w), speakBtn); });
   row.appendChild(speakBtn);
+
+  const playRecBtn = document.createElement("button");
+  playRecBtn.type = "button";
+  playRecBtn.className = "speak-btn";
+  playRecBtn.textContent = "▶️";
+  playRecBtn.title = "播放我自己的錄音";
+  playRecBtn.style.display = "none";
+  playRecBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const rec = await getUserRecording(recKeyFor(w.text));
+    if(!rec) return;
+    const url = URL.createObjectURL(rec);
+    const audioEl = document.getElementById("listenAudio");
+    audioEl.src = url;
+    audioEl.play().catch(() => {});
+    audioEl.onended = () => URL.revokeObjectURL(url);
+  });
+  async function refreshPlayRecBtn(){
+    const rec = await getUserRecording(recKeyFor(w.text));
+    playRecBtn.style.display = rec ? "" : "none";
+  }
+  refreshPlayRecBtn();
+
+  const recBtn = document.createElement("button");
+  recBtn.type = "button";
+  recBtn.className = "speak-btn";
+  recBtn.textContent = "🎙️";
+  recBtn.title = "錄下我自己唸這個字的發音（最長 8 秒）";
+  recBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if(recBtn.classList.contains("recording")){
+      stopRecording();
+      return;
+    }
+    recBtn.classList.add("recording");
+    recBtn.textContent = "⏹️";
+    startRecording(w.text, () => {
+      recBtn.classList.remove("recording");
+      recBtn.textContent = "🎙️";
+      refreshPlayRecBtn();
+    }, (err) => {
+      recBtn.classList.remove("recording");
+      recBtn.textContent = "🎙️";
+      alert("錄音失敗：" + (err && err.message ? err.message : err));
+    });
+  });
+  row.appendChild(recBtn);
+  row.appendChild(playRecBtn);
+
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
   deleteBtn.className = "delete-btn";
