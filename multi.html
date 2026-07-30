@@ -42,13 +42,14 @@
   textarea{width:100%; resize:vertical; font-size:1rem;}
   .note{font-size:0.75rem; color:var(--muted); margin:-6px 0 12px;}
   .list{background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:16px;}
-  .item{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border);}
+  .item{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:10px 14px; border-bottom:1px solid var(--border);}
   .item:last-child{border-bottom:none;}
   .item .id-text{font-weight:600;}
   .item .meaning{color:var(--muted); font-size:0.82rem;}
   .item.no-data .id-text{color:var(--muted);}
   .item.no-data .meaning{color:var(--danger);}
-  .item > div{flex:1;}
+  /* 文字區塊固定佔滿一整行，按鈕多的話會自動排到下一行，不會把單字擠成一個字母一行 */
+  .item > div{flex:1 1 100%; min-width:0;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
   .speak-btn.recording{background:var(--danger); color:#fff; border-color:var(--danger);}
   .speak-btn:disabled{opacity:0.5;}
