@@ -109,8 +109,16 @@
 <div class="wrap">
   <h1 id="pageTitle">🇮🇩 印尼語 Flash Card</h1>
   <div class="toolbar">
-    <button id="btnLangId">🇮🇩 印尼文</button>
-    <button id="btnLangTh">🇹🇭 泰文</button>
+    <button class="lang-btn" data-lang="id">🇮🇩 印尼文</button>
+    <button class="lang-btn" data-lang="th">🇹🇭 泰文</button>
+    <button class="lang-btn" data-lang="vi">🇻🇳 越南文</button>
+  </div>
+  <div class="toolbar hidden" id="viDialectBar">
+    <label for="viDialect" style="align-self:center;">越南語口音</label>
+    <select id="viDialect">
+      <option value="nam">南部（胡志明市）</option>
+      <option value="bac">北部（河內）</option>
+    </select>
   </div>
   <div class="sub">從單字清單勾選要複習的內容，開始 Flashcard 或測驗</div>
 
@@ -262,12 +270,17 @@
 <script>
 // ================= 語言切換 =================
 // 印尼文維持完全不加後綴的舊 key（跟 index.html 共用同一份資料，不用搬家）。
-// 泰文所有 localStorage key 都加 "_th" 後綴，兩種語言的單字表/已學會/難度/
-// 翻譯快取/例句快取完全分開，互不干擾。切換語言時直接整頁重新載入，
-// 避免要手動重置一堆模組層級的變數狀態，風險最低。
+// 其他語言（泰文、越南文...）所有 localStorage key 都加 "_語言代碼" 後綴，
+// 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
+// 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
 const LANG_LS = "flashcard_lang_v1";
-let currentLang = localStorage.getItem(LANG_LS) === "th" ? "th" : "id";
-function lsKey(base){ return currentLang === "th" ? base + "_th" : base; }
+const LANG_ORDER = ["id", "th", "vi"];
+let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
+function lsKey(base){ return currentLang === "id" ? base : `${base}_${currentLang}`; }
+
+// 越南文南北口音發音差很多，這個是唯一需要在語言之外再多一層選項的地方。
+const VI_DIALECT_LS = "flashcard_vi_dialect_v1";
+let viDialect = localStorage.getItem(VI_DIALECT_LS) === "bac" ? "bac" : "nam"; // 預設南部（胡志明市）
 
 const LANG_INFO = {
   id: {
@@ -280,7 +293,17 @@ const LANG_INFO = {
     label: "泰文（羅馬拼音）", flag: "🇹🇭", teacher: "泰語老師",
     speechLang: "th-TH",
     ttsInstructions: "Speak in authentic Thai with natural Thai pronunciation, intonation, and tones, as a native Thai speaker would.",
-    hasScript: true // 顯示的是羅馬拼音，真正要發音必須用 AI 額外生成的泰文字（thaiScript）
+    hasScript: true // 顯示的是羅馬拼音，真正要發音必須用 AI 額外生成的原生文字（nativeScript）
+  },
+  vi: {
+    label: "越南文（羅馬拼音）", flag: "🇻🇳", teacher: "越南語老師",
+    speechLang: "vi-VN",
+    get ttsInstructions(){
+      return viDialect === "bac"
+        ? "Speak in authentic Northern Vietnamese (Hanoi dialect) with natural pronunciation, intonation, and tones, as a native Northern Vietnamese speaker would."
+        : "Speak in authentic Southern Vietnamese (Ho Chi Minh City / Saigon dialect) with natural pronunciation, intonation, and tones, as a native Southern Vietnamese speaker would.";
+    },
+    hasScript: true
   }
 };
 function L(){ return LANG_INFO[currentLang]; } // 目前語言的設定物件（跟 speakAsync(text, lang) 的參數 lang 是兩回事，故意取不同名字避免混淆）
@@ -290,34 +313,41 @@ function setLang(l){
   localStorage.setItem(LANG_LS, l);
   location.reload();
 }
-document.getElementById("btnLangId").addEventListener("click", () => setLang("id"));
-document.getElementById("btnLangTh").addEventListener("click", () => setLang("th"));
+document.querySelectorAll(".lang-btn").forEach(btn => {
+  btn.addEventListener("click", () => setLang(btn.dataset.lang));
+});
+document.getElementById("viDialect").value = viDialect;
+document.getElementById("viDialect").addEventListener("change", (e) => {
+  viDialect = e.target.value;
+  localStorage.setItem(VI_DIALECT_LS, viDialect);
+});
 function updateLangButtons(){
-  document.getElementById("btnLangId").classList.toggle("primary", currentLang === "id");
-  document.getElementById("btnLangTh").classList.toggle("primary", currentLang === "th");
+  document.querySelectorAll(".lang-btn").forEach(btn => {
+    btn.classList.toggle("primary", btn.dataset.lang === currentLang);
+  });
   document.getElementById("pageTitle").textContent = `${L().flag} ${L().label} Flash Card`;
   document.title = `${L().label} Flash Card`;
   document.getElementById("wordSearch").placeholder = `搜尋${L().label}或中文...`;
   document.getElementById("btnStartQuiz").textContent = `開始測驗（英文選${L().label}）`;
   document.getElementById("btnStartWrite").textContent = writeBtnLabel();
   document.getElementById("writeInput").placeholder = `把上面這句中文翻成${L().label}...`;
-  // 印尼文是原本的預設語言，其他語言（泰文，以後可能更多）才需要「從別的語言
-  // 轉換過來」這個功能，所以用是不是印尼文來判斷要不要顯示，而不是寫死泰文，
-  // 之後加第三種語言就不用再改這裡。
+  // 印尼文是原本的預設語言，其他語言才需要「從別的語言轉換過來」這個功能，
+  // 所以用是不是印尼文來判斷要不要顯示，之後加第四種語言也不用再改這裡。
   document.getElementById("convertBar").classList.toggle("hidden", currentLang === "id");
   document.getElementById("convertNote").classList.toggle("hidden", currentLang === "id");
   document.getElementById("btnImportConvertTh").textContent = `🔄 匯入其他語言檔案並自動轉成${L().label}`;
   document.getElementById("convertNote").textContent = `會用 AI 把匯入的單字（不管原本是什麼語言）逐一轉成對應的${L().label}（羅馬拼音＋中英文意思），加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入。`;
+  document.getElementById("viDialectBar").classList.toggle("hidden", currentLang !== "vi");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
 
-// 給沒有真正泰文字可用時的 fallback：拿羅馬拼音直接唸還是比完全不唸好一點，
-// 只是在 Thai 模式下標明「可能不準」，不假裝這樣唸出來一定正確。
+// 給沒有真正原生文字可用時的 fallback：拿羅馬拼音直接唸還是比完全不唸好一點，
+// 只是在 hasScript 語言下標明「可能不準」，不假裝這樣唸出來一定正確。
 function getSpeechText(w){
   if(!L().hasScript) return w.text;
   const data = lookup(w.text);
-  return (data && data.thaiScript) || w.text;
+  return (data && data.nativeScript) || w.text;
 }
 
 // ================= 語音播放 =================
@@ -476,15 +506,18 @@ function playAudioBlob(blob){
 }
 
 const LS_KEY = "flashcard_word_list_v1";
-// 泰文先給空清單，使用者自己匯入或用例句功能慢慢累積（沒有預設泰文題庫）。
-const DEFAULT_WORDS_TH = [];
+// 印尼文以外的語言先給空清單，使用者自己匯入或用例句/轉換功能慢慢累積
+// （沒有預設題庫）。
+function defaultWordsForLang(){
+  return currentLang === "id" ? DEFAULT_WORDS : [];
+}
 
 function loadWordList(){
   const saved = localStorage.getItem(lsKey(LS_KEY));
   if(saved){
     try{ return JSON.parse(saved); }catch(e){}
   }
-  return (currentLang === "th" ? DEFAULT_WORDS_TH : DEFAULT_WORDS).slice();
+  return defaultWordsForLang().slice();
 }
 function saveWordList(list){
   localStorage.setItem(lsKey(LS_KEY), JSON.stringify(list));
@@ -575,11 +608,11 @@ function setOpenaiKey(k){ localStorage.setItem(OPENAI_KEY_LS, k); }
 
 let customDB = loadCustomDB();
 
-// 泰文先給空題庫，翻譯/發音/例句都是靠 AI 生成、存進 customDB（跟印尼文的
-// customDB 已經是同一套機制了，只是泰文完全沒有內建 WORD_DB_TH 資料）。
-const WORD_DB_TH = {};
+// 印尼文以外的語言先給空題庫，翻譯/發音/例句都是靠 AI 生成、存進 customDB
+// （跟印尼文的 customDB 已經是同一套機制了，只是沒有內建題庫資料）。
+const EMPTY_DB = {};
 function lookup(text){
-  const db = currentLang === "th" ? WORD_DB_TH : WORD_DB;
+  const db = currentLang === "id" ? WORD_DB : EMPTY_DB;
   return customDB[text] || db[text] || null;
 }
 
@@ -590,9 +623,10 @@ function chunkArr(arr, size){
 }
 
 async function generateWordData(words){
-  const isTh = currentLang === "th";
-  // 泰文用 thaiScript（真正泰文字，給語音朗讀用）取代印尼文的 pron（KBBI 標音）
-  // 欄位——泰文顯示的本來就是羅馬拼音，不需要另外標音，但需要真正的泰文字才能唸對。
+  const hasScript = L().hasScript;
+  // hasScript 語言（泰文、越南文）用 nativeScript（真正原生文字，給語音朗讀用）
+  // 取代印尼文的 pron（KBBI 標音）欄位——這些語言顯示的本來就是羅馬拼音，不需要
+  // 另外標音，但需要真正的原生文字才能唸對。
   const schema = {
     type: "object",
     properties: {
@@ -602,15 +636,15 @@ async function generateWordData(words){
           type: "object",
           properties: Object.assign(
             { zh: { type: "string" }, en: { type: "string" } },
-            isTh ? { thaiScript: { type: "string" } } : { pron: { type: "string" } },
+            hasScript ? { nativeScript: { type: "string" } } : { pron: { type: "string" } },
             {
               quizEn: { type: "string" },
               correct: { type: "string" },
               distractors: { type: "array", items: { type: "string" } }
             }
           ),
-          required: isTh
-            ? ["zh", "en", "thaiScript", "quizEn", "correct", "distractors"]
+          required: hasScript
+            ? ["zh", "en", "nativeScript", "quizEn", "correct", "distractors"]
             : ["zh", "en", "pron", "quizEn", "correct", "distractors"],
           additionalProperties: false
         }
@@ -620,13 +654,13 @@ async function generateWordData(words){
     additionalProperties: false
   };
   const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
-  const prompt = isTh ? `你是泰語教材編輯，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。學生不想學泰文字母，下面每一項是他自己用英文字母寫下的泰文單字/片語羅馬拼音（拼法可能不標準、不一致，請你自行判斷他實際想表達的泰文是什麼）。針對每一項依序提供：
+  const prompt = hasScript ? `你是${L().teacher}，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。學生不想學${L().label}的原生文字，下面每一項是他自己用英文字母寫下的${L().label}羅馬拼音（拼法可能不標準、不一致，請你自行判斷他實際想表達的是什麼）。針對每一項依序提供：
 - zh：繁體中文意思
 - en：英文意思
-- thaiScript：這個字/句子對應、最正確常用的泰文書寫（純粹給語音朗讀引擎用，學生不會看到）
+- nativeScript：這個字/句子對應、最正確常用的${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）
 - quizEn：一句能表達這個單字/片語意思的英文例句
-- correct：quizEn 對應的泰文翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語）
-- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的泰文句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
+- correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語）
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
 
 請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
 
@@ -657,7 +691,7 @@ ${list}`;
 // 越好維護——直接讓 AI 判斷來源語言、轉成目標語言就好，不用先繞經中文當中介，
 // 準確度不會比較好，只是多一次沒必要的轉換。
 async function convertWordsToTargetLang(words){
-  const isTh = currentLang === "th";
+  const hasScript = L().hasScript;
   const schema = {
     type: "object",
     properties: {
@@ -667,7 +701,7 @@ async function convertWordsToTargetLang(words){
           type: "object",
           properties: Object.assign(
             { romanized: { type: "string" } },
-            isTh ? { thaiScript: { type: "string" } } : {},
+            hasScript ? { nativeScript: { type: "string" } } : {},
             {
               zh: { type: "string" },
               en: { type: "string" },
@@ -676,8 +710,8 @@ async function convertWordsToTargetLang(words){
               distractors: { type: "array", items: { type: "string" } }
             }
           ),
-          required: (isTh
-            ? ["romanized", "thaiScript"]
+          required: (hasScript
+            ? ["romanized", "nativeScript"]
             : ["romanized"]
           ).concat(["zh", "en", "quizEn", "correct", "distractors"]),
           additionalProperties: false
@@ -688,7 +722,7 @@ async function convertWordsToTargetLang(words){
     additionalProperties: false
   };
   const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
-  const scriptLine = isTh ? `\n- thaiScript：對應的正確泰文書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
+  const scriptLine = hasScript ? `\n- nativeScript：對應的正確${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
   const prompt = `以下是一份單字/片語清單，來源語言不限（可能是印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
 - romanized：對應的${L().label}，用羅馬拼音（英文字母）寫（口語、常用、初學者好記的拼法，不用正式音標系統）${scriptLine}
 - zh：繁體中文意思
@@ -813,9 +847,9 @@ function saveUsageCache(){ localStorage.setItem(lsKey(USAGE_CACHE_LS), JSON.stri
 
 async function getUsageExamples(text, zh){
   if(usageCache[text]) return usageCache[text];
-  const isTh = currentLang === "th";
-  // 泰文例句多一個 thaiScript 欄位（真正泰文字），例句面板的 🔊 才唸得準；
-  // 印尼文本身就是拉丁字母，例句文字直接拿去唸就好，不需要這個欄位。
+  const hasScript = L().hasScript;
+  // hasScript 語言例句多一個 nativeScript 欄位（真正原生文字），例句面板的
+  // 🔊 才唸得準；印尼文本身就是拉丁字母，例句文字直接拿去唸就好，不需要這個欄位。
   const schema = {
     type: "object",
     properties: {
@@ -825,10 +859,10 @@ async function getUsageExamples(text, zh){
           type: "object",
           properties: Object.assign(
             { id: { type: "string" } },
-            isTh ? { thaiScript: { type: "string" } } : {},
+            hasScript ? { nativeScript: { type: "string" } } : {},
             { zh: { type: "string" }, note: { type: "string" } }
           ),
-          required: isTh ? ["id", "thaiScript", "zh", "note"] : ["id", "zh", "note"],
+          required: hasScript ? ["id", "nativeScript", "zh", "note"] : ["id", "zh", "note"],
           additionalProperties: false
         }
       }
@@ -836,14 +870,14 @@ async function getUsageExamples(text, zh){
     required: ["examples"],
     additionalProperties: false
   };
-  const prompt = isTh ? `你是泰語老師。學生不學泰文字母，只用羅馬拼音。請針對這個泰文單字/片語（羅馬拼音），提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
+  const prompt = hasScript ? `你是${L().teacher}。學生不學${L().label}的原生文字，只用羅馬拼音。請針對這個${L().label}單字/片語（羅馬拼音），提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
 
-程度限制：學生是泰語初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
+程度限制：學生是初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
 
 單字/片語（羅馬拼音）：${text}${zh ? `（中文意思：${zh}）` : ""}
 
 請回傳 examples 陣列，每個元素是：
-{ id：一句自然口語的泰文例句，用羅馬拼音寫（要用到這個單字/片語）, thaiScript：這句話對應的正確泰文書寫（純粹給語音朗讀用）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }` : `你是印尼語老師。請針對這個印尼文單字/片語，提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
+{ id：一句自然口語的${L().label}例句，用羅馬拼音寫（要用到這個單字/片語）, nativeScript：這句話對應的正確${L().label}原生文字書寫（純粹給語音朗讀用）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }` : `你是印尼語老師。請針對這個印尼文單字/片語，提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
 
 程度限制：學生是印尼語初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
 
@@ -930,7 +964,7 @@ function renderUsagePanel(panel, examples){
     speakBtn.type = "button";
     speakBtn.className = "speak-btn";
     speakBtn.textContent = "🔊";
-    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak((L().hasScript && ex.thaiScript) || ex.id, speakBtn); });
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak((L().hasScript && ex.nativeScript) || ex.id, speakBtn); });
     idLine.appendChild(speakBtn);
 
     const zhLine = document.createElement("div");
@@ -1394,7 +1428,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           nextId++;
           allWords.push({ id: nextId, text });
           customDB[text] = {
-            zh: entry.zh, en: entry.en, thaiScript: entry.thaiScript,
+            zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript,
             quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
           };
           addedCount++;
