@@ -169,7 +169,7 @@
       <input type="number" id="thinkPause" min="1" max="15" value="3" style="max-width:70px; flex:0 0 auto;">
     </div>
     <div class="toolbar">
-      <label for="voiceSource" style="align-self:center;">跑步模式發音</label>
+      <label for="voiceSource" style="align-self:center;">發音來源（單字表、Flash Card、測驗、跑步模式全部通用）</label>
       <select id="voiceSource">
         <option value="system">電腦內建語音（免費）</option>
         <option value="gpt" selected>GPT 語音（OpenAI TTS，需要 API Key，發音較準）</option>
@@ -327,7 +327,27 @@ if('speechSynthesis' in window){
   refreshVoices();
   speechSynthesis.addEventListener('voiceschanged', refreshVoices);
 }
-function speak(text, btn){
+async function speak(text, btn){
+  const voiceSource = document.getElementById("voiceSource").value;
+  if(voiceSource === "gpt"){
+    const audioEl = document.getElementById("listenAudio");
+    // speak() 在很多畫面（單字表、Flash Card...）都會被單獨點擊觸發，不像跑步
+    // 模式一開始就先解鎖過 <audio> 元素。這裡在點擊當下、還沒 await 任何非同步
+    // 動作之前，先同步播一段無聲音檔解鎖，避免 iOS Safari 因為「播放動作跟使用者
+    // 手勢隔了一段非同步等待」而擋掉之後真正的播放。
+    audioEl.src = SILENT_AUDIO_DATA_URI;
+    audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
+    if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
+    try{
+      const blob = await withTimeout(getTTSAudioBlob(text, L().ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+      await playAudioBlob(blob);
+    }catch(e){
+      alert("GPT 語音播放失敗：" + e.message);
+    }finally{
+      if(btn){ btn.disabled = false; btn.classList.remove('speaking'); }
+    }
+    return;
+  }
   if(!('speechSynthesis' in window)){ alert('這個瀏覽器不支援語音播放'); return; }
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
