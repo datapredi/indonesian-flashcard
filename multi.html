@@ -238,6 +238,7 @@
 
   <!-- ===== 跑步聽力模式畫面 ===== -->
   <div id="screen-listen" class="hidden">
+    <div class="progress" id="listenVoiceIndicator" style="font-weight:600;"></div>
     <div class="progress" id="listenProgress"></div>
     <div class="quiz-en" id="listenWord"></div>
     <p class="write-hint" id="listenZh"></p>
@@ -1721,6 +1722,8 @@ document.getElementById("btnStartListen").onclick = () => {
   listenIndex = 0;
   listenRunning = true;
   showScreen("listen");
+  const voiceSource = document.getElementById("voiceSource").value;
+  document.getElementById("listenVoiceIndicator").textContent = voiceSource === "gpt" ? "🔊 使用中：GPT 語音" : "🔊 使用中：電腦內建語音";
   const audioEl = document.getElementById("listenAudio");
   audioEl.src = SILENT_AUDIO_DATA_URI;
   audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
