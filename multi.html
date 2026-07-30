@@ -1325,10 +1325,10 @@ function scriptsForLang(){
   if(currentLang === "th") scripts.push("Thai");
   if(currentLang === "ja") scripts.push("Hiragana", "Katakana", "Han");
   if(currentLang === "ko") scripts.push("Hangul");
-  return scripts.map(s => `\p{Script=${s}}`).join("");
+  return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
 function nonWordCharRe(){
-  return new RegExp(`[^${scriptsForLang()}0-9\s.,!?'"‘’“”-]`, "u");
+  return new RegExp(`[^${scriptsForLang()}0-9\\s.,!?'"‘’“”-]`, "u");
 }
 function hasWordCharRe(){
   return new RegExp(`[${scriptsForLang()}]`, "u");
