@@ -112,6 +112,8 @@
     <button class="lang-btn" data-lang="id">🇮🇩 印尼文</button>
     <button class="lang-btn" data-lang="th">🇹🇭 泰文</button>
     <button class="lang-btn" data-lang="vi">🇻🇳 越南文</button>
+    <button class="lang-btn" data-lang="ja">🇯🇵 日文</button>
+    <button class="lang-btn" data-lang="ko">🇰🇷 韓文</button>
   </div>
   <div class="toolbar hidden" id="viDialectBar">
     <label for="viDialect" style="align-self:center;">越南語口音</label>
@@ -274,7 +276,7 @@
 // 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
 // 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
 const LANG_LS = "flashcard_lang_v1";
-const LANG_ORDER = ["id", "th", "vi"];
+const LANG_ORDER = ["id", "th", "vi", "ja", "ko"];
 let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
 function lsKey(base){ return currentLang === "id" ? base : `${base}_${currentLang}`; }
 
@@ -303,6 +305,18 @@ const LANG_INFO = {
         ? "Speak in authentic Northern Vietnamese (Hanoi dialect) with natural pronunciation, intonation, and tones, as a native Northern Vietnamese speaker would."
         : "Speak in authentic Southern Vietnamese (Ho Chi Minh City / Saigon dialect) with natural pronunciation, intonation, and tones, as a native Southern Vietnamese speaker would.";
     },
+    hasScript: true
+  },
+  ja: {
+    label: "日文（羅馬拼音）", flag: "🇯🇵", teacher: "日語老師",
+    speechLang: "ja-JP",
+    ttsInstructions: "Speak in authentic Japanese with natural pronunciation, intonation, and pitch accent, as a native Japanese speaker would.",
+    hasScript: true
+  },
+  ko: {
+    label: "韓文（羅馬拼音）", flag: "🇰🇷", teacher: "韓語老師",
+    speechLang: "ko-KR",
+    ttsInstructions: "Speak in authentic Korean with natural pronunciation and intonation, as a native Korean speaker would.",
     hasScript: true
   }
 };
