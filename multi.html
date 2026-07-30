@@ -138,6 +138,7 @@
     <div class="toolbar hidden" id="convertBar">
       <button id="btnImportConvertTh">🔄 匯入其他語言檔案並自動轉換</button>
       <input type="file" id="fileInputConvertTh" accept=".txt,.md">
+      <button id="btnResetConverted">♻️ 重置轉換記錄（不刪單字）</button>
     </div>
     <div class="note hidden" id="convertNote"></div>
     <div class="toolbar hidden" id="pendingSyncBar">
@@ -714,7 +715,7 @@ async function convertWordsToTargetLang(words){
         items: {
           type: "object",
           properties: Object.assign(
-            { romanized: { type: "string" } },
+            { source: { type: "string" }, romanized: { type: "string" } },
             hasScript ? { nativeScript: { type: "string" } } : {},
             {
               zh: { type: "string" },
@@ -725,8 +726,8 @@ async function convertWordsToTargetLang(words){
             }
           ),
           required: (hasScript
-            ? ["romanized", "nativeScript"]
-            : ["romanized"]
+            ? ["source", "romanized", "nativeScript"]
+            : ["source", "romanized"]
           ).concat(["zh", "en", "quizEn", "correct", "distractors"]),
           additionalProperties: false
         }
@@ -738,6 +739,7 @@ async function convertWordsToTargetLang(words){
   const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
   const scriptLine = hasScript ? `\n- nativeScript：對應的正確${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
   const prompt = `以下是一份單字/片語清單，來源語言不限（可能是印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
+- source：原封不動複製清單裡這一項的原文（一字不差），用來對應是哪一個原始項目
 - romanized：對應的${L().label}，用羅馬拼音（英文字母）寫（口語、常用、初學者好記的拼法，不用正式音標系統）${scriptLine}
 - zh：繁體中文意思
 - en：英文意思
@@ -745,7 +747,7 @@ async function convertWordsToTargetLang(words){
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
 
-請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+清單裡每一項都要對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
 
 單字清單（來源語言不限）：
 ${list}`;
@@ -1255,6 +1257,18 @@ document.getElementById("btnClearWordList").onclick = () => {
   saveConvertedSources();
   renderList();
 };
+document.getElementById("btnResetConverted").onclick = () => {
+  // 修過的 bug：以前整批標記已轉換，沒真的對應到結果的字也會被誤標，之後
+  // 永遠被跳過、補不回來。這個按鈕只重置「哪些字轉換過」的記錄，不會動到
+  // 已經在單字表裡的字——重新匯入來源檔案時，全部的字都會再檢查一次，
+  // 已經存在的字因為羅馬拼音字串通常會比對到而自動跳過，但如果 AI 這次
+  // 拼法不同，可能會產生新的重複，用「🧹 合併中文意思重複的單字」清一下就好。
+  if(convertedSources.size === 0){ alert("目前沒有轉換記錄可以重置。"); return; }
+  if(!confirm(`確定要重置轉換記錄嗎？（不會刪除任何單字，只是讓下次匯入時全部重新檢查一次）`)) return;
+  convertedSources = new Set();
+  saveConvertedSources();
+  alert("已重置。現在可以重新匯入來源檔案，之前沒真的轉成功的字會被找出來補上，轉完建議再點一次「🧹 合併中文意思重複的單字」清掉可能產生的重複。");
+};
 document.getElementById("btnDedupByMeaning").onclick = () => {
   // AI 生成的羅馬拼音沒有唯一標準寫法，同一個字可能被拼成不同字串、變成看起來
   // 不同的重複項目（例如 "sawadee" 跟 "sawatdee"）。這裡改用「中文意思是否
@@ -1428,6 +1442,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     const batches = chunkArr(wordsToConvert, 8);
     let done = 0;
     let addedCount = 0;
+    let unmatchedCount = 0;
     try{
       // 一批（8個）轉完就馬上加進清單、重繪畫面，不用等整份檔案轉完才看到字，
       // 跟原本「AI 自動生成翻譯」那個功能的做法一致。
@@ -1435,9 +1450,16 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
         btn.textContent = `轉換中... (${done}/${wordsToConvert.length})`;
         const entries = await convertWordsToTargetLang(batch);
         let nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
+        // 只有真的有比對到來源字、而且產出有效羅馬拼音的，才記錄為「已轉換」。
+        // AI 有時候會少回傳幾筆或漏掉某一項，如果整批照樣全部標記已轉換，
+        // 沒轉到的字就會被誤判成「以後都跳過」、永遠補不回來（就是這次回報的問題）。
+        const batchWordSet = new Set(batch.map(w => w.toLowerCase()));
+        const matchedThisBatch = new Set();
         entries.forEach(entry => {
           const text = (entry.romanized || "").trim();
-          if(!text) return;
+          const sourceKey = (entry.source || "").trim().toLowerCase();
+          if(!text || !sourceKey || !batchWordSet.has(sourceKey)) return;
+          matchedThisBatch.add(sourceKey);
           if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())) return;
           nextId++;
           allWords.push({ id: nextId, text });
@@ -1447,7 +1469,8 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           };
           addedCount++;
         });
-        batch.forEach(w => convertedSources.add(w.toLowerCase()));
+        matchedThisBatch.forEach(w => convertedSources.add(w));
+        unmatchedCount += batch.length - matchedThisBatch.size;
         saveConvertedSources();
         saveWordList(allWords);
         saveCustomDB();
@@ -1466,7 +1489,8 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     btn.textContent = originalLabel;
     const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的原文字` : "";
     const skipNote = alreadyDoneCount > 0 ? `${alreadyDoneCount} 個之前轉換過已跳過，` : "";
-    alert(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${staleNote}。`);
+    const unmatchedNote = unmatchedCount > 0 ? `\n\n有 ${unmatchedCount} 個字這次沒有成功對應到結果，還沒被標記為已轉換，重新匯入同一個檔案時會自動再試一次。` : "";
+    alert(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${staleNote}。${unmatchedNote}`);
   };
   reader.readAsText(file, "UTF-8");
 });
