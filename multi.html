@@ -677,6 +677,16 @@ let convertedMap = {};
 try{ convertedMap = JSON.parse(localStorage.getItem(lsKey(CONVERTED_MAP_LS))) || {}; }catch(e){ convertedMap = {}; }
 function saveConvertedMap(){ localStorage.setItem(lsKey(CONVERTED_MAP_LS), JSON.stringify(convertedMap)); }
 
+// ---- 同一份來源字，不管轉成哪個語言，中文/英文意思都要一致（給跨語言查詢比對用） ----
+// 這個 key 故意不經過 lsKey() 包裝——要跨語言共用同一份，不能像單字表那樣每個
+// 語言各自獨立存。第一次某個原字被轉換出中英文意思，就記住；之後不管轉成
+// 泰文、越南文、日文、韓文…都強制沿用同一組，不會因為每次 AI 各自生成而用詞
+// 飄移，跨語言查詢（🌐）才配得到。
+const SOURCE_MEANING_CACHE_LS = "flashcard_source_meaning_cache_v1";
+let sourceMeaningCache = {};
+try{ sourceMeaningCache = JSON.parse(localStorage.getItem(SOURCE_MEANING_CACHE_LS)) || {}; }catch(e){ sourceMeaningCache = {}; }
+function saveSourceMeaningCache(){ localStorage.setItem(SOURCE_MEANING_CACHE_LS, JSON.stringify(sourceMeaningCache)); }
+
 // ---- 難度標記（E簡單/M中等/H困難，用單字文字當 key，跟翻譯一樣不會被重新匯入洗掉） ----
 const DIFFICULTY_LS = "flashcard_difficulty_v1";
 let difficultyMap = {};
@@ -734,9 +744,10 @@ function lookup(text){
 
 // 跨語言查詢：不同語言的單字表是各自獨立的，沒有天生的「這是同一個概念」連結
 // （編號在不同語言之間也對不上，見使用者跟我的討論），唯一能拿來比對的線索是
-// 中文意思是否完全一樣。這是盡力而為，用詞不同就配不到，不保證每個字都找得到。
-function getCrossLangMatches(zhMeaning){
-  if(!zhMeaning) return [];
+// 中文或英文意思是否完全一樣（兩個都試，中文不同但英文剛好一樣也算配到）。
+// 這是盡力而為，兩邊用詞都不同就配不到，不保證每個字都找得到。
+function getCrossLangMatches(zhMeaning, enMeaning){
+  if(!zhMeaning && !enMeaning) return [];
   const results = [];
   LANG_ORDER.forEach((lang) => {
     if(lang === currentLang) return;
@@ -749,7 +760,8 @@ function getCrossLangMatches(zhMeaning){
       const builtIn = lang === "id" ? WORD_DB : EMPTY_DB;
       const match = words.find((w) => {
         const data = customOther[w.text] || builtIn[w.text];
-        return data && data.zh === zhMeaning;
+        if(!data) return false;
+        return (zhMeaning && data.zh === zhMeaning) || (enMeaning && data.en === enMeaning);
       });
       if(match){
         const data = customOther[match.text] || builtIn[match.text];
@@ -1372,7 +1384,7 @@ function createWordItem(w){
       return;
     }
     crossLangPanel.classList.remove("hidden");
-    const matches = getCrossLangMatches(data ? data.zh : null);
+    const matches = getCrossLangMatches(data ? data.zh : null, data ? data.en : null);
     crossLangPanel.innerHTML = "";
     if(matches.length === 0){
       crossLangPanel.textContent = "沒有找到其他語言裡中文意思一樣的字。";
@@ -1734,6 +1746,16 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           // 不管這個字是新加的還是本來就存在（同字重複），都記住這個原字對應
           // 到哪個結果字，下次匯入才有辦法確認「這個結果字是不是還在」。
           convertedMap[sourceKey] = text;
+          // 同一份來源字，不管轉成哪個語言，中英文意思都要一致，跨語言查詢
+          // （🌐）才配得到。第一次看到這個來源字就記住這次生成的中英文意思，
+          // 之後（不管轉成哪個語言）都強制沿用同一組，不讓每次各自生成飄移。
+          if(sourceMeaningCache[sourceKey]){
+            entry.zh = sourceMeaningCache[sourceKey].zh;
+            entry.en = sourceMeaningCache[sourceKey].en;
+          } else {
+            sourceMeaningCache[sourceKey] = { zh: entry.zh, en: entry.en };
+            saveSourceMeaningCache();
+          }
           if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())) return;
           nextId++;
           allWords.push({ id: nextId, text });
