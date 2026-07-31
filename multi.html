@@ -370,12 +370,13 @@ function updateLangButtons(){
   document.getElementById("btnStartQuiz").textContent = `開始測驗（英文選${L().label}）`;
   document.getElementById("btnStartWrite").textContent = writeBtnLabel();
   document.getElementById("writeInput").placeholder = `把上面這句中文翻成${L().label}...`;
-  // 印尼文是原本的預設語言，其他語言才需要「從別的語言轉換過來」這個功能，
-  // 所以用是不是印尼文來判斷要不要顯示，之後加第四種語言也不用再改這裡。
-  document.getElementById("convertBar").classList.toggle("hidden", currentLang === "id");
-  document.getElementById("convertNote").classList.toggle("hidden", currentLang === "id");
-  // 印尼文不需要另外生成羅馬拼音/原生文字資料，免費全量同步（含刪除）還有意義；
-  // 其他語言一定要靠 AI 補資料，兩個匯入按鈕放在一起只會增加困惑，直接隱藏掉。
+  // 「匯入並自動生成資料」對印尼文也有用（例如從泰文或英文檔案轉成印尼文），
+  // 不是只有其他語言才需要，所以每種語言都顯示。
+  document.getElementById("convertBar").classList.remove("hidden");
+  document.getElementById("convertNote").classList.remove("hidden");
+  // 印尼文額外保留「匯入 / 更新單字檔」——不呼叫 AI、免費全量同步（含刪除），
+  // 對應你原本的 Obsidian 同步流程；其他語言一定要靠 AI 補資料，這個按鈕沒有
+  // 意義，就不顯示，避免兩個按鈕放在一起增加困惑。
   document.getElementById("btnImport").classList.toggle("hidden", currentLang !== "id");
   document.getElementById("btnImportConvertTh").textContent = `📥 匯入並自動生成${L().label}資料（新增不覆蓋）`;
   document.getElementById("convertNote").textContent = `不管你匯入的檔案原本是${L().label}羅馬拼音、${L().label}原生文字、還是其他語言，都會用 AI 判斷意思，補上羅馬拼音＋中英文意思＋發音用的原生文字，加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入、也不會覆蓋掉原本的清單。`;
