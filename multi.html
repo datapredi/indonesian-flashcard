@@ -1262,7 +1262,9 @@ function createWordItem(w){
   forvoBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     const query = getSpeechText(w); // hasScript 語言用背後的原生文字查，Forvo 是照各語言原生文字收錄的
-    window.open(`https://forvo.com/search/${encodeURIComponent(query)}/`, "_blank", "noopener");
+    // "_blank" 在同一個網站（forvo.com）重複開會被某些瀏覽器直接重用上一個分頁，
+    // 每次給一個獨一無二的分頁名稱，強制一定開新的分頁，不會被跳去共用舊的。
+    window.open(`https://forvo.com/search/${encodeURIComponent(query)}/`, `forvo_${Date.now()}`, "noopener");
   });
   row.appendChild(forvoBtn);
 
