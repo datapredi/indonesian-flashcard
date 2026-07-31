@@ -280,7 +280,8 @@
 const LANG_LS = "flashcard_lang_v1";
 const LANG_ORDER = ["id", "th", "vi", "ja", "ko"];
 let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
-function lsKey(base){ return currentLang === "id" ? base : `${base}_${currentLang}`; }
+function lsKey(base){ return lsKeyForLang(base, currentLang); }
+function lsKeyForLang(base, lang){ return lang === "id" ? base : `${base}_${lang}`; }
 
 // 越南文南北口音發音差很多，這個是唯一需要在語言之外再多一層選項的地方。
 const VI_DIALECT_LS = "flashcard_vi_dialect_v1";
@@ -398,7 +399,11 @@ if('speechSynthesis' in window){
   refreshVoices();
   speechSynthesis.addEventListener('voiceschanged', refreshVoices);
 }
-async function speak(text, btn){
+async function speak(text, btn, langOverride){
+  // 大部分呼叫都是講「目前語言」的字，但跨語言查詢面板會秀出其他語言的字，
+  // 那種情況要傳 langOverride 進來，用那個語言自己的語音設定唸，不能用目前
+  // 語言的設定去唸別種語言的文字。
+  const info = langOverride ? LANG_INFO[langOverride] : L();
   const voiceSource = document.getElementById("voiceSource").value;
   if(voiceSource === "gpt"){
     const audioEl = document.getElementById("listenAudio");
@@ -410,7 +415,7 @@ async function speak(text, btn){
     audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
     if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
     try{
-      const blob = await withTimeout(getTTSAudioBlob(text, L().ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+      const blob = await withTimeout(getTTSAudioBlob(text, info.ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
       await playAudioBlob(blob);
     }catch(e){
       alert("GPT 語音播放失敗：" + e.message);
@@ -422,9 +427,9 @@ async function speak(text, btn){
   if(!('speechSynthesis' in window)){ alert('這個瀏覽器不支援語音播放'); return; }
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = L().speechLang;
+  utter.lang = info.speechLang;
   utter.rate = 0.85;
-  const prefix = L().speechLang.slice(0, 2).toLowerCase();
+  const prefix = info.speechLang.slice(0, 2).toLowerCase();
   const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
   if(voice) utter.voice = voice;
   if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
@@ -727,6 +732,34 @@ function lookup(text){
   return customDB[text] || db[text] || null;
 }
 
+// 跨語言查詢：不同語言的單字表是各自獨立的，沒有天生的「這是同一個概念」連結
+// （編號在不同語言之間也對不上，見使用者跟我的討論），唯一能拿來比對的線索是
+// 中文意思是否完全一樣。這是盡力而為，用詞不同就配不到，不保證每個字都找得到。
+function getCrossLangMatches(zhMeaning){
+  if(!zhMeaning) return [];
+  const results = [];
+  LANG_ORDER.forEach((lang) => {
+    if(lang === currentLang) return;
+    try{
+      const wordsRaw = localStorage.getItem(lsKeyForLang(LS_KEY, lang));
+      if(!wordsRaw) return;
+      const words = JSON.parse(wordsRaw);
+      let customOther = {};
+      try{ customOther = JSON.parse(localStorage.getItem(lsKeyForLang(CUSTOM_DB_LS, lang))) || {}; }catch(e){}
+      const builtIn = lang === "id" ? WORD_DB : EMPTY_DB;
+      const match = words.find((w) => {
+        const data = customOther[w.text] || builtIn[w.text];
+        return data && data.zh === zhMeaning;
+      });
+      if(match){
+        const data = customOther[match.text] || builtIn[match.text];
+        results.push({ lang, text: match.text, nativeScript: data.nativeScript || null });
+      }
+    }catch(e){ /* 那個語言的資料格式壞掉就跳過，不影響其他語言 */ }
+  });
+  return results;
+}
+
 function chunkArr(arr, size){
   const out = [];
   for(let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -1022,8 +1055,9 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel } = createWordItem(newWord);
-    el.insertBefore(usagePanel, el.firstChild);
+    const { row, usagePanel, crossLangPanel } = createWordItem(newWord);
+    el.insertBefore(crossLangPanel, el.firstChild);
+    el.insertBefore(usagePanel, crossLangPanel);
     el.insertBefore(row, usagePanel);
   }
   updateCount();
@@ -1323,7 +1357,48 @@ function createWordItem(w){
   refreshDiffChip();
   row.appendChild(diffChip);
 
-  return { row, usagePanel };
+  const crossLangPanel = document.createElement("div");
+  crossLangPanel.className = "usage-panel hidden";
+
+  const crossLangBtn = document.createElement("button");
+  crossLangBtn.type = "button";
+  crossLangBtn.className = "usage-btn";
+  crossLangBtn.textContent = "🌐";
+  crossLangBtn.title = "看看這個字在其他語言怎麼說（用中文意思比對，找不到的語言不會顯示）";
+  crossLangBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!crossLangPanel.classList.contains("hidden")){
+      crossLangPanel.classList.add("hidden");
+      return;
+    }
+    crossLangPanel.classList.remove("hidden");
+    const matches = getCrossLangMatches(data ? data.zh : null);
+    crossLangPanel.innerHTML = "";
+    if(matches.length === 0){
+      crossLangPanel.textContent = "沒有找到其他語言裡中文意思一樣的字。";
+      return;
+    }
+    matches.forEach((m) => {
+      const line = document.createElement("div");
+      line.className = "usage-example";
+      const label = document.createElement("span");
+      label.textContent = `${LANG_INFO[m.lang].flag} ${m.text}`;
+      const speakBtn = document.createElement("button");
+      speakBtn.type = "button";
+      speakBtn.className = "speak-btn";
+      speakBtn.textContent = "🔊";
+      speakBtn.addEventListener("click", (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        speak((LANG_INFO[m.lang].hasScript && m.nativeScript) || m.text, speakBtn, m.lang);
+      });
+      line.appendChild(label);
+      line.appendChild(speakBtn);
+      crossLangPanel.appendChild(line);
+    });
+  });
+  row.appendChild(crossLangBtn);
+
+  return { row, usagePanel, crossLangPanel };
 }
 
 function updatePendingSyncBar(){
@@ -1357,9 +1432,10 @@ function renderList(){
     el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel } = createWordItem(w);
+    const { row, usagePanel, crossLangPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
+    el.appendChild(crossLangPanel);
   });
   updateCount();
   updatePendingSyncBar();
