@@ -374,10 +374,9 @@ function updateLangButtons(){
   // 不是只有其他語言才需要，所以每種語言都顯示。
   document.getElementById("convertBar").classList.remove("hidden");
   document.getElementById("convertNote").classList.remove("hidden");
-  // 印尼文額外保留「匯入 / 更新單字檔」——不呼叫 AI、免費全量同步（含刪除），
-  // 對應你原本的 Obsidian 同步流程；其他語言一定要靠 AI 補資料，這個按鈕沒有
-  // 意義，就不顯示，避免兩個按鈕放在一起增加困惑。
-  document.getElementById("btnImport").classList.toggle("hidden", currentLang !== "id");
+  // 全部語言統一只用「匯入並自動生成資料」——其他語言本來就沒有「跟著來源
+  // 刪除」這個能力也一樣用得好好的，代表這不是必要功能，印尼文沒必要特例。
+  document.getElementById("btnImport").classList.add("hidden");
   document.getElementById("btnImportConvertTh").textContent = `📥 匯入並自動生成${L().label}資料（新增不覆蓋）`;
   document.getElementById("convertNote").textContent = `不管你匯入的檔案原本是${L().label}羅馬拼音、${L().label}原生文字、還是其他語言，都會用 AI 判斷意思，補上羅馬拼音＋中英文意思＋發音用的原生文字，加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入、也不會覆蓋掉原本的清單。`;
   document.getElementById("viDialectBar").classList.toggle("hidden", currentLang !== "vi");
@@ -1570,7 +1569,7 @@ function hasWordCharRe(){
   return new RegExp(`[${scriptsForLang()}]`, "u");
 }
 
-function extractIndonesianLine(raw){
+function extractLineWithScripts(raw, nonWordRe, hasWordRe){
   let s = raw.replace(/\r/g, "").trim();
   if(s === "") return null;
   if(s.startsWith("[")) return null;        // [🔗 分類標題] 這種區塊標題
@@ -1578,14 +1577,39 @@ function extractIndonesianLine(raw){
   s = s.replace(/\*\*/g, "");               // 去掉 **粗體**
   s = s.replace(/^\d+[\.\)]\s*/, "");       // 去掉「1. 」「1) 」編號
   s = s.replace(/^[\s\-\*]+/, "");          // 去掉「- 」「* 」項目符號
-  const cutMatch = s.match(nonWordCharRe());
+  const cutMatch = s.match(nonWordRe);
   if(cutMatch) s = s.slice(0, cutMatch.index);
   s = s.replace(/\s+/g, " ");
   s = s.replace(/[\s:\/=,\-]+$/, "").replace(/^[\s:\/=,\-]+/, "");
   s = s.trim();
   if(s === "") return null;
-  if(!hasWordCharRe().test(s)) return null; // 沒有目標語言的文字就跳過
+  if(!hasWordRe.test(s)) return null;
   return s;
+}
+
+function extractIndonesianLine(raw){
+  return extractLineWithScripts(raw, nonWordCharRe(), hasWordCharRe());
+}
+
+// 「匯入並自動生成資料」來源語言不限，不能只認目前目標語言允許的文字腳本
+// （那組規則是給「內容已經是目標語言」的一般匯入用的）。這裡放寬：泰文、
+// 韓文諺文、日文假名、拉丁字母固定允許（這些跟中文字不會搞混，可以放心開）。
+// 漢字（Han）維持只有目標語言是日文時才開放，不然會跟同一行後面貼的中文
+// 意思註解切不乾淨（日文本來就用漢字，中文意思註解也是漢字，這兩種情況本來
+// 就沒辦法只靠文字腳本分辨，算是既有的已知限制）。
+function scriptsForConvertImport(){
+  const scripts = ["Latin", "Thai", "Hangul", "Hiragana", "Katakana"];
+  if(currentLang === "ja") scripts.push("Han");
+  return scripts.map(s => `\\p{Script=${s}}`).join("");
+}
+function nonWordCharReConvert(){
+  return new RegExp(`[^${scriptsForConvertImport()}0-9\\s.,!?'"‘’“”-]`, "u");
+}
+function hasWordCharReConvert(){
+  return new RegExp(`[${scriptsForConvertImport()}]`, "u");
+}
+function extractConvertSourceLine(raw){
+  return extractLineWithScripts(raw, nonWordCharReConvert(), hasWordCharReConvert());
 }
 
 document.getElementById("btnImport").onclick = () => document.getElementById("fileInput").click();
@@ -1651,7 +1675,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     const indoWords = [];
     const seen = new Set();
     lines.forEach(line => {
-      const cleaned = extractIndonesianLine(line);
+      const cleaned = extractConvertSourceLine(line);
       if(cleaned === null) return;
       const key = cleaned.toLowerCase();
       if(seen.has(key)) return;
