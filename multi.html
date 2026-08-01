@@ -161,11 +161,14 @@
     <div class="note">用於「跑步聽力模式」把單字轉成真正的音檔（存在這台電腦，同一個字只會生成一次，之後重播不再花錢）。</div>
     <div class="toolbar">
       <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
+      <button id="btnGenerateAll">🚀 全部生成例句＋發音（出發前先跑一輪，離線也能用）</button>
     </div>
+    <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
     <div class="toolbar">
       <input type="text" id="wordSearch" placeholder="搜尋印尼文或中文...">
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
+      <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
@@ -1196,6 +1199,61 @@ document.getElementById("btnGenerate").onclick = async () => {
   renderList();
 };
 
+document.getElementById("btnGenerateAll").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key 才能生成翻譯/例句，請先在上面輸入並儲存。"); return; }
+  if(!getOpenaiKey()){ alert("需要 OpenAI API Key 才能生成發音，請先在上面輸入並儲存。"); return; }
+  const list = allWords.filter(w => selected.has(w.id));
+  if(list.length === 0){ alert("目前沒有勾選任何字，請先勾選要出發前準備的字。"); return; }
+  const btn = document.getElementById("btnGenerateAll");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+
+  // 第一階段：先確保每個字都有基本翻譯資料（跟「✨ AI 自動生成缺少的翻譯」一樣），
+  // 沒有這個，例句/發音都無從生成起。
+  const missing = list.filter(w => !lookup(w.text));
+  if(missing.length > 0){
+    const batches = chunkArr(missing, 8);
+    let doneBase = 0;
+    for(const batch of batches){
+      btn.textContent = `補基本翻譯中... (${doneBase}/${missing.length})`;
+      try{
+        const entries = await generateWordData(batch.map(w => w.text));
+        batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
+        saveCustomDB();
+        doneBase += batch.length;
+        renderList();
+      }catch(e){
+        alert("補基本翻譯失敗：" + e.message + "\n\n已經完成的部分不會不見，可以再按一次繼續。");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        return;
+      }
+    }
+  }
+
+  // 第二階段：逐字生成例句 + 發音（單字本身的發音、中文意思的發音）。已經生成過、
+  // 存在快取裡的會自動跳過，不會重複花錢；單一個字失敗不中斷整個流程，繼續下一個。
+  let done = 0;
+  let failCount = 0;
+  for(const w of list){
+    btn.textContent = `生成例句＋發音中... (${done}/${list.length})`;
+    const data = lookup(w.text);
+    try{
+      if(data && data.zh && !usageCache[w.text]) await getUsageExamples(w.text, data.zh);
+    }catch(e){ failCount++; }
+    try{
+      await getTTSAudioBlob(getSpeechText(w), L().ttsInstructions);
+    }catch(e){ failCount++; }
+    try{
+      if(data && data.zh) await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
+    }catch(e){ failCount++; }
+    done++;
+  }
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+  alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
+};
+
 function getVisibleWords(){
   // 比對清單模式優先權最高：只看你釘選過的那幾個字，忽略搜尋框跟難度篩選，
   // 這樣不管搜尋框現在打什麼，畫面都只會顯示你真正想比對的那幾個。
@@ -1599,6 +1657,13 @@ function updateCompareToggleLabel(){
 }
 document.getElementById("btnToggleCompareOnly").addEventListener("click", () => {
   showCompareOnly = !showCompareOnly;
+  updateCompareToggleLabel();
+  renderList();
+});
+document.getElementById("btnClearCompare").addEventListener("click", () => {
+  if(compareSet.size === 0) return;
+  compareSet = new Set();
+  showCompareOnly = false;
   updateCompareToggleLabel();
   renderList();
 });
