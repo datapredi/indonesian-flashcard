@@ -1763,10 +1763,31 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
             sourceMeaningCache[sourceKey] = { zh: entry.zh, en: entry.en };
             saveSourceMeaningCache();
           }
-          if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())) return;
+          // 羅馬拼音本來就會漏掉聲調/母音長短，不同的原生字很容易拼出一樣的
+          // 羅馬拼音（例如泰文「หนอน」蟲 跟「นอน」睡覺 都簡化成 "non"）。只有
+          // 背後的 nativeScript 也一樣，才是真的重複；拼音撞在一起但背後其實
+          // 是不同的字，兩個都要保留，用加編號的方式避免顯示文字（也是 customDB
+          // 的 key）互相蓋掉。
+          const existing = allWords.find(w => w.text.toLowerCase() === text.toLowerCase());
+          let finalText = text;
+          if(existing){
+            if(!L().hasScript){
+              // 印尼文沒有羅馬拼音簡化這回事，顯示文字本身就是完整的字，
+              // 文字一樣就是真的重複，維持原本單純的邏輯。
+              return;
+            }
+            const existingData = customDB[existing.text];
+            const sameWord = existingData && existingData.nativeScript && entry.nativeScript
+              && existingData.nativeScript === entry.nativeScript;
+            if(sameWord) return; // 背後真的是同一個字，才真的算重複、跳過
+            let suffix = 2;
+            while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+            finalText = `${text} (${suffix})`;
+          }
+          convertedMap[sourceKey] = finalText;
           nextId++;
-          allWords.push({ id: nextId, text });
-          customDB[text] = {
+          allWords.push({ id: nextId, text: finalText });
+          customDB[finalText] = {
             zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript,
             quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
           };
