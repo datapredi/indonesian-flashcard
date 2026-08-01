@@ -135,7 +135,7 @@
       <button id="btnNone">全不選</button>
       <button id="btnClearMastered">🔄 清空所有已學會</button>
       <button id="btnClearWordList">🗑️ 清空目前單字表</button>
-      <button id="btnDedupByMeaning">🧹 合併中文意思重複的單字</button>
+      <button id="btnDedupByMeaning">🧹 合併真正重複的字（拼法不同但背後同一個字）</button>
     </div>
     <div class="toolbar hidden" id="convertBar">
       <button id="btnImportConvertTh">📥 匯入並自動生成資料（新增不覆蓋）</button>
@@ -1505,14 +1505,21 @@ document.getElementById("btnClearWordList").onclick = () => {
   renderList();
 };
 document.getElementById("btnDedupByMeaning").onclick = () => {
-  // AI 生成的羅馬拼音沒有唯一標準寫法，同一個字可能被拼成不同字串、變成看起來
-  // 不同的重複項目（例如 "sawadee" 跟 "sawatdee"）。這裡改用「中文意思是否
-  // 完全一樣」當作判斷同一個字的依據，沒有翻譯資料的字沒辦法判斷、不會被動到。
+  // 中文意思一樣不代表是重複的字——同一個語言常常有好幾個不同的字剛好中文
+  // 翻譯很像（例如泰文「ตอนนี้」跟「เดี๋ยวนี้」都可以翻成「現在」，但是完全
+  // 不同的兩個字），不能因為中文意思一樣就刪掉。真正可靠的判斷依據是背後的
+  // nativeScript（真正的泰文/越南文/日文/韓文）是不是一樣——AI 生成的羅馬
+  // 拼音沒有唯一標準寫法，同一個字可能被拼成不同字串（例如 "sawadee" 跟
+  // "sawatdee"），但如果背後對應的 nativeScript 完全相同，才是真的重複。
+  if(!L().hasScript){
+    alert(`${L().label}沒有另外的原生文字欄位可以比對，這個工具只適用於有原生文字的語言（泰文、越南文、日文、韓文）。`);
+    return;
+  }
   const groups = {};
   allWords.forEach(w => {
     const data = lookup(w.text);
-    if(!data || !data.zh) return;
-    (groups[data.zh] = groups[data.zh] || []).push(w);
+    if(!data || !data.nativeScript) return;
+    (groups[data.nativeScript] = groups[data.nativeScript] || []).push(w);
   });
   const toRemove = new Set();
   let groupCount = 0;
@@ -1522,8 +1529,8 @@ document.getElementById("btnDedupByMeaning").onclick = () => {
     group.sort((a, b) => a.id - b.id);
     group.slice(1).forEach(w => toRemove.add(w.id));
   });
-  if(toRemove.size === 0){ alert("沒有找到中文意思重複的字。"); return; }
-  if(!confirm(`找到 ${groupCount} 組意思重複的字，總共會刪掉 ${toRemove.size} 個（每組留意思相同裡 id 最小的那個），這個動作沒辦法復原，確定要合併嗎？`)) return;
+  if(toRemove.size === 0){ alert("沒有找到真正重複（背後原生文字一樣）的字。"); return; }
+  if(!confirm(`找到 ${groupCount} 組背後原生文字一樣的重複字，總共會刪掉 ${toRemove.size} 個（每組留 id 最小的那個），這個動作沒辦法復原，確定要合併嗎？`)) return;
   allWords = allWords.filter(w => !toRemove.has(w.id));
   toRemove.forEach(id => {
     selected.delete(id);
