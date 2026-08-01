@@ -116,6 +116,7 @@
     <button class="lang-btn" data-lang="vi">🇻🇳 越南文</button>
     <button class="lang-btn" data-lang="ja">🇯🇵 日文</button>
     <button class="lang-btn" data-lang="ko">🇰🇷 韓文</button>
+    <button class="lang-btn" data-lang="yue">🇭🇰 粵語</button>
   </div>
   <div class="toolbar hidden" id="viDialectBar">
     <label for="viDialect" style="align-self:center;">越南語口音</label>
@@ -282,7 +283,7 @@
 // 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
 // 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
 const LANG_LS = "flashcard_lang_v1";
-const LANG_ORDER = ["id", "th", "vi", "ja", "ko"];
+const LANG_ORDER = ["id", "th", "vi", "ja", "ko", "yue"];
 let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
 function lsKey(base){ return lsKeyForLang(base, currentLang); }
 function lsKeyForLang(base, lang){ return lang === "id" ? base : `${base}_${lang}`; }
@@ -324,6 +325,12 @@ const LANG_INFO = {
     label: "韓文（羅馬拼音）", flag: "🇰🇷", teacher: "韓語老師",
     speechLang: "ko-KR",
     ttsInstructions: "Speak in authentic Korean with natural pronunciation and intonation, as a native Korean speaker would.",
+    hasScript: true
+  },
+  yue: {
+    label: "粵語（羅馬拼音）", flag: "🇭🇰", teacher: "粵語老師",
+    speechLang: "zh-HK",
+    ttsInstructions: "Speak in authentic Cantonese (Hong Kong / Guangzhou dialect), not Mandarin, with natural Cantonese pronunciation, intonation, and tones, as a native Cantonese speaker would.",
     hasScript: true
   }
 };
@@ -1686,6 +1693,7 @@ function scriptsForLang(){
   if(currentLang === "th") scripts.push("Thai");
   if(currentLang === "ja") scripts.push("Hiragana", "Katakana", "Han");
   if(currentLang === "ko") scripts.push("Hangul");
+  if(currentLang === "yue") scripts.push("Han");
   return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
 function nonWordCharRe(){
@@ -1725,7 +1733,7 @@ function extractIndonesianLine(raw){
 // 就沒辦法只靠文字腳本分辨，算是既有的已知限制）。
 function scriptsForConvertImport(){
   const scripts = ["Latin", "Thai", "Hangul", "Hiragana", "Katakana"];
-  if(currentLang === "ja") scripts.push("Han");
+  if(currentLang === "ja" || currentLang === "yue") scripts.push("Han");
   return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
 function nonWordCharReConvert(){
