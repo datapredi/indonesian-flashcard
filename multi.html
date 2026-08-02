@@ -143,6 +143,7 @@
       <input type="file" id="fileInputConvertTh" accept=".txt,.md">
     </div>
     <div class="note hidden" id="convertNote"></div>
+    <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
     <div class="toolbar hidden" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製句子新增、還沒同步進 Obsidian 的單字</button>
     </div>
@@ -1796,6 +1797,15 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
   reader.readAsText(file, "UTF-8");
 });
 
+// alert() 一關掉內容就不見了，之後想回頭看/截圖給我除錯都沒辦法。這裡同時把
+// 結果訊息寫進畫面上一個不會自動消失的區塊，一直留著到下次轉換才會被換掉。
+function showConvertResult(msg){
+  const el = document.getElementById("convertResultStatus");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  try{ alert(msg); }catch(e){}
+}
+
 document.getElementById("btnImportConvertTh").onclick = () => {
   if(!getApiKey()){ alert("這個功能需要用 AI 轉換，請先在上面輸入並儲存 Anthropic API Key。"); return; }
   document.getElementById("fileInputConvertTh").click();
@@ -1817,7 +1827,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
       indoWords.push(cleaned);
     });
     if(indoWords.length === 0){
-      alert("沒有解析到任何單字，請確認檔案內容。");
+      showConvertResult("沒有解析到任何單字，請確認檔案內容。");
       return;
     }
     // 如果之前不小心用「一般匯入」把這些印尼文原字直接加進了泰文清單，
@@ -1838,7 +1848,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     });
     const alreadyDoneCount = indoWords.length - wordsToConvert.length;
     if(wordsToConvert.length === 0){
-      alert(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。`);
+      showConvertResult(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。`);
       return;
     }
     const btn = document.getElementById("btnImportConvertTh");
@@ -1920,7 +1930,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     }catch(err){
       btn.disabled = false;
       btn.textContent = originalLabel;
-      alert(`轉換到一半失敗：${err.message}\n\n已經轉好、加進清單的 ${addedCount} 個不會不見，也已經記住轉過了。可以重新選同一個檔案再匯入一次，只會補剩下沒轉到的。`);
+      showConvertResult(`轉換到一半失敗：${err.message}\n\n已經轉好、加進清單的 ${addedCount} 個不會不見，也已經記住轉過了。可以重新選同一個檔案再匯入一次，只會補剩下沒轉到的。`);
       return;
     }
     btn.disabled = false;
@@ -1928,7 +1938,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的原文字` : "";
     const skipNote = alreadyDoneCount > 0 ? `${alreadyDoneCount} 個之前轉換過已跳過，` : "";
     const unmatchedNote = unmatchedCount > 0 ? `\n\n有 ${unmatchedCount} 個字這次沒有成功對應到結果，還沒被標記為已轉換，重新匯入同一個檔案時會自動再試一次。` : "";
-    alert(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${staleNote}。${unmatchedNote}`);
+    showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${staleNote}。${unmatchedNote}`);
   };
   reader.readAsText(file, "UTF-8");
 });
