@@ -69,6 +69,7 @@
   .usage-word.in-list{color:var(--accent2); text-decoration:underline; text-decoration-style:dotted;}
   .item.jump-highlight{animation:jumpFlash 1.6s ease-out;}
   @keyframes jumpFlash{ 0%{background:rgba(255,196,0,0.55);} 100%{background:transparent;} }
+  .jump-back-btn{position:fixed; right:16px; bottom:16px; z-index:50; border-radius:999px; padding:10px 16px; box-shadow:0 2px 10px rgba(0,0,0,0.25);}
   .usage-zh{color:var(--muted); margin-top:2px;}
   .usage-note{color:var(--muted); font-size:0.8rem; margin-top:4px; font-style:italic;}
   .diff-chip{
@@ -279,6 +280,8 @@
     </div>
   </div>
 </div>
+
+<button id="btnJumpBack" class="jump-back-btn secondary hidden">⬅ 回到句子</button>
 
 <script>
 // ================= 語言切換 =================
@@ -1138,6 +1141,7 @@ function isWordInList(clean){
 // 點已經在單字表裡的字：跳到那個字在清單裡的位置並閃一下提示，而不是靜靜沒反應。
 // 如果目前的搜尋/篩選/只顯示已選取/只顯示比對清單會讓那個字不在畫面上，
 // 就先清掉篩選讓它顯示出來，再捲過去。
+let jumpBackY = null;
 function jumpToWord(clean){
   const target = allWords.find(w => w.text.toLowerCase() === clean.toLowerCase());
   if(!target) return;
@@ -1159,11 +1163,19 @@ function jumpToWord(clean){
   const input = document.querySelector(`#wordList input[data-id="${target.id}"]`);
   if(!input) return;
   const row = input.closest(".item");
+  jumpBackY = window.scrollY;
+  document.getElementById("btnJumpBack").classList.remove("hidden");
   row.scrollIntoView({ behavior: "smooth", block: "center" });
   row.classList.remove("jump-highlight");
   void row.offsetWidth; // 重新觸發動畫，就算同一個字連續點好幾次也每次都會閃
   row.classList.add("jump-highlight");
 }
+document.getElementById("btnJumpBack").addEventListener("click", (e) => {
+  e.preventDefault();
+  if(jumpBackY !== null) window.scrollTo({ top: jumpBackY, behavior: "smooth" });
+  document.getElementById("btnJumpBack").classList.add("hidden");
+  jumpBackY = null;
+});
 function renderTappableSentence(sentence){
   const wrap = document.createElement("span");
   const tokens = sentence.split(/(\s+)/);
