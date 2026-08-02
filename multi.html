@@ -1759,8 +1759,10 @@ document.getElementById("btnDedupByMeaning").onclick = () => {
   showDedupReviewPanel(dupGroups);
 };
 
-// 不直接刪，而是把每一組重複字都列出來給使用者自己勾選要刪哪些（預設全勾），
-// 使用者確認過清單裡真的是同一個字之後再按下面的按鈕才會真的刪除。
+// 不直接刪，而是把每一組重複字都列出來給使用者自己決定每組要留哪一個——
+// id 比較小的不代表資料比較好（例如比較後面加的那個可能已經有更完整的
+// 例句/發音），所以每個字都用同一種「留下」勾選框，使用者自己選，
+// 不是預設死板照 id 決定，只是預設先勾第一個方便一鍵確認。
 function showDedupReviewPanel(dupGroups){
   const panel = document.getElementById("dedupReviewPanel");
   panel.innerHTML = "";
@@ -1769,24 +1771,18 @@ function showDedupReviewPanel(dupGroups){
   const title = document.createElement("div");
   title.style.fontWeight = "600";
   title.style.marginBottom = "8px";
-  title.textContent = `找到 ${dupGroups.length} 組背後原生文字一樣的重複字，勾選要刪除的字（每組已預設留下 id 最小的那個）：`;
+  title.textContent = `找到 ${dupGroups.length} 組背後原生文字一樣的重複字，每組勾選要「留下」的那個（其餘會被刪除，每組至少要留一個）：`;
   panel.appendChild(title);
 
-  const checkboxes = [];
+  const groupEntries = [];
   dupGroups.forEach(group => {
-    const keep = group[0];
-    const keepData = lookup(keep.text);
     const groupBox = document.createElement("div");
     groupBox.style.margin = "10px 0";
     groupBox.style.paddingBottom = "8px";
     groupBox.style.borderBottom = "1px solid var(--border)";
 
-    const keepLine = document.createElement("div");
-    keepLine.style.color = "var(--muted)";
-    keepLine.textContent = `留下：${keep.id}. ${keep.text}${keepData ? `（${keepData.zh}）` : ""}`;
-    groupBox.appendChild(keepLine);
-
-    group.slice(1).forEach(w => {
+    const entries = [];
+    group.forEach((w, idx) => {
       const d = lookup(w.text);
       const line = document.createElement("label");
       line.style.display = "flex";
@@ -1794,15 +1790,16 @@ function showDedupReviewPanel(dupGroups){
       line.style.gap = "6px";
       const cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.checked = true;
+      cb.checked = idx === 0; // 預設先留第一個（id 最小），使用者可以自己改選別的
       cb.dataset.id = w.id;
-      checkboxes.push(cb);
       const span = document.createElement("span");
-      span.textContent = `刪除：${w.id}. ${w.text}${d ? `（${d.zh}）` : ""}`;
+      span.textContent = `留下：${w.id}. ${w.text}${d ? `（${d.zh}）` : ""}`;
       line.appendChild(cb);
       line.appendChild(span);
       groupBox.appendChild(line);
+      entries.push({ cb, w });
     });
+    groupEntries.push(entries);
     panel.appendChild(groupBox);
   });
 
@@ -1811,10 +1808,17 @@ function showDedupReviewPanel(dupGroups){
   const confirmBtn = document.createElement("button");
   confirmBtn.type = "button";
   confirmBtn.className = "primary";
-  confirmBtn.textContent = "✅ 確認合併勾選的字";
+  confirmBtn.textContent = "✅ 確認合併";
   confirmBtn.addEventListener("click", () => {
-    const toRemove = new Set(checkboxes.filter(cb => cb.checked).map(cb => Number(cb.dataset.id)));
-    if(toRemove.size === 0){ alert("沒有勾選任何字，沒有東西被刪除。"); return; }
+    if(groupEntries.some(entries => !entries.some(e => e.cb.checked))){
+      alert("有一組完全沒有勾選「留下」的字——每組至少要留一個，請檢查後再確認。");
+      return;
+    }
+    const toRemove = new Set();
+    groupEntries.forEach(entries => {
+      entries.forEach(e => { if(!e.cb.checked) toRemove.add(e.w.id); });
+    });
+    if(toRemove.size === 0){ alert("目前每組都全部勾選留下，沒有東西會被刪除。"); return; }
     allWords = allWords.filter(w => !toRemove.has(w.id));
     toRemove.forEach(id => {
       selected.delete(id);
