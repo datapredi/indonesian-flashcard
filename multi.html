@@ -164,6 +164,7 @@
     <div class="toolbar">
       <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
       <button id="btnGenerateAll">🚀 全部生成例句＋發音（出發前先跑一輪，離線也能用）</button>
+      <button id="btnGenerateAllTones" class="hidden">🎵 全部生成聲調標記</button>
     </div>
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
     <div class="toolbar">
@@ -392,6 +393,7 @@ function updateLangButtons(){
   document.getElementById("btnImportConvertTh").textContent = `📥 匯入並自動生成${L().label}資料（新增不覆蓋）`;
   document.getElementById("convertNote").textContent = `不管你匯入的檔案原本是${L().label}羅馬拼音、${L().label}原生文字、還是其他語言，都會用 AI 判斷意思，補上羅馬拼音＋中英文意思＋發音用的原生文字，加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入、也不會覆蓋掉原本的清單。`;
   document.getElementById("viDialectBar").classList.toggle("hidden", currentLang !== "vi");
+  document.getElementById("btnGenerateAllTones").classList.toggle("hidden", currentLang !== "th");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -1065,6 +1067,37 @@ async function getUsageExamples(text, zh){
   return parsed.examples;
 }
 
+const TONE_MARKS_CACHE_LS = "flashcard_tone_marks_cache_v1"; // 泰文專用：HLMRF 聲調標記，只在泰文模式使用
+let toneMarksCache = {};
+try{ toneMarksCache = JSON.parse(localStorage.getItem(lsKey(TONE_MARKS_CACHE_LS))) || {}; }catch(e){ toneMarksCache = {}; }
+function saveToneMarksCache(){ localStorage.setItem(lsKey(TONE_MARKS_CACHE_LS), JSON.stringify(toneMarksCache)); }
+
+async function getToneMarks(text, nativeScript){
+  if(toneMarksCache[text]) return toneMarksCache[text];
+  const schema = {
+    type: "object",
+    properties: { marked: { type: "string" } },
+    required: ["marked"],
+    additionalProperties: false
+  };
+  const prompt = `你是泰文老師。請幫這個泰文羅馬拼音標上聲調符號，讓學生知道每個音節的聲調。
+
+泰文原生文字：${nativeScript || text}
+羅馬拼音：${text}
+
+請用這個格式：每個音節後面加上上標括號＋聲調字母，聲調字母只用 H（高音 high）、L（低音 low）、M（中音 mid）、R（上升音 rising）、F（下降音 falling）這五種。上標括號請用 Unicode 上標括號字元 ⁽ ⁾（不是普通括號）。
+
+範例：มีไลน์ไหมครับ/ค่ะ 要標成 mii⁽M⁾ laai⁽M⁾ mǎi⁽R⁾ khráp⁽H⁾/khâ⁽F⁾
+
+請直接根據泰文原生文字的實際聲調來標，音節切分跟拼寫盡量貼近原本給的羅馬拼音，只是每個音節後面加上聲調標記。如果原羅馬拼音有 / 分隔的多個選項（例如男女生說法），每個都要標。
+
+請回傳 marked：標好聲調的完整字串。`;
+  const parsed = await callClaude(prompt, schema, 512);
+  toneMarksCache[text] = parsed.marked;
+  saveToneMarksCache();
+  return parsed.marked;
+}
+
 function addWordToList(text){
   const clean = text.trim();
   if(!clean) return false;
@@ -1084,9 +1117,10 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel, crossLangPanel } = createWordItem(newWord);
+    const { row, usagePanel, tonePanel, crossLangPanel } = createWordItem(newWord);
     el.insertBefore(crossLangPanel, el.firstChild);
-    el.insertBefore(usagePanel, crossLangPanel);
+    el.insertBefore(tonePanel, crossLangPanel);
+    el.insertBefore(usagePanel, tonePanel);
     el.insertBefore(row, usagePanel);
   }
   updateCount();
@@ -1262,6 +1296,28 @@ document.getElementById("btnGenerateAll").onclick = async () => {
   alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
 };
 
+document.getElementById("btnGenerateAllTones").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key 才能生成聲調標記，請先在上面輸入並儲存。"); return; }
+  const list = allWords.filter(w => selected.has(w.id));
+  if(list.length === 0){ alert("目前沒有勾選任何字，請先勾選要標聲調的字。"); return; }
+  const btn = document.getElementById("btnGenerateAllTones");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  let done = 0;
+  let failCount = 0;
+  for(const w of list){
+    const data = lookup(w.text);
+    btn.textContent = `生成聲調標記中... (${done}/${list.length})`;
+    try{
+      if(!toneMarksCache[w.text]) await getToneMarks(w.text, data ? data.nativeScript : "");
+    }catch(e){ failCount++; }
+    done++;
+  }
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+  alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
+};
+
 function getVisibleWords(){
   // 比對清單模式優先權最高：只看你釘選過的那幾個字，忽略搜尋框跟難度篩選，
   // 這樣不管搜尋框現在打什麼，畫面都只會顯示你真正想比對的那幾個。
@@ -1427,6 +1483,38 @@ function createWordItem(w){
   });
   row.appendChild(usageBtn);
 
+  const tonePanel = document.createElement("div");
+  tonePanel.className = "usage-panel hidden";
+
+  const toneBtn = document.createElement("button");
+  toneBtn.type = "button";
+  toneBtn.className = "usage-btn";
+  toneBtn.textContent = "🎵";
+  toneBtn.title = "AI 標註聲調（HLMRF）";
+  toneBtn.setAttribute("aria-label", `AI 標註 ${w.text} 的聲調`);
+  if(currentLang !== "th"){
+    toneBtn.style.display = "none";
+  }
+  toneBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!tonePanel.classList.contains("hidden")){
+      tonePanel.classList.add("hidden");
+      return;
+    }
+    tonePanel.classList.remove("hidden");
+    if(tonePanel.dataset.loaded === "1") return;
+    if(!getApiKey()){ tonePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+    tonePanel.textContent = "標註中...";
+    try{
+      const marked = await getToneMarks(w.text, data ? data.nativeScript : "");
+      tonePanel.textContent = marked;
+      tonePanel.dataset.loaded = "1";
+    }catch(err){
+      tonePanel.textContent = "標註失敗：" + err.message;
+    }
+  });
+  row.appendChild(toneBtn);
+
   const diffOrder = [null, "E", "M", "H"];
   const diffChip = document.createElement("button");
   diffChip.type = "button";
@@ -1507,7 +1595,7 @@ function createWordItem(w){
   });
   row.appendChild(crossLangBtn);
 
-  return { row, usagePanel, crossLangPanel };
+  return { row, usagePanel, tonePanel, crossLangPanel };
 }
 
 function updatePendingSyncBar(){
@@ -1541,9 +1629,10 @@ function renderList(){
     el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel, crossLangPanel } = createWordItem(w);
+    const { row, usagePanel, tonePanel, crossLangPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
+    el.appendChild(tonePanel);
     el.appendChild(crossLangPanel);
   });
   updateCount();
