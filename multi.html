@@ -39,6 +39,8 @@
     border:1px solid var(--border); background:var(--card); color:var(--text); flex:1; min-width:200px;
   }
   select{flex:0 0 auto; min-width:0;}
+  #wordSearch{border:2px solid var(--accent); background:color-mix(in srgb, var(--accent) 10%, var(--card));}
+  #wordSearch:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);}
   textarea{width:100%; resize:vertical; font-size:1rem;}
   .note{font-size:0.75rem; color:var(--muted); margin:-6px 0 12px;}
   .list{background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:16px;}
