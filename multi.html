@@ -1761,7 +1761,19 @@ document.getElementById("btnDedupByMeaning").onclick = () => {
     group.slice(1).forEach(w => toRemove.add(w.id));
   });
   if(toRemove.size === 0){ alert("沒有找到真正重複（背後原生文字一樣）的字。"); return; }
-  if(!confirm(`找到 ${groupCount} 組背後原生文字一樣的重複字，總共會刪掉 ${toRemove.size} 個（每組留 id 最小的那個），這個動作沒辦法復原，確定要合併嗎？`)) return;
+  const previewLines = [];
+  Object.values(groups).forEach(group => {
+    if(group.length <= 1) return;
+    group.sort((a, b) => a.id - b.id);
+    const keep = group[0];
+    const keepData = lookup(keep.text);
+    previewLines.push(`【留下】${keep.id}. ${keep.text}${keepData ? `（${keepData.zh}）` : ""}`);
+    group.slice(1).forEach(w => {
+      const d = lookup(w.text);
+      previewLines.push(`  刪除：${w.id}. ${w.text}${d ? `（${d.zh}）` : ""}`);
+    });
+  });
+  if(!confirm(`找到 ${groupCount} 組背後原生文字一樣的重複字，總共會刪掉 ${toRemove.size} 個（每組留 id 最小的那個），這個動作沒辦法復原：\n\n${previewLines.join("\n")}\n\n確定要合併嗎？`)) return;
   allWords = allWords.filter(w => !toRemove.has(w.id));
   toRemove.forEach(id => {
     selected.delete(id);
