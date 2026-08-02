@@ -67,6 +67,8 @@
   .usage-word{cursor:pointer; border-radius:4px; padding:0 1px;}
   .usage-word:hover{background:var(--bg);}
   .usage-word.in-list{color:var(--accent2); text-decoration:underline; text-decoration-style:dotted;}
+  .item.jump-highlight{animation:jumpFlash 1.6s ease-out;}
+  @keyframes jumpFlash{ 0%{background:rgba(255,196,0,0.55);} 100%{background:transparent;} }
   .usage-zh{color:var(--muted); margin-top:2px;}
   .usage-note{color:var(--muted); font-size:0.8rem; margin-top:4px; font-style:italic;}
   .diff-chip{
@@ -1133,6 +1135,35 @@ function addWordToList(text){
 function isWordInList(clean){
   return allWords.some(w => w.text.toLowerCase() === clean.toLowerCase());
 }
+// 點已經在單字表裡的字：跳到那個字在清單裡的位置並閃一下提示，而不是靜靜沒反應。
+// 如果目前的搜尋/篩選/只顯示已選取/只顯示比對清單會讓那個字不在畫面上，
+// 就先清掉篩選讓它顯示出來，再捲過去。
+function jumpToWord(clean){
+  const target = allWords.find(w => w.text.toLowerCase() === clean.toLowerCase());
+  if(!target) return;
+  if(!getVisibleWords().some(w => w.id === target.id)){
+    document.getElementById("wordSearch").value = "";
+    document.getElementById("difficultyFilter").value = "";
+    if(showSelectedOnly){
+      showSelectedOnly = false;
+      const btn = document.getElementById("btnToggleSelectedOnly");
+      btn.textContent = "只顯示已選取";
+      btn.classList.remove("primary");
+    }
+    if(showCompareOnly){
+      showCompareOnly = false;
+      updateCompareToggleLabel();
+    }
+    renderList();
+  }
+  const input = document.querySelector(`#wordList input[data-id="${target.id}"]`);
+  if(!input) return;
+  const row = input.closest(".item");
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  row.classList.remove("jump-highlight");
+  void row.offsetWidth; // 重新觸發動畫，就算同一個字連續點好幾次也每次都會閃
+  row.classList.add("jump-highlight");
+}
 function renderTappableSentence(sentence){
   const wrap = document.createElement("span");
   const tokens = sentence.split(/(\s+)/);
@@ -1149,10 +1180,10 @@ function renderTappableSentence(sentence){
     const wSpan = document.createElement("span");
     wSpan.className = "usage-word" + (isWordInList(clean) ? " in-list" : "");
     wSpan.textContent = tok;
-    wSpan.title = isWordInList(clean) ? "已在單字表裡" : "點一下加入單字表";
+    wSpan.title = isWordInList(clean) ? "已在單字表裡，點一下跳過去看" : "點一下加入單字表";
     wSpan.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
-      if(wSpan.classList.contains("in-list")) return;
+      if(wSpan.classList.contains("in-list")){ jumpToWord(clean); return; }
       if(addWordToList(clean)) wSpan.classList.add("in-list");
     });
     wrap.appendChild(wSpan);
