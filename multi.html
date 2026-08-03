@@ -179,6 +179,7 @@
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
+      <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
@@ -687,6 +688,13 @@ if(currentLang === "id" && !localStorage.getItem(lsKey(MASTERED_CARDS_LS)) && !l
 function saveCardMastered(){ saveMasteredSet(lsKey(MASTERED_CARDS_LS), cardMasteredIds); }
 function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMasteredIds); }
 
+// 發音常常搞混、需要反覆用錄音/Forvo比對的字——跟「比對清單」不一樣的地方是
+// 這個會存起來（重新整理、關掉再打開都還在），標記完可以隨時用「只顯示待複習
+// 發音」叫出來繼續練，等真的聽熟了、比對過都沒問題了，再自己點掉標記。
+const PRON_FLAG_LS = "flashcard_pron_flag_v1";
+let pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
+function savePronFlag(){ saveMasteredSet(lsKey(PRON_FLAG_LS), pronFlagIds); }
+
 let allWords = loadWordList();
 
 // ---- 記住「來源語言原字」轉換後對應到清單裡的哪個字（給 convertWordsToTargetLang 用） ----
@@ -743,6 +751,7 @@ let sortAZ = false;
 // 重新整理頁面就會清空，不用另外存 localStorage。
 let compareSet = new Set();
 let showCompareOnly = false;
+let showPronFlagOnly = false;
 
 // ---- AI 自動生成翻譯（用使用者自己的 Anthropic API Key） ----
 const API_KEY_LS = "anthropic_api_key";
@@ -1195,6 +1204,10 @@ function jumpToWord(clean){
       showCompareOnly = false;
       updateCompareToggleLabel();
     }
+    if(showPronFlagOnly){
+      showPronFlagOnly = false;
+      updatePronFlagToggleLabel();
+    }
     renderList();
   }
   const input = document.querySelector(`#wordList input[data-id="${target.id}"]`);
@@ -1475,6 +1488,7 @@ function getVisibleWords(){
   const diffFilter = document.getElementById("difficultyFilter").value;
   const list = allWords.filter(w => {
     if(showSelectedOnly && !selected.has(w.id)) return false;
+    if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -1733,6 +1747,28 @@ function createWordItem(w){
   });
   refreshCompareBtn();
   row.appendChild(compareBtn);
+
+  const pronFlagBtn = document.createElement("button");
+  pronFlagBtn.type = "button";
+  pronFlagBtn.className = "diff-chip";
+  function refreshPronFlagBtn(){
+    const flagged = pronFlagIds.has(w.id);
+    pronFlagBtn.classList.toggle("diff-H", flagged);
+    pronFlagBtn.textContent = "⚠️";
+    pronFlagBtn.style.opacity = flagged ? "1" : "0.35";
+    pronFlagBtn.setAttribute("aria-label", `${w.text}${flagged ? "（已標記發音待複習，點一下取消）" : "（點一下標記這個字發音要多比對）"}`);
+    pronFlagBtn.title = flagged ? "發音待複習（點一下取消標記）" : "標記：這個字發音常搞混，要多比對";
+  }
+  pronFlagBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(pronFlagIds.has(w.id)) pronFlagIds.delete(w.id); else pronFlagIds.add(w.id);
+    savePronFlag();
+    refreshPronFlagBtn();
+    updatePronFlagToggleLabel();
+    if(showPronFlagOnly) renderList();
+  });
+  refreshPronFlagBtn();
+  row.appendChild(pronFlagBtn);
 
   const crossLangPanel = document.createElement("div");
   crossLangPanel.className = "usage-panel hidden";
@@ -2016,6 +2052,17 @@ document.getElementById("btnClearCompare").addEventListener("click", () => {
   renderList();
 });
 updateCompareToggleLabel();
+function updatePronFlagToggleLabel(){
+  const btn = document.getElementById("btnTogglePronFlagOnly");
+  btn.textContent = showPronFlagOnly ? `顯示全部單字 (發音待複習 ${pronFlagIds.size} 個)` : `⚠️ 只顯示發音待複習 (${pronFlagIds.size})`;
+  btn.classList.toggle("primary", showPronFlagOnly);
+}
+document.getElementById("btnTogglePronFlagOnly").addEventListener("click", () => {
+  showPronFlagOnly = !showPronFlagOnly;
+  updatePronFlagToggleLabel();
+  renderList();
+});
+updatePronFlagToggleLabel();
 document.getElementById("btnSortAZ").addEventListener("click", (e) => {
   sortAZ = !sortAZ;
   e.currentTarget.classList.toggle("primary", sortAZ);
