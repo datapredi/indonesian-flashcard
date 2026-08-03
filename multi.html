@@ -144,6 +144,12 @@
       <button id="btnDedupByMeaning">🧹 合併真正重複的字（拼法不同但背後同一個字）</button>
     </div>
     <div class="list hidden" id="dedupReviewPanel" style="padding:14px;"></div>
+    <div class="toolbar">
+      <button id="btnExportBackup">💾 匯出全部語言資料備份</button>
+      <button id="btnImportBackupTrigger">📥 選擇備份檔還原</button>
+      <input type="file" id="fileInputBackup" accept=".json">
+    </div>
+    <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。不含 API Key（安全考量，換裝置要自己重新輸入）、不含你自己的錄音（IndexedDB 音檔太大，錄音本來就是重錄就好）。還原會直接覆蓋目前資料，請小心操作。</div>
     <div class="toolbar hidden" id="convertBar">
       <button id="btnImportConvertTh">📥 匯入並自動生成資料（新增不覆蓋）</button>
       <input type="file" id="fileInputConvertTh" accept=".txt,.md">
@@ -2196,6 +2202,68 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 
 // alert() 一關掉內容就不見了，之後想回頭看/截圖給我除錯都沒辦法。這裡同時把
 // 結果訊息寫進畫面上一個不會自動消失的區塊，一直留著到下次轉換才會被換掉。
+// ================= 備份／還原 =================
+// 匯出所有語言的資料（單字表、翻譯快取、例句快取、聲調標記、⚠️ 標記、已學會進度等），
+// 存成一個 JSON 檔下載。刻意不含 API Key（安全考量）、不含錄音（IndexedDB 存的音檔，
+// 太大也沒必要備份，重錄就好）。
+const BACKUP_PER_LANG_BASES = [
+  LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS,
+  CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS
+];
+const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS];
+
+function exportBackup(){
+  const data = { version: 1, exportedAt: new Date().toISOString(), keys: {} };
+  BACKUP_GLOBAL_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    if(v !== null) data.keys[k] = v;
+  });
+  LANG_ORDER.forEach(lang => {
+    BACKUP_PER_LANG_BASES.forEach(base => {
+      const key = lsKeyForLang(base, lang);
+      const v = localStorage.getItem(key);
+      if(v !== null) data.keys[key] = v;
+    });
+  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `flashcard_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+document.getElementById("btnExportBackup").addEventListener("click", exportBackup);
+
+document.getElementById("btnImportBackupTrigger").addEventListener("click", () => {
+  document.getElementById("fileInputBackup").click();
+});
+document.getElementById("fileInputBackup").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try{
+      data = JSON.parse(reader.result);
+      if(!data || typeof data.keys !== "object") throw new Error("檔案格式不對，不是這個工具匯出的備份檔。");
+    }catch(err){
+      alert("還原失敗：" + err.message);
+      return;
+    }
+    const keys = Object.keys(data.keys);
+    if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key、不影響錄音），共 ${keys.length} 筆資料。這個動作沒辦法復原，確定要還原嗎？`)) return;
+    keys.forEach(k => localStorage.setItem(k, data.keys[k]));
+    alert("還原完成，頁面即將重新整理套用新資料。");
+    location.reload();
+  };
+  reader.readAsText(file);
+});
+
 function showConvertResult(msg){
   const el = document.getElementById("convertResultStatus");
   el.textContent = msg;
