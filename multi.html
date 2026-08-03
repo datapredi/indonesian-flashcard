@@ -1656,13 +1656,7 @@ function createWordItem(w){
   if(currentLang !== "th"){
     toneBtn.style.display = "none";
   }
-  toneBtn.addEventListener("click", async (e) => {
-    e.preventDefault(); e.stopPropagation();
-    if(!tonePanel.classList.contains("hidden")){
-      tonePanel.classList.add("hidden");
-      return;
-    }
-    tonePanel.classList.remove("hidden");
+  async function loadTonePanel(){
     if(tonePanel.dataset.loaded === "1") return;
     if(!getApiKey()){ tonePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
     tonePanel.textContent = "標註中...";
@@ -1673,8 +1667,24 @@ function createWordItem(w){
     }catch(err){
       tonePanel.textContent = "標註失敗：" + err.message;
     }
+  }
+  toneBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!tonePanel.classList.contains("hidden")){
+      tonePanel.classList.add("hidden");
+      return;
+    }
+    tonePanel.classList.remove("hidden");
+    await loadTonePanel();
   });
   row.appendChild(toneBtn);
+  // 標記過「⚠️ 發音待複習」的字，代表使用者本來就是想看聲調的，直接先展開、
+  // 先生成好，不用使用者自己再點一次 🎵。只在泰文模式生效（其他語言還沒有
+  // 這個聲調標記功能）。
+  if(currentLang === "th" && pronFlagIds.has(w.id)){
+    tonePanel.classList.remove("hidden");
+    loadTonePanel();
+  }
 
   const nativeTonePanel = document.createElement("div");
   nativeTonePanel.className = "usage-panel hidden";
