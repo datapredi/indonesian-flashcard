@@ -153,6 +153,10 @@
     <div class="toolbar hidden" id="convertBar">
       <button id="btnImportConvertTh">📥 匯入並自動生成資料（新增不覆蓋）</button>
       <input type="file" id="fileInputConvertTh" accept=".txt,.md">
+      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
+        <input type="checkbox" id="forceReconvert">
+        強制重新轉換（忽略已轉換記錄）
+      </label>
     </div>
     <div class="note hidden" id="convertNote"></div>
     <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
@@ -2307,8 +2311,11 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     }
     // 只轉「還沒轉過」或「轉過但對應的字後來不見了（被刪掉/合併掉/當初其實
     // 沒轉成功）」的來源字，已經轉過而且結果還在清單裡的完全不會被動到，
-    // 不用整批重轉、也不會因為 AI 拼法飄移產生新的重複。
-    const wordsToConvert = indoWords.filter(w => {
+    // 不用整批重轉、也不會因為 AI 拼法飄移產生新的重複。勾了「強制重新轉換」
+    // 的話就跳過這層檢查，這個檔案裡的字全部都重跑一次——用來處理轉換結果
+    // 本身有問題（不是單純找不到）的情況，例如卡住的舊 convertedMap 記錄。
+    const forceReconvert = document.getElementById("forceReconvert").checked;
+    const wordsToConvert = forceReconvert ? indoWords.slice() : indoWords.filter(w => {
       const mapped = convertedMap[w.toLowerCase()];
       if(!mapped) return true;
       return !allWords.some(x => x.text.toLowerCase() === mapped.toLowerCase());
@@ -2324,6 +2331,7 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     const batches = chunkArr(wordsToConvert, 8);
     let done = 0;
     let addedCount = 0;
+    let updatedCount = 0;
     let unmatchedCount = 0;
     try{
       // 一批（8個）轉完就馬上加進清單、重繪畫面，不用等整份檔案轉完才看到字，
@@ -2365,13 +2373,34 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           if(existing){
             if(!L().hasScript){
               // 印尼文沒有羅馬拼音簡化這回事，顯示文字本身就是完整的字，
-              // 文字一樣就是真的重複，維持原本單純的邏輯。
+              // 文字一樣就是真的重複。強制模式下代表使用者知道這個字資料有
+              // 問題、就是想拿新生成的結果覆蓋掉舊的，不是單純跳過。
+              if(forceReconvert){
+                customDB[existing.text] = {
+                  zh: entry.zh, en: entry.en,
+                  quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
+                };
+                convertedMap[sourceKey] = existing.text;
+                updatedCount++;
+              }
               return;
             }
             const existingData = customDB[existing.text];
             const sameWord = existingData && existingData.nativeScript && entry.nativeScript
               && existingData.nativeScript === entry.nativeScript;
-            if(sameWord) return; // 背後真的是同一個字，才真的算重複、跳過
+            if(sameWord){
+              // 背後真的是同一個字：一般情況下算真的重複、跳過；強制模式下則是
+              // 用這次新生成的資料覆蓋掉舊的（原地更新，不新增字、不留舊資料）。
+              if(forceReconvert){
+                customDB[existing.text] = {
+                  zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript,
+                  quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
+                };
+                convertedMap[sourceKey] = existing.text;
+                updatedCount++;
+              }
+              return;
+            }
             let suffix = 2;
             while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
             finalText = `${text} (${suffix})`;
@@ -2404,8 +2433,9 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     btn.textContent = originalLabel;
     const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的原文字` : "";
     const skipNote = alreadyDoneCount > 0 ? `${alreadyDoneCount} 個之前轉換過已跳過，` : "";
+    const updatedNote = updatedCount > 0 ? `，用新結果更新了 ${updatedCount} 個原本就存在的字` : "";
     const unmatchedNote = unmatchedCount > 0 ? `\n\n有 ${unmatchedCount} 個字這次沒有成功對應到結果，還沒被標記為已轉換，重新匯入同一個檔案時會自動再試一次。` : "";
-    showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${staleNote}。${unmatchedNote}`);
+    showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${updatedNote}${staleNote}。${unmatchedNote}`);
   };
   reader.readAsText(file, "UTF-8");
 });
