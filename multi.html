@@ -1287,6 +1287,30 @@ document.getElementById("btnSaveOpenaiKey").onclick = () => {
   alert("已儲存 Key。");
 };
 
+// 批次生成（例句/發音/聲調）常常要跑好幾分鐘，手機螢幕一自動鎖定，瀏覽器就會
+// 暫停整個分頁的執行，生成跑到一半就停掉。網頁本身沒辦法做到「螢幕真的鎖住、
+// 或切到別的 App」還繼續在背景執行——這是手機瀏覽器的限制，換成 App 才能做到。
+// 目前能做的是用 Wake Lock API 讓螢幕在生成期間不要自動關掉，只要畫面留在這頁
+// 就會一直跑完，不用一直手動點螢幕防止鎖定。裝置不支援的話就靜默略過。
+let wakeLock = null;
+let wakeLockWanted = false;
+async function acquireWakeLock(){
+  wakeLockWanted = true;
+  if(!("wakeLock" in navigator)) return;
+  try{
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => { wakeLock = null; });
+  }catch(e){ /* 使用者拒絕或裝置不支援，忽略，不影響生成本身 */ }
+}
+function releaseWakeLock(){
+  wakeLockWanted = false;
+  if(wakeLock){ wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+document.addEventListener("visibilitychange", () => {
+  // Wake Lock 在分頁被切走、不可見時會自動失效；切回來時如果批次還在跑，要重新取得。
+  if(wakeLockWanted && document.visibilityState === "visible" && !wakeLock) acquireWakeLock();
+});
+
 document.getElementById("btnGenerate").onclick = async () => {
   if(!getApiKey()){
     alert("請先輸入並儲存 API Key。");
@@ -1299,26 +1323,31 @@ document.getElementById("btnGenerate").onclick = async () => {
   }
   const btn = document.getElementById("btnGenerate");
   btn.disabled = true;
-  const batches = chunkArr(missing, 8);
-  let done = 0;
-  for(const batch of batches){
-    btn.textContent = `生成中... (${done}/${missing.length})`;
-    try{
-      const entries = await generateWordData(batch.map(w => w.text));
-      batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
-      saveCustomDB();
-      done += batch.length;
-      renderList();
-    }catch(e){
-      alert("生成失敗：" + e.message);
-      btn.disabled = false;
-      btn.textContent = "✨ AI 自動生成缺少的翻譯";
-      return;
+  await acquireWakeLock();
+  try{
+    const batches = chunkArr(missing, 8);
+    let done = 0;
+    for(const batch of batches){
+      btn.textContent = `生成中... (${done}/${missing.length})`;
+      try{
+        const entries = await generateWordData(batch.map(w => w.text));
+        batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
+        saveCustomDB();
+        done += batch.length;
+        renderList();
+      }catch(e){
+        alert("生成失敗：" + e.message);
+        btn.disabled = false;
+        btn.textContent = "✨ AI 自動生成缺少的翻譯";
+        return;
+      }
     }
+    btn.disabled = false;
+    btn.textContent = "✨ AI 自動生成缺少的翻譯";
+    renderList();
+  } finally {
+    releaseWakeLock();
   }
-  btn.disabled = false;
-  btn.textContent = "✨ AI 自動生成缺少的翻譯";
-  renderList();
 };
 
 document.getElementById("btnGenerateAll").onclick = async () => {
@@ -1329,51 +1358,55 @@ document.getElementById("btnGenerateAll").onclick = async () => {
   const btn = document.getElementById("btnGenerateAll");
   const originalLabel = btn.textContent;
   btn.disabled = true;
-
-  // 第一階段：先確保每個字都有基本翻譯資料（跟「✨ AI 自動生成缺少的翻譯」一樣），
-  // 沒有這個，例句/發音都無從生成起。
-  const missing = list.filter(w => !lookup(w.text));
-  if(missing.length > 0){
-    const batches = chunkArr(missing, 8);
-    let doneBase = 0;
-    for(const batch of batches){
-      btn.textContent = `補基本翻譯中... (${doneBase}/${missing.length})`;
-      try{
-        const entries = await generateWordData(batch.map(w => w.text));
-        batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
-        saveCustomDB();
-        doneBase += batch.length;
-        renderList();
-      }catch(e){
-        alert("補基本翻譯失敗：" + e.message + "\n\n已經完成的部分不會不見，可以再按一次繼續。");
-        btn.disabled = false;
-        btn.textContent = originalLabel;
-        return;
+  await acquireWakeLock();
+  try{
+    // 第一階段：先確保每個字都有基本翻譯資料（跟「✨ AI 自動生成缺少的翻譯」一樣），
+    // 沒有這個，例句/發音都無從生成起。
+    const missing = list.filter(w => !lookup(w.text));
+    if(missing.length > 0){
+      const batches = chunkArr(missing, 8);
+      let doneBase = 0;
+      for(const batch of batches){
+        btn.textContent = `補基本翻譯中... (${doneBase}/${missing.length})`;
+        try{
+          const entries = await generateWordData(batch.map(w => w.text));
+          batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
+          saveCustomDB();
+          doneBase += batch.length;
+          renderList();
+        }catch(e){
+          alert("補基本翻譯失敗：" + e.message + "\n\n已經完成的部分不會不見，可以再按一次繼續。");
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+          return;
+        }
       }
     }
-  }
 
-  // 第二階段：逐字生成例句 + 發音（單字本身的發音、中文意思的發音）。已經生成過、
-  // 存在快取裡的會自動跳過，不會重複花錢；單一個字失敗不中斷整個流程，繼續下一個。
-  let done = 0;
-  let failCount = 0;
-  for(const w of list){
-    btn.textContent = `生成例句＋發音中... (${done}/${list.length})`;
-    const data = lookup(w.text);
-    try{
-      if(data && data.zh && !usageCache[w.text]) await getUsageExamples(w.text, data.zh);
-    }catch(e){ failCount++; }
-    try{
-      await getTTSAudioBlob(getSpeechText(w), L().ttsInstructions);
-    }catch(e){ failCount++; }
-    try{
-      if(data && data.zh) await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
-    }catch(e){ failCount++; }
-    done++;
+    // 第二階段：逐字生成例句 + 發音（單字本身的發音、中文意思的發音）。已經生成過、
+    // 存在快取裡的會自動跳過，不會重複花錢；單一個字失敗不中斷整個流程，繼續下一個。
+    let done = 0;
+    let failCount = 0;
+    for(const w of list){
+      btn.textContent = `生成例句＋發音中... (${done}/${list.length})`;
+      const data = lookup(w.text);
+      try{
+        if(data && data.zh && !usageCache[w.text]) await getUsageExamples(w.text, data.zh);
+      }catch(e){ failCount++; }
+      try{
+        await getTTSAudioBlob(getSpeechText(w), L().ttsInstructions);
+      }catch(e){ failCount++; }
+      try{
+        if(data && data.zh) await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
+      }catch(e){ failCount++; }
+      done++;
+    }
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
+  } finally {
+    releaseWakeLock();
   }
-  btn.disabled = false;
-  btn.textContent = originalLabel;
-  alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
 };
 
 document.getElementById("btnGenerateAllTones").onclick = async () => {
@@ -1383,19 +1416,24 @@ document.getElementById("btnGenerateAllTones").onclick = async () => {
   const btn = document.getElementById("btnGenerateAllTones");
   const originalLabel = btn.textContent;
   btn.disabled = true;
-  let done = 0;
-  let failCount = 0;
-  for(const w of list){
-    const data = lookup(w.text);
-    btn.textContent = `生成聲調標記中... (${done}/${list.length})`;
-    try{
-      if(!toneMarksCache[w.text]) await getToneMarks(w.text, data ? data.nativeScript : "");
-    }catch(e){ failCount++; }
-    done++;
+  await acquireWakeLock();
+  try{
+    let done = 0;
+    let failCount = 0;
+    for(const w of list){
+      const data = lookup(w.text);
+      btn.textContent = `生成聲調標記中... (${done}/${list.length})`;
+      try{
+        if(!toneMarksCache[w.text]) await getToneMarks(w.text, data ? data.nativeScript : "");
+      }catch(e){ failCount++; }
+      done++;
+    }
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
+  } finally {
+    releaseWakeLock();
   }
-  btn.disabled = false;
-  btn.textContent = originalLabel;
-  alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
 };
 
 document.getElementById("btnGenerateAllNativeTones").onclick = async () => {
@@ -1405,21 +1443,26 @@ document.getElementById("btnGenerateAllNativeTones").onclick = async () => {
   const btn = document.getElementById("btnGenerateAllNativeTones");
   const originalLabel = btn.textContent;
   btn.disabled = true;
-  let done = 0;
-  let skipped = 0;
-  let failCount = 0;
-  for(const w of list){
-    const data = lookup(w.text);
-    btn.textContent = `生成泰文字母聲調中... (${done}/${list.length})`;
-    if(!data || !data.nativeScript){ skipped++; done++; continue; }
-    try{
-      if(!nativeToneMarksCache[w.text]) await getNativeToneMarks(w.text, data.nativeScript);
-    }catch(e){ failCount++; }
-    done++;
+  await acquireWakeLock();
+  try{
+    let done = 0;
+    let skipped = 0;
+    let failCount = 0;
+    for(const w of list){
+      const data = lookup(w.text);
+      btn.textContent = `生成泰文字母聲調中... (${done}/${list.length})`;
+      if(!data || !data.nativeScript){ skipped++; done++; continue; }
+      try{
+        if(!nativeToneMarksCache[w.text]) await getNativeToneMarks(w.text, data.nativeScript);
+      }catch(e){ failCount++; }
+      done++;
+    }
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    alert(`完成，處理了 ${done} 個字。${skipped > 0 ? `有 ${skipped} 個字還沒有泰文原生文字資料，跳過了。` : ""}${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
+  } finally {
+    releaseWakeLock();
   }
-  btn.disabled = false;
-  btn.textContent = originalLabel;
-  alert(`完成，處理了 ${done} 個字。${skipped > 0 ? `有 ${skipped} 個字還沒有泰文原生文字資料，跳過了。` : ""}${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
 };
 
 function getVisibleWords(){
