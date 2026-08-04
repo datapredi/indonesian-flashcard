@@ -1165,10 +1165,49 @@ async function getNativeToneMarks(text, nativeScript){
   return parsed.marked;
 }
 
-const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v5"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位；v3: 放寬不只嚴格極小對立詞、最多列 6 個；v4: 限制 A1-A2 優先、B1 補位，加上重新生成；v5: 改用「自助旅行日常會話」實際範圍取代不可靠的 CEFR 自我判斷，加經典組合當錨點
+const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v6"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位；v3: 放寬不只嚴格極小對立詞、最多列 6 個；v4: 限制 A1-A2 優先、B1 補位，加上重新生成；v5: 改用「自助旅行日常會話」實際範圍取代不可靠的 CEFR 自我判斷，加經典組合當錨點；v6: 改用寫死的經典組合表格保底合併，不再單靠 AI 每次自己記得
 let minimalPairsCache = {};
 try{ minimalPairsCache = JSON.parse(localStorage.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
 function saveMinimalPairsCache(){ localStorage.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
+
+// AI 每次自己回想「這個字容易跟什麼搞混」不夠穩定（同一個字問兩次，經典組合
+// 有時候會漏掉，反而列出不常用的字，甚至排進「離婚」這種明明講好不要的字），
+// 所以最有名、最常被泰文教材放在一起教的幾組直接寫死在這裡保底：查到的字只
+// 要屬於某一組，同組其他字保證會出現，不用靠 AI 每次都記得。這份表格範圍很
+// 小，只涵蓋幾組最經典的，其他字還是靠 AI 自己找。這裡只寫死 nativeScript
+// 跟中文意思（字典基本意思，出錯風險低），聲調標記刻意不寫死、而是沿用
+// getToneMarks 現有的 AI 生成邏輯（跟泰文字母聲調標記那個 ก 按鈕共用同一套），
+// 避免我自己憑記憶亂猜聲調規則標錯。
+const THAI_KNOWN_CONFUSION_CLUSTERS = [
+  [
+    { nativeScript: "ไม่", romanized: "mai", zh: "不" },
+    { nativeScript: "ไม้", romanized: "maai", zh: "木頭；量詞" },
+    { nativeScript: "ใหม่", romanized: "mai", zh: "新" },
+    { nativeScript: "ไหม", romanized: "mai", zh: "絲；放句尾表示疑問" }
+  ],
+  [
+    { nativeScript: "เก้า", romanized: "kao", zh: "九" },
+    { nativeScript: "เก่า", romanized: "kao", zh: "舊" }
+  ],
+  [
+    { nativeScript: "ยาก", romanized: "yaak", zh: "困難" },
+    { nativeScript: "อยาก", romanized: "yaak", zh: "想要" },
+    { nativeScript: "อย่า", romanized: "yaa", zh: "不要（叫別人不要做）" }
+  ],
+  [
+    { nativeScript: "สวย", romanized: "suay", zh: "漂亮" },
+    { nativeScript: "ซวย", romanized: "suay", zh: "倒楣" }
+  ]
+];
+function findKnownConfusionMatches(nativeScript){
+  if(!nativeScript) return [];
+  for(const cluster of THAI_KNOWN_CONFUSION_CLUSTERS){
+    if(cluster.some(m => m.nativeScript === nativeScript)){
+      return cluster.filter(m => m.nativeScript !== nativeScript);
+    }
+  }
+  return [];
+}
 
 async function getMinimalPairs(text, nativeScript, zh, force){
   // AI 挑出來的候選字本來就沒有絕對標準答案，每次生成的組合可能不太一樣，
@@ -1226,9 +1265,24 @@ async function getMinimalPairs(text, nativeScript, zh, force){
   note：用繁體中文簡短說明兩個字的差異，例如「只差聲調：這個字是上升音，原字是下降音」或「母音長短不同」
 }`;
   const parsed = await callClaude(prompt, schema, 1024);
-  minimalPairsCache[text] = parsed.pairs;
+  // 寫死的經典組合保底：這個字如果屬於某一組，同組其他字直接保證放進結果最
+  // 前面，不用靠 AI 自己記得。聲調標記借用 getToneMarks 現有的 AI 生成邏輯
+  // （會存進它自己的快取，不重複花錢），note 用固定文字說明是經典組合。
+  const knownMatches = findKnownConfusionMatches(nativeScript);
+  const known = [];
+  for(const m of knownMatches){
+    let toneMarked = m.romanized;
+    try{ toneMarked = await getToneMarks(m.romanized, m.nativeScript); }catch(e){ /* 拿不到聲調標記就先用純拼音顯示，不影響這個字本身有沒有被列出來 */ }
+    known.push({
+      nativeScript: m.nativeScript, romanized: m.romanized, toneMarked, zh: m.zh,
+      note: "泰文教材常放在一起教的經典易混淆組合，主要靠聲調（或拼寫細節）分辨。"
+    });
+  }
+  const knownScripts = new Set(known.map(k => k.nativeScript));
+  const merged = known.concat(parsed.pairs.filter(p => !knownScripts.has(p.nativeScript))).slice(0, 6);
+  minimalPairsCache[text] = merged;
   saveMinimalPairsCache();
-  return parsed.pairs;
+  return merged;
 }
 
 function addWordToList(text){
