@@ -190,6 +190,7 @@
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
+      <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
@@ -764,6 +765,10 @@ let sortAZ = false;
 let compareSet = new Set();
 let showCompareOnly = false;
 let showPronFlagOnly = false;
+// 每次「匯入並自動生成資料」成功後自動記住這批處理到的字，畫面預設只顯示
+// 這些，不用再自己捲到清單最下面找。只存在這次瀏覽階段，不用存 localStorage。
+let newlyImportedIds = new Set();
+let showNewlyImportedOnly = false;
 
 // ---- AI 自動生成翻譯（用使用者自己的 Anthropic API Key） ----
 const API_KEY_LS = "anthropic_api_key";
@@ -1220,6 +1225,10 @@ function jumpToWord(clean){
       showPronFlagOnly = false;
       updatePronFlagToggleLabel();
     }
+    if(showNewlyImportedOnly){
+      showNewlyImportedOnly = false;
+      updateNewlyImportedToggleLabel();
+    }
     renderList();
   }
   const input = document.querySelector(`#wordList input[data-id="${target.id}"]`);
@@ -1495,6 +1504,9 @@ function getVisibleWords(){
   // 這樣不管搜尋框現在打什麼，畫面都只會顯示你真正想比對的那幾個。
   if(showCompareOnly){
     return allWords.filter(w => compareSet.has(w.id));
+  }
+  if(showNewlyImportedOnly){
+    return allWords.filter(w => newlyImportedIds.has(w.id));
   }
   const query = document.getElementById("wordSearch").value.trim().toLowerCase();
   const diffFilter = document.getElementById("difficultyFilter").value;
@@ -2085,6 +2097,17 @@ document.getElementById("btnTogglePronFlagOnly").addEventListener("click", () =>
   renderList();
 });
 updatePronFlagToggleLabel();
+function updateNewlyImportedToggleLabel(){
+  const btn = document.getElementById("btnToggleNewlyImportedOnly");
+  btn.textContent = showNewlyImportedOnly ? `顯示全部單字 (剛匯入 ${newlyImportedIds.size} 個)` : `🆕 只顯示剛匯入的單字 (${newlyImportedIds.size})`;
+  btn.classList.toggle("primary", showNewlyImportedOnly);
+}
+document.getElementById("btnToggleNewlyImportedOnly").addEventListener("click", () => {
+  showNewlyImportedOnly = !showNewlyImportedOnly;
+  updateNewlyImportedToggleLabel();
+  renderList();
+});
+updateNewlyImportedToggleLabel();
 document.getElementById("btnSortAZ").addEventListener("click", (e) => {
   sortAZ = !sortAZ;
   e.currentTarget.classList.toggle("primary", sortAZ);
@@ -2301,6 +2324,9 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
       showConvertResult("沒有解析到任何單字，請確認檔案內容。");
       return;
     }
+    // 每次真的開始處理一個檔案，就重新開始記錄這次匯入對應到哪些字，
+    // 不要跟上一次匯入的結果混在一起。
+    newlyImportedIds = new Set();
     // 如果之前不小心用「一般匯入」把這些印尼文原字直接加進了泰文清單，
     // 這裡先把那些殘留的印尼文原字清掉，改用轉換後的泰文版本取代，
     // 避免印尼文原字跟轉換後的泰文版本兩份都留著。
@@ -2322,6 +2348,19 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
     });
     const alreadyDoneCount = indoWords.length - wordsToConvert.length;
     if(wordsToConvert.length === 0){
+      // 全部都已經轉換過了，但還是把這次匯入對應到的字標成「剛匯入」，
+      // 使用者還是能直接跳去看這批字，不用因為沒有新增就找不到。
+      indoWords.forEach(w => {
+        const mapped = convertedMap[w.toLowerCase()];
+        if(!mapped) return;
+        const match = allWords.find(x => x.text.toLowerCase() === mapped.toLowerCase());
+        if(match) newlyImportedIds.add(match.id);
+      });
+      if(newlyImportedIds.size > 0){
+        showNewlyImportedOnly = true;
+        updateNewlyImportedToggleLabel();
+        renderList();
+      }
       showConvertResult(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。`);
       return;
     }
@@ -2415,6 +2454,19 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
           addedCount++;
         });
         unmatchedCount += batch.length - matchedThisBatch.size;
+        // 記住這批處理到的字目前對應到清單裡的哪個 id（不管是新加的、強制模式
+        // 原地更新的、還是本來就存在被判定重複跳過的），畫面預設只顯示這些，
+        // 不用自己捲到清單最下面找剛匯入的字。
+        batch.forEach(w => {
+          const mapped = convertedMap[w.toLowerCase()];
+          if(!mapped) return;
+          const match = allWords.find(x => x.text.toLowerCase() === mapped.toLowerCase());
+          if(match) newlyImportedIds.add(match.id);
+        });
+        if(newlyImportedIds.size > 0){
+          showNewlyImportedOnly = true;
+          updateNewlyImportedToggleLabel();
+        }
         saveConvertedMap();
         saveWordList(allWords);
         saveCustomDB();
