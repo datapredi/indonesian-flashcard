@@ -1170,43 +1170,41 @@ let minimalPairsCache = {};
 try{ minimalPairsCache = JSON.parse(localStorage.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
 function saveMinimalPairsCache(){ localStorage.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
 
-// AI 每次自己回想「這個字容易跟什麼搞混」不夠穩定（同一個字問兩次，經典組合
-// 有時候會漏掉，反而列出不常用的字，甚至排進「離婚」這種明明講好不要的字），
-// 所以最有名、最常被泰文教材放在一起教的幾組直接寫死在這裡保底：查到的字只
-// 要屬於某一組，同組其他字保證會出現，不用靠 AI 每次都記得。這份表格範圍很
-// 小，只涵蓋幾組最經典的，其他字還是靠 AI 自己找。這裡只寫死 nativeScript
-// 跟中文意思（字典基本意思，出錯風險低），聲調標記刻意不寫死、而是沿用
-// getToneMarks 現有的 AI 生成邏輯（跟泰文字母聲調標記那個 ก 按鈕共用同一套），
-// 避免我自己憑記憶亂猜聲調規則標錯。
-const THAI_KNOWN_CONFUSION_CLUSTERS = [
-  [
-    { nativeScript: "ไม่", romanized: "mai", zh: "不" },
-    { nativeScript: "ไม้", romanized: "maai", zh: "木頭；量詞" },
-    { nativeScript: "ใหม่", romanized: "mai", zh: "新" },
-    { nativeScript: "ไหม", romanized: "mai", zh: "絲；放句尾表示疑問" }
-  ],
-  [
-    { nativeScript: "เก้า", romanized: "kao", zh: "九" },
-    { nativeScript: "เก่า", romanized: "kao", zh: "舊" }
-  ],
-  [
-    { nativeScript: "ยาก", romanized: "yaak", zh: "困難" },
-    { nativeScript: "อยาก", romanized: "yaak", zh: "想要" },
-    { nativeScript: "อย่า", romanized: "yaa", zh: "不要（叫別人不要做）" }
-  ],
-  [
-    { nativeScript: "สวย", romanized: "suay", zh: "漂亮" },
-    { nativeScript: "ซวย", romanized: "suay", zh: "倒楣" }
-  ]
-];
-function findKnownConfusionMatches(nativeScript){
-  if(!nativeScript) return [];
-  for(const cluster of THAI_KNOWN_CONFUSION_CLUSTERS){
-    if(cluster.some(m => m.nativeScript === nativeScript)){
-      return cluster.filter(m => m.nativeScript !== nativeScript);
+// 真正可靠、不用靠 AI 每次自己記得的判斷邏輯：直接比對使用者自己單字表裡
+// 所有泰文字的羅馬拼音，用編輯距離（Levenshtein distance）找出拼法很接近、
+// 但背後原生文字不同的字——這種就是最容易搞混、最值得練習分辨的，而且是
+// 根據使用者實際擁有的單字算出來的，不是憑空用 AI 亂猜或靠記憶硬湊清單。
+function levenshteinDistance(a, b){
+  a = a.toLowerCase(); b = b.toLowerCase();
+  const dp = [];
+  for(let i = 0; i <= a.length; i++) dp.push([i]);
+  for(let j = 1; j <= b.length; j++) dp[0][j] = j;
+  for(let i = 1; i <= a.length; i++){
+    for(let j = 1; j <= b.length; j++){
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
-  return [];
+  return dp[a.length][b.length];
+}
+function findSimilarExistingWords(w){
+  const data = lookup(w.text);
+  if(!data || !data.nativeScript) return [];
+  // 去掉重複撞拼音時自動加的 " (2)"、" (3)" 編號，比對原本的拼法。
+  const base = w.text.toLowerCase().replace(/\s*\(\d+\)$/, "");
+  return allWords
+    .filter(other => other.id !== w.id)
+    .map(other => {
+      const d = lookup(other.text);
+      // nativeScript 一樣代表背後其實是同一個字（重複），不是要練習分辨的
+      // 對象，跳過；只有拼音接近、但背後真的是不同字的才算。
+      if(!d || !d.nativeScript || d.nativeScript === data.nativeScript) return null;
+      const otherBase = other.text.toLowerCase().replace(/\s*\(\d+\)$/, "");
+      const dist = levenshteinDistance(base, otherBase);
+      return dist <= 2 ? { word: other, data: d, dist } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 6);
 }
 
 async function getMinimalPairs(text, nativeScript, zh, force){
@@ -1265,24 +1263,9 @@ async function getMinimalPairs(text, nativeScript, zh, force){
   note：用繁體中文簡短說明兩個字的差異，例如「只差聲調：這個字是上升音，原字是下降音」或「母音長短不同」
 }`;
   const parsed = await callClaude(prompt, schema, 1024);
-  // 寫死的經典組合保底：這個字如果屬於某一組，同組其他字直接保證放進結果最
-  // 前面，不用靠 AI 自己記得。聲調標記借用 getToneMarks 現有的 AI 生成邏輯
-  // （會存進它自己的快取，不重複花錢），note 用固定文字說明是經典組合。
-  const knownMatches = findKnownConfusionMatches(nativeScript);
-  const known = [];
-  for(const m of knownMatches){
-    let toneMarked = m.romanized;
-    try{ toneMarked = await getToneMarks(m.romanized, m.nativeScript); }catch(e){ /* 拿不到聲調標記就先用純拼音顯示，不影響這個字本身有沒有被列出來 */ }
-    known.push({
-      nativeScript: m.nativeScript, romanized: m.romanized, toneMarked, zh: m.zh,
-      note: "泰文教材常放在一起教的經典易混淆組合，主要靠聲調（或拼寫細節）分辨。"
-    });
-  }
-  const knownScripts = new Set(known.map(k => k.nativeScript));
-  const merged = known.concat(parsed.pairs.filter(p => !knownScripts.has(p.nativeScript))).slice(0, 6);
-  minimalPairsCache[text] = merged;
+  minimalPairsCache[text] = parsed.pairs;
   saveMinimalPairsCache();
-  return merged;
+  return parsed.pairs;
 }
 
 function addWordToList(text){
@@ -1436,10 +1419,65 @@ function renderUsagePanel(panel, examples){
   });
 }
 
-function renderMinimalPairsPanel(panel, pairs, onRegenerate){
+function renderExistingMatchesSection(container, matches){
+  const header = document.createElement("div");
+  header.style.fontWeight = "600";
+  header.textContent = "📒 你單字表裡拼音很接近的字（實際比對出來的，不是用猜的）";
+  container.appendChild(header);
+  if(matches.length === 0){
+    const empty = document.createElement("div");
+    empty.className = "usage-note";
+    empty.textContent = "目前單字表裡沒有拼音接近的字。";
+    container.appendChild(empty);
+    return;
+  }
+  matches.forEach(m => {
+    const item = document.createElement("div");
+    item.className = "usage-example";
+
+    const idLine = document.createElement("div");
+    idLine.className = "usage-id";
+    const label = document.createElement("span");
+    label.textContent = `${m.word.id}. ${m.word.text}`;
+    idLine.appendChild(label);
+
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(getSpeechText(m.word), speakBtn); });
+    idLine.appendChild(speakBtn);
+
+    const jumpBtn = document.createElement("button");
+    jumpBtn.type = "button";
+    jumpBtn.className = "speak-btn";
+    jumpBtn.textContent = "🔎 跳轉查看";
+    jumpBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); jumpToWord(m.word.text); });
+    idLine.appendChild(jumpBtn);
+
+    const zhLine = document.createElement("div");
+    zhLine.className = "usage-zh";
+    zhLine.textContent = m.data.zh;
+
+    item.appendChild(idLine);
+    item.appendChild(zhLine);
+    container.appendChild(item);
+  });
+}
+
+function renderMinimalPairsPanel(panel, existingMatches, pairs, onRegenerate){
   panel.innerHTML = "";
+  renderExistingMatchesSection(panel, existingMatches);
+  const aiHeader = document.createElement("div");
+  aiHeader.style.fontWeight = "600";
+  aiHeader.style.marginTop = "10px";
+  aiHeader.textContent = "🤖 AI 額外建議、還沒加入的字（AI 憑語言知識判斷，不保證完整或準確）";
+  panel.appendChild(aiHeader);
   if(pairs.length === 0){
-    panel.textContent = "AI 沒有想到常見的容易搞混的字。";
+    const empty = document.createElement("div");
+    empty.className = "usage-note";
+    empty.textContent = "AI 沒有想到常見的容易搞混的字。";
+    panel.appendChild(empty);
   }
   pairs.forEach(p => {
     const item = document.createElement("div");
@@ -1953,21 +1991,40 @@ function createWordItem(w){
   minimalPairsBtn.type = "button";
   minimalPairsBtn.className = "usage-btn";
   minimalPairsBtn.textContent = "👂";
-  minimalPairsBtn.title = "AI 找容易搞混的相似發音字";
-  minimalPairsBtn.setAttribute("aria-label", `AI 找跟 ${w.text} 容易搞混的字`);
+  minimalPairsBtn.title = "找容易搞混的相似發音字（比對你自己的單字表＋AI 額外建議）";
+  minimalPairsBtn.setAttribute("aria-label", `找跟 ${w.text} 容易搞混的字`);
   if(currentLang !== "th"){
     minimalPairsBtn.style.display = "none";
   }
   async function loadMinimalPairs(force){
     if(!force && minimalPairsPanel.dataset.loaded === "1") return;
-    if(!getApiKey()){ minimalPairsPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+    // 跟自己單字表比對是本地計算、不用 API Key，一定先顯示；AI 的額外建議
+    // 才需要 Key，沒有 Key 或 AI 那段失敗都不影響這段照樣看得到。
+    const existingMatches = findSimilarExistingWords(w);
+    if(!getApiKey()){
+      minimalPairsPanel.innerHTML = "";
+      renderExistingMatchesSection(minimalPairsPanel, existingMatches);
+      const note = document.createElement("div");
+      note.className = "usage-note";
+      note.style.marginTop = "10px";
+      note.textContent = "（要看 AI 額外建議的字，請先在上面輸入並儲存 Anthropic API Key）";
+      minimalPairsPanel.appendChild(note);
+      minimalPairsPanel.dataset.loaded = "1";
+      return;
+    }
     minimalPairsPanel.textContent = "搜尋中...";
     try{
       const pairs = await getMinimalPairs(w.text, data ? data.nativeScript : "", data ? data.zh : "", force);
-      renderMinimalPairsPanel(minimalPairsPanel, pairs, () => loadMinimalPairs(true));
+      renderMinimalPairsPanel(minimalPairsPanel, existingMatches, pairs, () => loadMinimalPairs(true));
       minimalPairsPanel.dataset.loaded = "1";
     }catch(err){
-      minimalPairsPanel.textContent = "搜尋失敗：" + err.message;
+      minimalPairsPanel.innerHTML = "";
+      renderExistingMatchesSection(minimalPairsPanel, existingMatches);
+      const errNote = document.createElement("div");
+      errNote.className = "usage-note";
+      errNote.style.marginTop = "10px";
+      errNote.textContent = "AI 額外建議搜尋失敗：" + err.message;
+      minimalPairsPanel.appendChild(errNote);
     }
   }
   minimalPairsBtn.addEventListener("click", async (e) => {
