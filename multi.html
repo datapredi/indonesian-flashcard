@@ -1165,7 +1165,7 @@ async function getNativeToneMarks(text, nativeScript){
   return parsed.marked;
 }
 
-const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v4"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位；v3: 放寬不只嚴格極小對立詞、最多列 6 個；v4: 限制 A1-A2 優先、B1 補位，加上重新生成
+const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v5"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位；v3: 放寬不只嚴格極小對立詞、最多列 6 個；v4: 限制 A1-A2 優先、B1 補位，加上重新生成；v5: 改用「自助旅行日常會話」實際範圍取代不可靠的 CEFR 自我判斷，加經典組合當錨點
 let minimalPairsCache = {};
 try{ minimalPairsCache = JSON.parse(localStorage.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
 function saveMinimalPairsCache(){ localStorage.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
@@ -1197,12 +1197,21 @@ async function getMinimalPairs(text, nativeScript, zh, force){
     required: ["pairs"],
     additionalProperties: false
   };
-  const prompt = `你是泰文老師。請針對這個泰文字，盡量找出台灣學生容易搞混的常見泰文字，最多列 6 個，不要因為湊不到就硬掰，但也不要漏掉真的常見、容易混淆的字。包含以下幾種情況都要考慮，不是只有嚴格意義的「極小對立詞」：
+  const prompt = `你是泰文老師，學生是要去泰國自助旅遊的成人初學者（不是外語系學生），只在意「日常生存會話」用得到的字：問路、點餐、殺價、打招呼、基本情緒、時間地點、常見動作（吃/喝/去/要/想/看/買/睡/走...）這類場合。
+
+請針對這個泰文字，盡量找出這位學生容易搞混的泰文字，最多列 6 個，不要因為湊不到就硬掰，但也不要漏掉真的常見、容易混淆的字。包含以下幾種情況都要考慮，不是只有嚴格意義的「極小對立詞」：
 1. 拼法幾乎一樣、只差聲調的字（例如同樣拼成 kao 但聲調不同的字）
 2. 母音長短不同、其他都一樣的字
-3. 羅馬拼音看起來/唸起來很像，但字尾或音節長度略有不同、初學者容易看混或聽混的常見字（例如 yàa「不要」跟 yàak「想要」，雖然多一個字尾子音，但初學者很容易搞混，這種也要列進去）
+3. 羅馬拼音看起來/唸起來很像，但字尾或音節長度略有不同、初學者容易看混或聽混的常見字
 
-程度限制：優先列 CEFR A1-A2 程度、初學者日常一定會學到的高頻基礎字（例如疑問詞、常用動詞、常用形容詞、數字、基本名詞），這些請排在結果的前面。只有 A1-A2 真的湊不滿、但還有其他真的容易混淆的字時，才可以往後追加 B1 程度的字，並排在 A1-A2 的後面。不要列比 B1 更進階、或書面/正式場合才用的字（例如「離婚」這種少用的名詞），就算拼音真的很像也不要列。
+泰文教學裡有幾組非常經典、常被一起提到的「容易搞混字組」，如果這次查詢的字剛好屬於（或很接近）下面這種組合，一定要優先列出同組的其他字，不能漏掉：
+- ไม่ mâi（不）／ไม้ máai（木頭；也是量詞）／ใหม่ mài（新）／ไหม mǎi（絲；問句尾）
+- เก้า kâo（九）／เก่า kào（舊）
+- ยาก yâak（困難）／อยาก yàak（想要）
+- สวย sǔay（漂亮）／ซวย suay（倒楣）
+以上只是舉例讓你知道這種「常被放在一起教」的組合長什麼樣子，不代表答案只能從這幾組裡選，泰文裡還有很多其他經典組合，請憑你對泰文教學的知識判斷。
+
+範圍限制：只列日常生存會話真的用得到的高頻基礎字，不要用抽象的 CEFR 等級去判斷，而是實際想「一個要去泰國自助旅行的人，這幾天真的會需要說出口或聽懂這個字嗎」。像離婚、親戚稱謂細分、政治、法律、商業這類字，就算聽起來拼音很像，也不是自助旅行會用到的，不要列。
 
 這個字：泰文原生文字 ${nativeScript || text}，羅馬拼音 ${text}${zh ? `，中文意思 ${zh}` : ""}
 
