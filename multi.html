@@ -1165,7 +1165,7 @@ async function getNativeToneMarks(text, nativeScript){
   return parsed.marked;
 }
 
-const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v2"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位
+const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v3"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位；v3: 放寬不只嚴格極小對立詞、最多列 6 個
 let minimalPairsCache = {};
 try{ minimalPairsCache = JSON.parse(localStorage.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
 function saveMinimalPairsCache(){ localStorage.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
@@ -1194,11 +1194,14 @@ async function getMinimalPairs(text, nativeScript, zh){
     required: ["pairs"],
     additionalProperties: false
   };
-  const prompt = `你是泰文老師。請針對這個泰文字，列出台灣學生最容易搞混的 1-3 個泰文「極小對立詞」（minimal pairs）或發音很相近的常見字——特別是只差聲調、或只差一個母音長短/子音的常見字。
+  const prompt = `你是泰文老師。請針對這個泰文字，盡量找出台灣學生容易搞混的常見泰文字，最多列 6 個，不要因為湊不到就硬掰，但也不要漏掉真的常見、容易混淆的字。包含以下幾種情況都要考慮，不是只有嚴格意義的「極小對立詞」：
+1. 拼法幾乎一樣、只差聲調的字（例如同樣拼成 kao 但聲調不同的字）
+2. 母音長短不同、其他都一樣的字
+3. 羅馬拼音看起來/唸起來很像，但字尾或音節長度略有不同、初學者容易看混或聽混的常見字（例如 yàa「不要」跟 yàak「想要」，雖然多一個字尾子音，但初學者很容易搞混，這種也要列進去）
 
 這個字：泰文原生文字 ${nativeScript || text}，羅馬拼音 ${text}${zh ? `，中文意思 ${zh}` : ""}
 
-只列真的存在、常用的泰文字，不要瞎掰或硬湊。如果真的想不到常見的極小對立詞，pairs 可以回傳空陣列。
+只列真的存在、常用的泰文字，不要瞎掰或硬湊不常用的字。如果真的想不到常見的容易混淆字，pairs 可以回傳空陣列。
 
 每個項目請回傳：
 {
