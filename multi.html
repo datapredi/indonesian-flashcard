@@ -1165,7 +1165,7 @@ async function getNativeToneMarks(text, nativeScript){
   return parsed.marked;
 }
 
-const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v1"; // 泰文專用：容易搞混的極小對立詞/發音相近字
+const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v2"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位
 let minimalPairsCache = {};
 try{ minimalPairsCache = JSON.parse(localStorage.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
 function saveMinimalPairsCache(){ localStorage.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
@@ -1182,10 +1182,11 @@ async function getMinimalPairs(text, nativeScript, zh){
           properties: {
             nativeScript: { type: "string" },
             romanized: { type: "string" },
+            toneMarked: { type: "string" },
             zh: { type: "string" },
             note: { type: "string" }
           },
-          required: ["nativeScript", "romanized", "zh", "note"],
+          required: ["nativeScript", "romanized", "toneMarked", "zh", "note"],
           additionalProperties: false
         }
       }
@@ -1200,7 +1201,13 @@ async function getMinimalPairs(text, nativeScript, zh){
 只列真的存在、常用的泰文字，不要瞎掰或硬湊。如果真的想不到常見的極小對立詞，pairs 可以回傳空陣列。
 
 每個項目請回傳：
-{ nativeScript：那個字的泰文原生文字, romanized：羅馬拼音（不用標聲調符號）, zh：中文意思, note：用繁體中文簡短說明兩個字的差異，例如「只差聲調：這個字是上升音，原字是下降音」或「母音長短不同」 }`;
+{
+  nativeScript：那個字的泰文原生文字,
+  romanized：羅馬拼音（不用標聲調符號）,
+  toneMarked：把 romanized 依照音節切開，每個音節後面加上上標括號＋聲調字母（H 高音、L 低音、M 中音、R 上升音、F 下降音，上標括號用 Unicode 字元 ⁽ ⁾），例如 mii⁽M⁾laai⁽M⁾ 這種格式,
+  zh：中文意思,
+  note：用繁體中文簡短說明兩個字的差異，例如「只差聲調：這個字是上升音，原字是下降音」或「母音長短不同」
+}`;
   const parsed = await callClaude(prompt, schema, 1024);
   minimalPairsCache[text] = parsed.pairs;
   saveMinimalPairsCache();
@@ -1243,6 +1250,16 @@ function addWordToList(text){
 // 只有比對「已加入」跟真正要加入清單時才用去掉頭尾標點後的乾淨版本。
 function isWordInList(clean){
   return allWords.some(w => w.text.toLowerCase() === clean.toLowerCase());
+}
+// 跟 isWordInList 不一樣：羅馬拼音常常撞在一起（不同泰文字，拼音簡化後拼法
+// 一樣，例如 kao 可能是「抓癢」也可能是別的字），單純比對拼音會誤判成
+// 「已經加過了」。真正可靠的判斷依據是背後的原生文字是不是完全一樣。
+function isNativeScriptInList(nativeScript){
+  if(!nativeScript) return false;
+  return allWords.some(w => {
+    const d = lookup(w.text);
+    return d && d.nativeScript === nativeScript;
+  });
 }
 // 點已經在單字表裡的字：跳到那個字在清單裡的位置並閃一下提示，而不是靜靜沒反應。
 // 如果目前的搜尋/篩選/只顯示已選取/只顯示比對清單會讓那個字不在畫面上，
@@ -1361,7 +1378,7 @@ function renderMinimalPairsPanel(panel, pairs){
     const idLine = document.createElement("div");
     idLine.className = "usage-id";
     const label = document.createElement("span");
-    label.textContent = p.romanized;
+    label.textContent = p.toneMarked || p.romanized;
     idLine.appendChild(label);
 
     const speakBtn = document.createElement("button");
@@ -1374,12 +1391,24 @@ function renderMinimalPairsPanel(panel, pairs){
     const addBtn = document.createElement("button");
     addBtn.type = "button";
     addBtn.className = "speak-btn";
-    const inList = isWordInList(p.romanized);
+    // 拼音常常跟清單裡別的字撞在一起（不同泰文字，拼音簡化後拼法一樣），
+    // 一定要比對背後的原生文字才知道「這個字」是不是真的已經加過了，
+    // 不能只看拼音字串——不然會像使用者回報的，明明沒有這個字卻顯示已加入。
+    const inList = isNativeScriptInList(p.nativeScript);
     addBtn.textContent = inList ? "已加入" : "➕ 加入單字表";
     if(inList) addBtn.disabled = true;
     addBtn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
-      if(addWordToList(p.romanized)){
+      let text = p.romanized.trim();
+      // 拼音撞到清單裡別的字，但背後其實是不同的字（上面已經排除真的重複的
+      // 情況），加編號讓兩個字都留得住，不要被 addWordToList 的純文字比對
+      // 誤判成重複而悄悄加不進去。
+      if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
+        let suffix = 2;
+        while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+        text = `${text} (${suffix})`;
+      }
+      if(addWordToList(text)){
         addBtn.textContent = "已加入";
         addBtn.disabled = true;
       }
