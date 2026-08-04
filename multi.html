@@ -1103,6 +1103,46 @@ async function getUsageExamples(text, zh){
   return parsed.examples;
 }
 
+const ANTONYMS_CACHE_LS = "flashcard_antonyms_cache_v1"; // 反義詞（相反詞），所有語言通用
+let antonymsCache = {};
+try{ antonymsCache = JSON.parse(localStorage.getItem(lsKey(ANTONYMS_CACHE_LS))) || {}; }catch(e){ antonymsCache = {}; }
+function saveAntonymsCache(){ localStorage.setItem(lsKey(ANTONYMS_CACHE_LS), JSON.stringify(antonymsCache)); }
+
+async function getAntonyms(text, zh, nativeScript){
+  if(antonymsCache[text]) return antonymsCache[text];
+  const hasScript = L().hasScript;
+  const schema = {
+    type: "object",
+    properties: {
+      antonyms: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: Object.assign(
+            { romanized: { type: "string" } },
+            hasScript ? { nativeScript: { type: "string" } } : {},
+            { zh: { type: "string" }, en: { type: "string" } }
+          ),
+          required: hasScript ? ["romanized", "nativeScript", "zh", "en"] : ["romanized", "zh", "en"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["antonyms"],
+    additionalProperties: false
+  };
+  const prompt = `你是${L().teacher}。請針對這個${L().label}單字/片語，列出常見、常用、日常對話真的會用到的反義詞（相反詞），最多 3 個，只列真的存在的字，不要瞎掰或硬湊。如果這個字本身沒有明確的反義詞（例如專有名詞），antonyms 可以回傳空陣列。
+
+這個字：${hasScript ? `${L().label}原生文字 ${nativeScript || text}，` : ""}羅馬拼音 ${text}${zh ? `，中文意思 ${zh}` : ""}
+
+每個項目請回傳：
+{ romanized：反義詞的${hasScript ? "羅馬拼音（不用標聲調符號）" : "拼寫"}${hasScript ? `, nativeScript：對應的${L().label}原生文字書寫（純粹給語音朗讀用）` : ""}, zh：中文意思, en：英文意思 }`;
+  const parsed = await callClaude(prompt, schema, 1024);
+  antonymsCache[text] = parsed.antonyms;
+  saveAntonymsCache();
+  return parsed.antonyms;
+}
+
 const TONE_MARKS_CACHE_LS = "flashcard_tone_marks_cache_v1"; // 泰文專用：HLMRF 聲調標記，只在泰文模式使用
 let toneMarksCache = {};
 try{ toneMarksCache = JSON.parse(localStorage.getItem(lsKey(TONE_MARKS_CACHE_LS))) || {}; }catch(e){ toneMarksCache = {}; }
@@ -1287,12 +1327,13 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
+    const { row, usagePanel, antonymsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
     el.insertBefore(crossLangPanel, el.firstChild);
     el.insertBefore(minimalPairsPanel, crossLangPanel);
     el.insertBefore(nativeTonePanel, minimalPairsPanel);
     el.insertBefore(tonePanel, nativeTonePanel);
-    el.insertBefore(usagePanel, tonePanel);
+    el.insertBefore(antonymsPanel, tonePanel);
+    el.insertBefore(usagePanel, antonymsPanel);
     el.insertBefore(row, usagePanel);
   }
   updateCount();
@@ -1415,6 +1456,64 @@ function renderUsagePanel(panel, examples){
     item.appendChild(idLine);
     item.appendChild(zhLine);
     item.appendChild(noteLine);
+    panel.appendChild(item);
+  });
+}
+
+function renderAntonymsPanel(panel, antonyms){
+  panel.innerHTML = "";
+  if(antonyms.length === 0){
+    panel.textContent = "AI 沒有想到明確的反義詞。";
+    return;
+  }
+  const hasScript = L().hasScript;
+  antonyms.forEach(a => {
+    const item = document.createElement("div");
+    item.className = "usage-example";
+
+    const idLine = document.createElement("div");
+    idLine.className = "usage-id";
+    const label = document.createElement("span");
+    label.textContent = a.romanized;
+    idLine.appendChild(label);
+
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak((hasScript && a.nativeScript) || a.romanized, speakBtn); });
+    idLine.appendChild(speakBtn);
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "speak-btn";
+    // hasScript 語言（羅馬拼音）跟印尼文（顯示文字本身）判斷「已加入」的方式
+    // 不一樣：hasScript 拼音容易撞在一起，要看背後原生文字才準；印尼文本身
+    // 沒有這個問題，直接比對文字就好。
+    const inList = hasScript ? isNativeScriptInList(a.nativeScript) : isWordInList(a.romanized);
+    addBtn.textContent = inList ? "已加入" : "➕ 加入單字表";
+    if(inList) addBtn.disabled = true;
+    addBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      let text = a.romanized.trim();
+      if(hasScript && allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
+        let suffix = 2;
+        while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+        text = `${text} (${suffix})`;
+      }
+      if(addWordToList(text)){
+        addBtn.textContent = "已加入";
+        addBtn.disabled = true;
+      }
+    });
+    idLine.appendChild(addBtn);
+
+    const zhLine = document.createElement("div");
+    zhLine.className = "usage-zh";
+    zhLine.textContent = a.zh;
+
+    item.appendChild(idLine);
+    item.appendChild(zhLine);
     panel.appendChild(item);
   });
 }
@@ -1909,6 +2008,35 @@ function createWordItem(w){
   });
   row.appendChild(usageBtn);
 
+  const antonymsPanel = document.createElement("div");
+  antonymsPanel.className = "usage-panel hidden";
+
+  const antonymsBtn = document.createElement("button");
+  antonymsBtn.type = "button";
+  antonymsBtn.className = "usage-btn";
+  antonymsBtn.textContent = "↔️";
+  antonymsBtn.title = "AI 找反義詞（相反詞）";
+  antonymsBtn.setAttribute("aria-label", `AI 找 ${w.text} 的反義詞`);
+  antonymsBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!antonymsPanel.classList.contains("hidden")){
+      antonymsPanel.classList.add("hidden");
+      return;
+    }
+    antonymsPanel.classList.remove("hidden");
+    if(antonymsPanel.dataset.loaded === "1") return;
+    if(!getApiKey()){ antonymsPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+    antonymsPanel.textContent = "搜尋中...";
+    try{
+      const antonyms = await getAntonyms(w.text, data ? data.zh : "", data ? data.nativeScript : "");
+      renderAntonymsPanel(antonymsPanel, antonyms);
+      antonymsPanel.dataset.loaded = "1";
+    }catch(err){
+      antonymsPanel.textContent = "搜尋失敗：" + err.message;
+    }
+  });
+  row.appendChild(antonymsBtn);
+
   const tonePanel = document.createElement("div");
   tonePanel.className = "usage-panel hidden";
 
@@ -2140,7 +2268,7 @@ function createWordItem(w){
   });
   row.appendChild(crossLangBtn);
 
-  return { row, usagePanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
+  return { row, usagePanel, antonymsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
 }
 
 function updatePendingSyncBar(){
@@ -2174,9 +2302,10 @@ function renderList(){
     el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
+    const { row, usagePanel, antonymsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
+    el.appendChild(antonymsPanel);
     el.appendChild(tonePanel);
     el.appendChild(nativeTonePanel);
     el.appendChild(minimalPairsPanel);
