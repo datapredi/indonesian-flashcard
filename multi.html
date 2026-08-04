@@ -1165,6 +1165,48 @@ async function getNativeToneMarks(text, nativeScript){
   return parsed.marked;
 }
 
+const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v1"; // 泰文專用：容易搞混的極小對立詞/發音相近字
+let minimalPairsCache = {};
+try{ minimalPairsCache = JSON.parse(localStorage.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
+function saveMinimalPairsCache(){ localStorage.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
+
+async function getMinimalPairs(text, nativeScript, zh){
+  if(minimalPairsCache[text]) return minimalPairsCache[text];
+  const schema = {
+    type: "object",
+    properties: {
+      pairs: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            nativeScript: { type: "string" },
+            romanized: { type: "string" },
+            zh: { type: "string" },
+            note: { type: "string" }
+          },
+          required: ["nativeScript", "romanized", "zh", "note"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["pairs"],
+    additionalProperties: false
+  };
+  const prompt = `你是泰文老師。請針對這個泰文字，列出台灣學生最容易搞混的 1-3 個泰文「極小對立詞」（minimal pairs）或發音很相近的常見字——特別是只差聲調、或只差一個母音長短/子音的常見字。
+
+這個字：泰文原生文字 ${nativeScript || text}，羅馬拼音 ${text}${zh ? `，中文意思 ${zh}` : ""}
+
+只列真的存在、常用的泰文字，不要瞎掰或硬湊。如果真的想不到常見的極小對立詞，pairs 可以回傳空陣列。
+
+每個項目請回傳：
+{ nativeScript：那個字的泰文原生文字, romanized：羅馬拼音（不用標聲調符號）, zh：中文意思, note：用繁體中文簡短說明兩個字的差異，例如「只差聲調：這個字是上升音，原字是下降音」或「母音長短不同」 }`;
+  const parsed = await callClaude(prompt, schema, 1024);
+  minimalPairsCache[text] = parsed.pairs;
+  saveMinimalPairsCache();
+  return parsed.pairs;
+}
+
 function addWordToList(text){
   const clean = text.trim();
   if(!clean) return false;
@@ -1184,9 +1226,10 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel, tonePanel, nativeTonePanel, crossLangPanel } = createWordItem(newWord);
+    const { row, usagePanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
     el.insertBefore(crossLangPanel, el.firstChild);
-    el.insertBefore(nativeTonePanel, crossLangPanel);
+    el.insertBefore(minimalPairsPanel, crossLangPanel);
+    el.insertBefore(nativeTonePanel, minimalPairsPanel);
     el.insertBefore(tonePanel, nativeTonePanel);
     el.insertBefore(usagePanel, tonePanel);
     el.insertBefore(row, usagePanel);
@@ -1297,6 +1340,59 @@ function renderUsagePanel(panel, examples){
     const noteLine = document.createElement("div");
     noteLine.className = "usage-note";
     noteLine.textContent = ex.note;
+
+    item.appendChild(idLine);
+    item.appendChild(zhLine);
+    item.appendChild(noteLine);
+    panel.appendChild(item);
+  });
+}
+
+function renderMinimalPairsPanel(panel, pairs){
+  panel.innerHTML = "";
+  if(pairs.length === 0){
+    panel.textContent = "AI 沒有想到常見的容易搞混的字。";
+    return;
+  }
+  pairs.forEach(p => {
+    const item = document.createElement("div");
+    item.className = "usage-example";
+
+    const idLine = document.createElement("div");
+    idLine.className = "usage-id";
+    const label = document.createElement("span");
+    label.textContent = p.romanized;
+    idLine.appendChild(label);
+
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(p.nativeScript || p.romanized, speakBtn); });
+    idLine.appendChild(speakBtn);
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "speak-btn";
+    const inList = isWordInList(p.romanized);
+    addBtn.textContent = inList ? "已加入" : "➕ 加入單字表";
+    if(inList) addBtn.disabled = true;
+    addBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(addWordToList(p.romanized)){
+        addBtn.textContent = "已加入";
+        addBtn.disabled = true;
+      }
+    });
+    idLine.appendChild(addBtn);
+
+    const zhLine = document.createElement("div");
+    zhLine.className = "usage-zh";
+    zhLine.textContent = p.zh;
+
+    const noteLine = document.createElement("div");
+    noteLine.className = "usage-note";
+    noteLine.textContent = p.note;
 
     item.appendChild(idLine);
     item.appendChild(zhLine);
@@ -1743,6 +1839,38 @@ function createWordItem(w){
   });
   row.appendChild(nativeToneBtn);
 
+  const minimalPairsPanel = document.createElement("div");
+  minimalPairsPanel.className = "usage-panel hidden";
+
+  const minimalPairsBtn = document.createElement("button");
+  minimalPairsBtn.type = "button";
+  minimalPairsBtn.className = "usage-btn";
+  minimalPairsBtn.textContent = "👂";
+  minimalPairsBtn.title = "AI 找容易搞混的相似發音字";
+  minimalPairsBtn.setAttribute("aria-label", `AI 找跟 ${w.text} 容易搞混的字`);
+  if(currentLang !== "th"){
+    minimalPairsBtn.style.display = "none";
+  }
+  minimalPairsBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!minimalPairsPanel.classList.contains("hidden")){
+      minimalPairsPanel.classList.add("hidden");
+      return;
+    }
+    minimalPairsPanel.classList.remove("hidden");
+    if(minimalPairsPanel.dataset.loaded === "1") return;
+    if(!getApiKey()){ minimalPairsPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+    minimalPairsPanel.textContent = "搜尋中...";
+    try{
+      const pairs = await getMinimalPairs(w.text, data ? data.nativeScript : "", data ? data.zh : "");
+      renderMinimalPairsPanel(minimalPairsPanel, pairs);
+      minimalPairsPanel.dataset.loaded = "1";
+    }catch(err){
+      minimalPairsPanel.textContent = "搜尋失敗：" + err.message;
+    }
+  });
+  row.appendChild(minimalPairsBtn);
+
   const diffOrder = [null, "E", "M", "H"];
   const diffChip = document.createElement("button");
   diffChip.type = "button";
@@ -1845,7 +1973,7 @@ function createWordItem(w){
   });
   row.appendChild(crossLangBtn);
 
-  return { row, usagePanel, tonePanel, nativeTonePanel, crossLangPanel };
+  return { row, usagePanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
 }
 
 function updatePendingSyncBar(){
@@ -1879,11 +2007,12 @@ function renderList(){
     el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel, tonePanel, nativeTonePanel, crossLangPanel } = createWordItem(w);
+    const { row, usagePanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
     el.appendChild(tonePanel);
     el.appendChild(nativeTonePanel);
+    el.appendChild(minimalPairsPanel);
     el.appendChild(crossLangPanel);
   });
   updateCount();
