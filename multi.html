@@ -301,7 +301,10 @@
     <div class="quiz-en" id="listenWord"></div>
     <p class="write-hint" id="listenZh"></p>
     <audio id="listenAudio"></audio>
-    <div class="actions" style="margin-top:24px; justify-content:center;">
+    <div class="actions" style="margin-top:16px; justify-content:center;">
+      <button class="secondary" id="btnListenKnowIt">✓ 已經會了，這輪不要再重複</button>
+    </div>
+    <div class="actions" style="margin-top:8px; justify-content:center;">
       <button id="btnBackFromListen">停止並返回清單</button>
     </div>
   </div>
@@ -3332,6 +3335,11 @@ let listenSession = [];
 let listenIndex = 0;
 let listenRunning = false;
 let listenTimeoutId = null;
+// 使用者按了「已經會了」的時候不直接動 listenSession（還在播放中途動陣列
+// 容易搞亂目前這輪的索引），只先設一個旗標，等這個字這輪播完、要往下一個
+// 字前才真的移除，並且刻意不把 listenIndex 往前推一格（移除後原本的位置
+// 已經是下一個字了，再 +1 會多跳過一個）。
+let listenSkipRequested = false;
 
 // 0.3 秒的真實無聲 WAV（8-bit/8kHz），用來在使用者點擊當下「解鎖」<audio> 元素。
 // 手機瀏覽器（尤其 iOS Safari）要求播放動作緊接著使用者手勢才會放行；跑步模式的
@@ -3378,6 +3386,8 @@ async function runListenLoop(){
   while(listenRunning){
     const w = listenSession[listenIndex];
     const data = lookup(w.text);
+    listenSkipRequested = false;
+    document.getElementById("btnListenKnowIt").disabled = false;
     document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
     document.getElementById("listenWord").textContent = w.text;
     document.getElementById("listenZh").textContent = "";
@@ -3430,9 +3440,28 @@ async function runListenLoop(){
     if(!listenRunning) break;
 
     await waitMs(800);
-    listenIndex = (listenIndex + 1) % listenSession.length;
+    if(listenSkipRequested){
+      listenSkipRequested = false;
+      listenSession.splice(listenIndex, 1);
+      if(listenSession.length === 0){
+        document.getElementById("listenProgress").textContent = "這批字都跳過了！";
+        document.getElementById("listenWord").textContent = "🎉";
+        document.getElementById("listenZh").textContent = "";
+        listenRunning = false;
+        break;
+      }
+      // 移除之後，原本的位置已經是下一個字了，不用再 +1，不然會多跳過一個。
+      if(listenIndex >= listenSession.length) listenIndex = 0;
+    } else {
+      listenIndex = (listenIndex + 1) % listenSession.length;
+    }
   }
 }
+document.getElementById("btnListenKnowIt").addEventListener("click", () => {
+  if(!listenRunning) return;
+  listenSkipRequested = true;
+  document.getElementById("btnListenKnowIt").disabled = true;
+});
 
 document.getElementById("btnBackFromListen").onclick = () => {
   listenRunning = false;
