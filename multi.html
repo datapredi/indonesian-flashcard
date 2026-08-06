@@ -216,10 +216,17 @@
       </select>
     </div>
     <div class="toolbar">
-      <label for="listenRangeFrom" style="align-self:center;">跑步模式複習範圍（照編號，兩個都填才生效，留空就用已勾選的字）：</label>
+      <label for="listenRangeFrom" style="align-self:center;">跑步模式複習範圍（照編號，兩個都填才生效；也可以加選難度；都留空就用已勾選的字）：</label>
       <input type="number" id="listenRangeFrom" placeholder="從" min="1" step="1" style="max-width:90px; flex:0 0 auto;">
       <span style="align-self:center;">～</span>
       <input type="number" id="listenRangeTo" placeholder="到" min="1" step="1" style="max-width:90px; flex:0 0 auto;">
+      <select id="listenDifficultyFilter">
+        <option value="">全部難度</option>
+        <option value="E">E 簡單</option>
+        <option value="M">M 中等</option>
+        <option value="H">H 困難</option>
+        <option value="none">未標記</option>
+      </select>
     </div>
     <div class="actions">
       <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
@@ -3294,10 +3301,19 @@ document.getElementById("btnStartListen").onclick = () => {
   const rangeFrom = Number(document.getElementById("listenRangeFrom").value);
   const rangeTo = Number(document.getElementById("listenRangeTo").value);
   const useRange = rangeFrom > 0 && rangeTo > 0;
-  const list = useRange
+  let list = useRange
     ? allWords.filter(w => w.id >= Math.min(rangeFrom, rangeTo) && w.id <= Math.max(rangeFrom, rangeTo) && lookup(w.text))
     : allWords.filter(w => selected.has(w.id) && lookup(w.text));
-  if(list.length === 0){ alert(useRange ? "這個編號範圍裡沒有已經有翻譯資料的字" : "請先選有翻譯資料的單字"); return; }
+  // 難度篩選可以跟編號範圍或已勾選的字疊加使用，不是互斥的：例如「1~50 裡面
+  // 只挑困難的」或「已勾選的字裡面只挑困難的」都可以。
+  const diffFilter = document.getElementById("listenDifficultyFilter").value;
+  if(diffFilter){
+    list = list.filter(w => {
+      const d = getDifficulty(w.text);
+      return diffFilter === "none" ? d === null : d === diffFilter;
+    });
+  }
+  if(list.length === 0){ alert(useRange ? "這個編號範圍（加上難度篩選）裡沒有符合的字" : "請先選有翻譯資料的單字，或檢查難度篩選"); return; }
   listenSession = shuffleArr(list.slice());
   listenIndex = 0;
   listenRunning = true;
