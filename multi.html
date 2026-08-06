@@ -132,6 +132,9 @@
       <option value="bac">北部（河內）</option>
     </select>
   </div>
+  <div class="toolbar">
+    <button id="btnJumpToActions">⬇ 跳到最下面（開始 Flash Card／測驗／跑步模式）</button>
+  </div>
   <div class="sub">從單字清單勾選要複習的內容，開始 Flashcard 或測驗</div>
 
   <!-- ===== 選字畫面 ===== -->
@@ -228,7 +231,7 @@
         <option value="none">未標記</option>
       </select>
     </div>
-    <div class="actions">
+    <div class="actions" id="mainActions">
       <button class="primary" id="btnStartCards">開始 Flash Card 複習</button>
       <button id="btnCardDirection"></button>
       <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
@@ -1466,6 +1469,13 @@ document.getElementById("btnJumpBack").addEventListener("click", (e) => {
   if(jumpBackY !== null) window.scrollTo({ top: jumpBackY, behavior: "smooth" });
   document.getElementById("btnJumpBack").classList.add("hidden");
   jumpBackY = null;
+});
+// 單字表一長，開始 Flash Card／測驗／跑步模式的按鈕就要捲很久才到得了，
+// 在最上面放一個直接跳過去的按鈕，不用每次都捲過整個單字表。
+document.getElementById("btnJumpToActions").addEventListener("click", (e) => {
+  e.preventDefault();
+  const actions = document.getElementById("mainActions");
+  if(actions) actions.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 function renderTappableSentence(sentence){
   const wrap = document.createElement("span");
