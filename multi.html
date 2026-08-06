@@ -134,6 +134,8 @@
   </div>
   <div class="toolbar">
     <button id="btnJumpToActions">⬇ 跳到最下面（開始 Flash Card／測驗／跑步模式）</button>
+    <input type="number" id="jumpToIdInput" placeholder="編號" min="1" step="1" style="max-width:90px; flex:0 0 auto;">
+    <button id="btnJumpToId">🔎 跳到這個編號的字</button>
   </div>
   <div class="sub">從單字清單勾選要複習的內容，開始 Flashcard 或測驗</div>
 
@@ -1400,6 +1402,16 @@ let jumpBackFilters = null;
 function jumpToWord(clean){
   const target = allWords.find(w => w.text.toLowerCase() === clean.toLowerCase());
   if(!target) return;
+  jumpToWordObj(target);
+}
+// 用編號跳轉（首頁「跳到編號」框框用）：跟點例句裡的字跳過去共用同一套
+// 篩選記憶／捲動／閃爍邏輯，只是找目標字的方式不同（用 id 而不是拼字）。
+function jumpToWordById(id){
+  const target = allWords.find(w => w.id === id);
+  if(!target){ alert(`找不到編號 ${id} 的字。`); return; }
+  jumpToWordObj(target);
+}
+function jumpToWordObj(target){
   if(!getVisibleWords().some(w => w.id === target.id)){
     // 跳過去之前，先記住目前的篩選狀態，等按「回到句子」才能整套還原，
     // 不然回去之後篩選會被清空、變成顯示全部單字，不是原本選的那個難度。
@@ -1476,6 +1488,15 @@ document.getElementById("btnJumpToActions").addEventListener("click", (e) => {
   e.preventDefault();
   const actions = document.getElementById("mainActions");
   if(actions) actions.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+function doJumpToIdInput(){
+  const id = Number(document.getElementById("jumpToIdInput").value);
+  if(!id){ alert("請輸入編號"); return; }
+  jumpToWordById(id);
+}
+document.getElementById("btnJumpToId").addEventListener("click", (e) => { e.preventDefault(); doJumpToIdInput(); });
+document.getElementById("jumpToIdInput").addEventListener("keydown", (e) => {
+  if(e.key === "Enter"){ e.preventDefault(); doJumpToIdInput(); }
 });
 function renderTappableSentence(sentence){
   const wrap = document.createElement("span");
