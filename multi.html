@@ -244,6 +244,7 @@
       <button class="secondary" id="btnStartQuiz">開始測驗（英文選印尼文）</button>
       <button class="secondary" id="btnStartWrite">✍️ 中翻印尼文（AI 出句、AI 批改）</button>
       <button class="secondary" id="btnStartListen">🏃 跑步聽力模式</button>
+      <button class="secondary hidden" id="btnResumeListen">▶️ 繼續上次跑步進度</button>
     </div>
   </div>
 
@@ -3512,6 +3513,35 @@ let listenSession = [];
 let listenIndex = 0;
 let listenRunning = false;
 let listenTimeoutId = null;
+// 存目前跑步模式進度，這樣不小心切出去（例如手機的上一頁手勢）回來時，可以
+// 選「繼續上次跑步進度」接著聽，不用重新勾選範圍/難度再從頭開始。只存字的
+// 編號＋目前聽到第幾個，不存完整資料，恢復時用目前最新的單字表重新對應。
+const LISTEN_PROGRESS_LS = "flashcard_listen_progress_v1";
+function saveListenProgress(){
+  if(listenSession.length === 0) return;
+  localStorage.setItem(lsKey(LISTEN_PROGRESS_LS), JSON.stringify({ ids: listenSession.map(w => w.id), index: listenIndex }));
+}
+function loadListenProgress(){
+  try{ return JSON.parse(localStorage.getItem(lsKey(LISTEN_PROGRESS_LS))); }catch(e){ return null; }
+}
+function clearListenProgress(){ localStorage.removeItem(lsKey(LISTEN_PROGRESS_LS)); }
+function updateResumeListenBtn(){
+  const btn = document.getElementById("btnResumeListen");
+  const progress = loadListenProgress();
+  if(!progress || !Array.isArray(progress.ids) || progress.ids.length === 0){
+    btn.classList.add("hidden");
+    return;
+  }
+  // 存過的字有些可能後來被刪掉了，只算還在的；全部都不在了就不用顯示這個按鈕。
+  const stillExist = progress.ids.filter(id => allWords.some(w => w.id === id));
+  if(stillExist.length === 0){
+    clearListenProgress();
+    btn.classList.add("hidden");
+    return;
+  }
+  btn.classList.remove("hidden");
+  btn.textContent = `▶️ 繼續上次跑步進度（第 ${Math.min(progress.index + 1, stillExist.length)}/${stillExist.length} 個）`;
+}
 // 使用者按了「已經會了」的時候不直接動 listenSession（還在播放中途動陣列
 // 容易搞亂目前這輪的索引），只先設一個旗標，等這個字這輪播完、要往下一個
 // 字前才真的移除，並且刻意不把 listenIndex 往前推一格（移除後原本的位置
@@ -3557,10 +3587,17 @@ document.getElementById("btnStartListen").onclick = () => {
     });
   }
   if(list.length === 0){ alert(useRange ? "這個編號範圍（加上難度篩選）裡沒有符合的字" : "請先選有翻譯資料的單字，或檢查難度篩選"); return; }
-  listenSession = shuffleArr(list.slice());
-  listenIndex = 0;
+  startListenSession(shuffleArr(list.slice()), 0);
+};
+
+// 開始播放（不管是全新選的一批字，還是「繼續上次跑步進度」恢復回來的）
+// 共用的啟動邏輯，避免兩邊各寫一份、之後改一邊忘了改另一邊。
+function startListenSession(session, startIndex){
+  listenSession = session;
+  listenIndex = startIndex;
   listenRunning = true;
   listenPaused = false;
+  saveListenProgress();
   const pauseBtn = document.getElementById("btnListenPause");
   pauseBtn.textContent = "⏸️ 暫停";
   pauseBtn.classList.remove("primary");
@@ -3571,7 +3608,19 @@ document.getElementById("btnStartListen").onclick = () => {
   audioEl.src = SILENT_AUDIO_DATA_URI;
   audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
   runListenLoop();
-};
+}
+document.getElementById("btnResumeListen").addEventListener("click", () => {
+  const progress = loadListenProgress();
+  if(!progress) return;
+  const resolved = progress.ids.map(id => allWords.find(w => w.id === id)).filter(w => w && lookup(w.text));
+  if(resolved.length === 0){
+    alert("找不到可以恢復的字，可能都被刪掉了。");
+    clearListenProgress();
+    updateResumeListenBtn();
+    return;
+  }
+  startListenSession(resolved, Math.min(progress.index, resolved.length - 1));
+});
 
 async function runListenLoop(){
   const thinkMs = Math.max(500, (Number(document.getElementById("thinkPause").value) || 3) * 1000);
@@ -3663,6 +3712,7 @@ async function runListenLoop(){
     } else {
       listenIndex = (listenIndex + 1) % listenSession.length;
     }
+    saveListenProgress();
   }
 }
 document.getElementById("btnListenKnowIt").addEventListener("click", () => {
@@ -3728,10 +3778,14 @@ function showScreen(name){
   ["select","cards","quiz","write","listen","result"].forEach(s => {
     document.getElementById("screen-" + s).classList.toggle("hidden", s !== name);
   });
-  if(name === "select") renderList();
+  if(name === "select"){
+    renderList();
+    updateResumeListenBtn();
+  }
 }
 
 renderList();
+updateResumeListenBtn();
 </script>
 </body>
 </html>
