@@ -309,6 +309,7 @@
     <audio id="listenAudio"></audio>
     <div class="actions" style="margin-top:16px; justify-content:center;">
       <button id="btnListenPause">⏸️ 暫停</button>
+      <button id="btnListenFast">⏩ 按住 2 倍速</button>
       <button class="secondary" id="btnListenKnowIt">✓ 已經會了，這輪不要再重複</button>
     </div>
     <div class="actions" style="margin-top:8px; justify-content:center;">
@@ -589,13 +590,18 @@ function waitMsOrSkip(ms){
   });
 }
 
+// 跑步聽力模式「按住 2 倍速」用：GPT 音檔可以直接調整 <audio>.playbackRate，
+// 瀏覽器內建語音的語速只能在建立 utterance 的當下決定、播放中途改不了，
+// 所以下一句要唸出來的時候現查這個旗標。不在跑步模式時維持 false，不影響
+// 單字表、Flash Card 等其他地方原本的播放速度。
+let listenFastMode = false;
 // Promise-based speak for sequencing utterances (跑步聽力模式：電腦內建語音)
 function speakAsync(text, lang){
   return new Promise((resolve) => {
     if(!('speechSynthesis' in window) || !text){ resolve(); return; }
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = lang;
-    utter.rate = 0.85;
+    utter.rate = listenFastMode ? 1.7 : 0.85;
     const prefix = lang.slice(0, 2).toLowerCase();
     const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
     if(voice) utter.voice = voice;
@@ -707,6 +713,9 @@ function playAudioBlob(blob){
     const audioEl = document.getElementById("listenAudio");
     const url = URL.createObjectURL(blob);
     audioEl.src = url;
+    // 换新的音檔保險起見都重新套用一次目前的速度設定（跑步模式外
+    // listenFastMode 永遠是 false，這裡不影響其他地方的播放速度）。
+    audioEl.playbackRate = listenFastMode ? 2 : 1;
     let settled = false;
     const finish = (fn, arg) => {
       if(settled) return;
@@ -3597,6 +3606,8 @@ function startListenSession(session, startIndex){
   listenIndex = startIndex;
   listenRunning = true;
   listenPaused = false;
+  listenFastMode = false;
+  document.getElementById("btnListenFast").classList.remove("primary");
   saveListenProgress();
   const pauseBtn = document.getElementById("btnListenPause");
   pauseBtn.textContent = "⏸️ 暫停";
@@ -3735,6 +3746,20 @@ document.getElementById("btnListenPause").addEventListener("click", (e) => {
     if('speechSynthesis' in window) speechSynthesis.cancel();
   }
 });
+{
+  const fastBtn = document.getElementById("btnListenFast");
+  function setListenFast(on){
+    listenFastMode = on;
+    document.getElementById("listenAudio").playbackRate = on ? 2 : 1;
+    fastBtn.classList.toggle("primary", on);
+  }
+  // 按住＝2倍速、放開（或手指滑出按鈕、被系統手勢中斷）都要恢復正常速度，
+  // 用 pointer 事件才能同時支援滑鼠跟手機觸控，不用分別寫兩套。
+  fastBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); setListenFast(true); });
+  ["pointerup", "pointercancel", "pointerleave", "pointerout"].forEach(ev => {
+    fastBtn.addEventListener(ev, () => setListenFast(false));
+  });
+}
 
 document.getElementById("btnBackFromListen").onclick = () => {
   listenRunning = false;
