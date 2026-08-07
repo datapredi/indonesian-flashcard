@@ -108,6 +108,9 @@
   .missed{font-size:0.85rem; color:var(--muted); margin-top:10px;}
 
   .write-hint{color:var(--muted); font-size:0.9rem; text-align:center; margin:-8px 0 18px;}
+  /* 跑步模式的中文意思一開始是空的、唸到那一句才會填字，保留固定高度不然
+     下面的按鈕（尤其是按住 2 倍速那個）會被推著移動，手指按下去會撲空。 */
+  #listenZh{min-height:1.3em;}
   .write-feedback{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; margin-top:16px;}
   .write-feedback .verdict{font-weight:800; margin:0 0 8px;}
   .write-feedback .verdict.ok{color:var(--accent2);}
