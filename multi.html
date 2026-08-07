@@ -307,6 +307,7 @@
     <p class="write-hint" id="listenZh"></p>
     <audio id="listenAudio"></audio>
     <div class="actions" style="margin-top:16px; justify-content:center;">
+      <button id="btnListenPause">⏸️ 暫停</button>
       <button class="secondary" id="btnListenKnowIt">✓ 已經會了，這輪不要再重複</button>
     </div>
     <div class="actions" style="margin-top:8px; justify-content:center;">
@@ -580,7 +581,7 @@ function waitMsOrSkip(ms){
   return new Promise((resolve) => {
     const start = Date.now();
     function check(){
-      if(listenSkipRequested || !listenRunning || Date.now() - start >= ms){ resolve(); return; }
+      if(listenSkipRequested || listenPaused || !listenRunning || Date.now() - start >= ms){ resolve(); return; }
       listenTimeoutId = setTimeout(check, 100);
     }
     check();
@@ -3516,6 +3517,18 @@ let listenTimeoutId = null;
 // 字前才真的移除，並且刻意不把 listenIndex 往前推一格（移除後原本的位置
 // 已經是下一個字了，再 +1 會多跳過一個）。
 let listenSkipRequested = false;
+// 暫停：跟停止不一樣，停止是整個離開跑步模式，暫停是原地停住、恢復後從
+// 同一個字重新開始（不會跳到下一個，也不會把這個字從清單裡拿掉）。
+let listenPaused = false;
+function waitWhilePaused(){
+  return new Promise((resolve) => {
+    function check(){
+      if(!listenPaused || !listenRunning){ resolve(); return; }
+      listenTimeoutId = setTimeout(check, 200);
+    }
+    check();
+  });
+}
 
 // 0.3 秒的真實無聲 WAV（8-bit/8kHz），用來在使用者點擊當下「解鎖」<audio> 元素。
 // 手機瀏覽器（尤其 iOS Safari）要求播放動作緊接著使用者手勢才會放行；跑步模式的
@@ -3547,6 +3560,10 @@ document.getElementById("btnStartListen").onclick = () => {
   listenSession = shuffleArr(list.slice());
   listenIndex = 0;
   listenRunning = true;
+  listenPaused = false;
+  const pauseBtn = document.getElementById("btnListenPause");
+  pauseBtn.textContent = "⏸️ 暫停";
+  pauseBtn.classList.remove("primary");
   showScreen("listen");
   const voiceSource = document.getElementById("voiceSource").value;
   document.getElementById("listenVoiceIndicator").textContent = voiceSource === "gpt" ? "🔊 使用中：GPT 語音" : "🔊 使用中：電腦內建語音";
@@ -3560,6 +3577,13 @@ async function runListenLoop(){
   const thinkMs = Math.max(500, (Number(document.getElementById("thinkPause").value) || 3) * 1000);
   const voiceSource = document.getElementById("voiceSource").value;
   while(listenRunning){
+    // 暫停中就卡在這裡，不開始播下一個字，也不會誤判成「這個字被跳過」。
+    // 恢復之後會從同一個字（同一個 listenIndex）重新開始整套播放。
+    if(listenPaused){
+      document.getElementById("listenProgress").textContent = "⏸️ 已暫停";
+      await waitWhilePaused();
+      if(!listenRunning) break;
+    }
     const w = listenSession[listenIndex];
     const data = lookup(w.text);
     listenSkipRequested = false;
@@ -3569,8 +3593,8 @@ async function runListenLoop(){
     document.getElementById("listenZh").textContent = "";
 
     // 播放這個字（重複3次＋思考停頓＋中文意思）獨立包成一個函式，中途要提早
-    // 結束（因為按了「已經會了」或整個模式被停掉）用 return 就好，不會影響
-    // 外層 while 迴圈的 break（那個是專門用來真的整個停掉跑步模式的）。
+    // 結束（因為按了「已經會了」、暫停、或整個模式被停掉）用 return 就好，
+    // 不會影響外層 while 迴圈的 break（那個是專門用來真的整個停掉跑步模式的）。
     async function playCurrentWord(){
       if(voiceSource === "gpt"){
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（生成語音中...）`;
@@ -3578,28 +3602,28 @@ async function runListenLoop(){
         const zhBlob = await withTimeout(getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
 
-        for(let i = 0; i < 3 && listenRunning && !listenSkipRequested; i++){
+        for(let i = 0; i < 3 && listenRunning && !listenSkipRequested && !listenPaused; i++){
           await playAudioBlob(idBlob);
-          if(!listenRunning || listenSkipRequested) return;
+          if(!listenRunning || listenSkipRequested || listenPaused) return;
           await waitMs(400);
         }
-        if(!listenRunning || listenSkipRequested) return;
+        if(!listenRunning || listenSkipRequested || listenPaused) return;
 
         await waitMsOrSkip(thinkMs);
-        if(!listenRunning || listenSkipRequested) return;
+        if(!listenRunning || listenSkipRequested || listenPaused) return;
 
         document.getElementById("listenZh").textContent = data.zh;
         await playAudioBlob(zhBlob);
       } else {
-        for(let i = 0; i < 3 && listenRunning && !listenSkipRequested; i++){
+        for(let i = 0; i < 3 && listenRunning && !listenSkipRequested && !listenPaused; i++){
           await speakAsync(getSpeechText(w), L().speechLang);
-          if(!listenRunning || listenSkipRequested) return;
+          if(!listenRunning || listenSkipRequested || listenPaused) return;
           await waitMs(400);
         }
-        if(!listenRunning || listenSkipRequested) return;
+        if(!listenRunning || listenSkipRequested || listenPaused) return;
 
         await waitMsOrSkip(thinkMs);
-        if(!listenRunning || listenSkipRequested) return;
+        if(!listenRunning || listenSkipRequested || listenPaused) return;
 
         document.getElementById("listenZh").textContent = data.zh;
         await speakAsync(data.zh, "zh-TW");
@@ -3620,6 +3644,7 @@ async function runListenLoop(){
       break;
     }
     if(!listenRunning) break;
+    if(listenPaused) continue; // 不算跳過也不算正常播完，直接回迴圈開頭卡住等恢復，這個字下次從頭重播。
 
     // 被跳過的字不用等這段正常換字才有的 800ms 緩衝，直接進下一個。
     if(!listenSkipRequested) await waitMs(800);
@@ -3648,6 +3673,17 @@ document.getElementById("btnListenKnowIt").addEventListener("click", () => {
   // 目前這句自然播完才生效，這樣按下去才會感覺是真的馬上跳下一個。
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
+});
+document.getElementById("btnListenPause").addEventListener("click", (e) => {
+  if(!listenRunning) return;
+  listenPaused = !listenPaused;
+  e.currentTarget.textContent = listenPaused ? "▶️ 繼續" : "⏸️ 暫停";
+  e.currentTarget.classList.toggle("primary", listenPaused);
+  if(listenPaused){
+    // 立刻靜音，不要等目前這句自然播完才生效。
+    abortCurrentPlayback();
+    if('speechSynthesis' in window) speechSynthesis.cancel();
+  }
 });
 
 document.getElementById("btnBackFromListen").onclick = () => {
