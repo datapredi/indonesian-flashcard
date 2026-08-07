@@ -80,6 +80,7 @@
     flex:0 0 auto; width:30px; padding:0; height:30px; line-height:28px; text-align:center;
     font-weight:700; font-size:0.8rem; color:var(--muted);
   }
+  .diff-chip.diff-S{border-color:#4a90d9; color:#4a90d9;}
   .diff-chip.diff-E{border-color:var(--accent2); color:var(--accent2);}
   .diff-chip.diff-M{border-color:#c9a227; color:#c9a227;}
   .diff-chip.diff-H{border-color:var(--danger); color:var(--danger);}
@@ -201,6 +202,7 @@
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
+        <option value="S">S 超簡單</option>
         <option value="E">E 簡單</option>
         <option value="M">M 中等</option>
         <option value="H">H 困難</option>
@@ -227,6 +229,7 @@
       <input type="number" id="listenRangeTo" placeholder="到" min="1" step="1" style="max-width:90px; flex:0 0 auto;">
       <select id="listenDifficultyFilter">
         <option value="">全部難度</option>
+        <option value="S">S 超簡單</option>
         <option value="E">E 簡單</option>
         <option value="M">M 中等</option>
         <option value="H">H 困難</option>
@@ -816,6 +819,13 @@ function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMaster
 const PRON_FLAG_LS = "flashcard_pron_flag_v1";
 let pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
 function savePronFlag(){ saveMasteredSet(lsKey(PRON_FLAG_LS), pronFlagIds); }
+
+// 預設還是播 AI 發音，只有使用者自己確認過「這個字 AI 唸錯了」、明確標記
+// 要用自己錄的音取代，才會改播錄音——不能因為剛好有錄音檔就自動偷換掉，
+// 使用者錄音很多時候只是想比較，不代表 AI 那個是錯的。
+const USE_RECORDING_LS = "flashcard_use_recording_v1";
+let useRecordingIds = loadMasteredSet(lsKey(USE_RECORDING_LS));
+function saveUseRecordingIds(){ saveMasteredSet(lsKey(USE_RECORDING_LS), useRecordingIds); }
 
 let allWords = loadWordList();
 
@@ -2077,7 +2087,7 @@ function createWordItem(w){
   speakBtn.textContent = "🔊";
   speakBtn.setAttribute("aria-label", `連續播放 3 次 ${w.text} 發音`);
   speakBtn.title = "連續播放 3 次";
-  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speakRepeat(getSpeechText(w), speakBtn, 3, null, recKeyFor(w.text)); });
+  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speakRepeat(getSpeechText(w), speakBtn, 3, null, useRecordingIds.has(w.id) ? recKeyFor(w.text) : null); });
   row.appendChild(speakBtn);
 
   const playRecBtn = document.createElement("button");
@@ -2096,9 +2106,32 @@ function createWordItem(w){
     audioEl.play().catch(() => {});
     audioEl.onended = () => URL.revokeObjectURL(url);
   });
+  const useRecBtn = document.createElement("button");
+  useRecBtn.type = "button";
+  useRecBtn.className = "speak-btn";
+  useRecBtn.style.display = "none";
+  function refreshUseRecBtn(){
+    const on = useRecordingIds.has(w.id);
+    useRecBtn.textContent = on ? "★ 用我的錄音" : "☆ 用我的錄音";
+    useRecBtn.title = on ? "🔊 播放按鈕目前播的是你的錄音，點一下改回 AI 發音" : "確認 AI 這個字唸錯了？點一下讓 🔊 播放按鈕改播你的錄音";
+  }
+  useRecBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if(useRecordingIds.has(w.id)) useRecordingIds.delete(w.id); else useRecordingIds.add(w.id);
+    saveUseRecordingIds();
+    refreshUseRecBtn();
+  });
   async function refreshPlayRecBtn(){
     const rec = await getUserRecording(recKeyFor(w.text));
     playRecBtn.style.display = rec ? "" : "none";
+    useRecBtn.style.display = rec ? "" : "none";
+    if(!rec && useRecordingIds.has(w.id)){
+      // 錄音被刪掉了（例如重錄前的舊檔案），標記也跟著失效，不然會卡在
+      // 「明明沒有錄音，卻一直想播錄音」的狀態。
+      useRecordingIds.delete(w.id);
+      saveUseRecordingIds();
+    }
+    refreshUseRecBtn();
   }
   refreshPlayRecBtn();
 
@@ -2127,6 +2160,7 @@ function createWordItem(w){
   });
   row.appendChild(recBtn);
   row.appendChild(playRecBtn);
+  row.appendChild(useRecBtn);
 
   const forvoBtn = document.createElement("button");
   forvoBtn.type = "button";
@@ -2336,7 +2370,7 @@ function createWordItem(w){
   });
   row.appendChild(minimalPairsBtn);
 
-  const diffOrder = [null, "E", "M", "H"];
+  const diffOrder = [null, "S", "E", "M", "H"];
   const diffChip = document.createElement("button");
   diffChip.type = "button";
   function refreshDiffChip(){
@@ -3139,7 +3173,7 @@ document.getElementById("cardArea").onclick = () => {
 document.getElementById("cardSpeak").addEventListener("click", (e) => {
   e.stopPropagation();
   const w = cardSession[cardIndex];
-  speak(getSpeechText(w), e.currentTarget, null, recKeyFor(w.text));
+  speak(getSpeechText(w), e.currentTarget, null, useRecordingIds.has(w.id) ? recKeyFor(w.text) : null);
 });
 document.getElementById("btnPrev").onclick = () => {
   cardIndex = (cardIndex - 1 + cardSession.length) % cardSession.length;
