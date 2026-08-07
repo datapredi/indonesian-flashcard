@@ -471,6 +471,12 @@ if('speechSynthesis' in window){
 // 結束，不要當成錯誤處理。
 let speakGeneration = 0;
 async function speak(text, btn, langOverride, recordingOverrideKey){
+  // 每次開始一個新的播放請求，先明確中斷「上一個還沒播完的」，不要只靠等一下
+  // 改 <audio>.src 順便把它打斷——那個是瀏覽器自己的行為，靠不靠得住、多快
+  // 生效不一定，這就是「有時候按下一個字馬上播、有時候沒反應」的原因。這裡
+  // 用跟聽力模式「已經會了」按鈕一樣的機制，明確、同步地把上一段結束掉，
+  // 保證接下來要做的事（無論是播錄音還是播 AI 語音）不會被卡住的舊播放擋住。
+  abortCurrentPlayback();
   // 如果這個字有使用者自己錄過的音（例如聽 Forvo 真人發音之後錄下來取代
   // AI 發音有問題的字），優先播那個，不用管目前選的是 GPT 還是電腦內建
   // 語音——使用者錄的才是他確認過真的對的版本。recordingOverrideKey 只有
