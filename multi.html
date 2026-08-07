@@ -465,7 +465,30 @@ if('speechSynthesis' in window){
 // 世代編號判斷「我開始播放之後，有沒有更新的播放請求插進來」，有的話就悄悄
 // 結束，不要當成錯誤處理。
 let speakGeneration = 0;
-async function speak(text, btn, langOverride){
+async function speak(text, btn, langOverride, recordingOverrideKey){
+  // 如果這個字有使用者自己錄過的音（例如聽 Forvo 真人發音之後錄下來取代
+  // AI 發音有問題的字），優先播那個，不用管目前選的是 GPT 還是電腦內建
+  // 語音——使用者錄的才是他確認過真的對的版本。recordingOverrideKey 只有
+  // 「這個字本身」的播放（單字表、Flash Card）會傳進來，例句、跨語言查詢
+  // 等其他文字沒有對應的錄音可以覆蓋，不受影響。
+  if(recordingOverrideKey){
+    let rec = null;
+    try{ rec = await getUserRecording(recordingOverrideKey); }catch(e){ /* 讀錄音失敗就照舊走 AI 發音，不要卡住播放 */ }
+    if(rec){
+      const myGeneration = ++speakGeneration;
+      if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
+      try{
+        if(myGeneration !== speakGeneration) return;
+        await playAudioBlob(rec);
+      }catch(e){
+        if(myGeneration !== speakGeneration) return;
+        alert("播放你的錄音失敗：" + e.message);
+      }finally{
+        if(btn){ btn.disabled = false; btn.classList.remove('speaking'); }
+      }
+      return;
+    }
+  }
   // 大部分呼叫都是講「目前語言」的字，但跨語言查詢面板會秀出其他語言的字，
   // 那種情況要傳 langOverride 進來，用那個語言自己的語音設定唸，不能用目前
   // 語言的設定去唸別種語言的文字。
@@ -518,10 +541,10 @@ async function speak(text, btn, langOverride){
 function delayMs(ms){ return new Promise((resolve) => setTimeout(resolve, ms)); }
 // 單字表那顆主要的 🔊 按鈕專用：連續唸 3 次方便反覆聽，跟展開的例句/其他
 // 面板的發音按鈕（只唸一次）分開，不共用這個邏輯。
-async function speakRepeat(text, btn, times, langOverride){
+async function speakRepeat(text, btn, times, langOverride, recordingOverrideKey){
   for(let i = 0; i < times; i++){
     const beforeGeneration = speakGeneration;
-    await speak(text, btn, langOverride);
+    await speak(text, btn, langOverride, recordingOverrideKey);
     // 播放途中如果使用者點了別的字（世代編號被別的呼叫又往前推了），代表這個字
     // 已經被取代了，不要再繼續剩下的重複次數，也不用再去碰共用的播放元件。
     if(speakGeneration !== beforeGeneration + 1) break;
@@ -2054,7 +2077,7 @@ function createWordItem(w){
   speakBtn.textContent = "🔊";
   speakBtn.setAttribute("aria-label", `連續播放 3 次 ${w.text} 發音`);
   speakBtn.title = "連續播放 3 次";
-  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speakRepeat(getSpeechText(w), speakBtn, 3); });
+  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speakRepeat(getSpeechText(w), speakBtn, 3, null, recKeyFor(w.text)); });
   row.appendChild(speakBtn);
 
   const playRecBtn = document.createElement("button");
@@ -3115,7 +3138,8 @@ document.getElementById("cardArea").onclick = () => {
 };
 document.getElementById("cardSpeak").addEventListener("click", (e) => {
   e.stopPropagation();
-  speak(getSpeechText(cardSession[cardIndex]), e.currentTarget);
+  const w = cardSession[cardIndex];
+  speak(getSpeechText(w), e.currentTarget, null, recKeyFor(w.text));
 });
 document.getElementById("btnPrev").onclick = () => {
   cardIndex = (cardIndex - 1 + cardSession.length) % cardSession.length;
