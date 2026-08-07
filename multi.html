@@ -470,6 +470,11 @@ if('speechSynthesis' in window){
 // 世代編號判斷「我開始播放之後，有沒有更新的播放請求插進來」，有的話就悄悄
 // 結束，不要當成錯誤處理。
 let speakGeneration = 0;
+// 回傳值代表「這次呼叫從頭到尾有沒有全程都是最新的播放請求」（true=是，
+// false=中途被更新的請求取代了）。speakRepeat 靠這個判斷要不要繼續下一次
+// 重複——不能只看「播放中有沒有被打斷」，因為兩次重複中間還有 400ms 的
+// 空檔，使用者的點擊如果剛好落在空檔裡，那時候沒有東西在播、abortCurrentPlayback
+// 抓不到，只能靠這個回傳值讓 speakRepeat 自己在空檔前後也檢查一次。
 async function speak(text, btn, langOverride, recordingOverrideKey){
   // 每次開始一個新的播放請求，先明確中斷「上一個還沒播完的」，不要只靠等一下
   // 改 <audio>.src 順便把它打斷——那個是瀏覽器自己的行為，靠不靠得住、多快
@@ -477,6 +482,7 @@ async function speak(text, btn, langOverride, recordingOverrideKey){
   // 用跟聽力模式「已經會了」按鈕一樣的機制，明確、同步地把上一段結束掉，
   // 保證接下來要做的事（無論是播錄音還是播 AI 語音）不會被卡住的舊播放擋住。
   abortCurrentPlayback();
+  const myGeneration = ++speakGeneration;
   // 如果這個字有使用者自己錄過的音（例如聽 Forvo 真人發音之後錄下來取代
   // AI 發音有問題的字），優先播那個，不用管目前選的是 GPT 還是電腦內建
   // 語音——使用者錄的才是他確認過真的對的版本。recordingOverrideKey 只有
@@ -486,18 +492,15 @@ async function speak(text, btn, langOverride, recordingOverrideKey){
     let rec = null;
     try{ rec = await getUserRecording(recordingOverrideKey); }catch(e){ /* 讀錄音失敗就照舊走 AI 發音，不要卡住播放 */ }
     if(rec){
-      const myGeneration = ++speakGeneration;
       if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
       try{
-        if(myGeneration !== speakGeneration) return;
-        await playAudioBlob(rec);
+        if(myGeneration === speakGeneration) await playAudioBlob(rec);
       }catch(e){
-        if(myGeneration !== speakGeneration) return;
-        alert("播放你的錄音失敗：" + e.message);
+        if(myGeneration === speakGeneration) alert("播放你的錄音失敗：" + e.message);
       }finally{
         if(btn){ btn.disabled = false; btn.classList.remove('speaking'); }
       }
-      return;
+      return myGeneration === speakGeneration;
     }
   }
   // 大部分呼叫都是講「目前語言」的字，但跨語言查詢面板會秀出其他語言的字，
@@ -506,7 +509,6 @@ async function speak(text, btn, langOverride, recordingOverrideKey){
   const info = langOverride ? LANG_INFO[langOverride] : L();
   const voiceSource = document.getElementById("voiceSource").value;
   if(voiceSource === "gpt"){
-    const myGeneration = ++speakGeneration;
     const audioEl = document.getElementById("listenAudio");
     // speak() 在很多畫面（單字表、Flash Card...）都會被單獨點擊觸發，不像跑步
     // 模式一開始就先解鎖過 <audio> 元素。這裡在點擊當下、還沒 await 任何非同步
@@ -517,18 +519,15 @@ async function speak(text, btn, langOverride, recordingOverrideKey){
     if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
     try{
       const blob = await withTimeout(getTTSAudioBlob(text, info.ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
-      if(myGeneration !== speakGeneration) return; // 等生成的時候，使用者已經點了別的字
-      await playAudioBlob(blob);
+      if(myGeneration === speakGeneration) await playAudioBlob(blob);
     }catch(e){
-      if(myGeneration !== speakGeneration) return; // 播放到一半被新的請求打斷，不算錯誤
-      alert("GPT 語音播放失敗：" + e.message);
+      if(myGeneration === speakGeneration) alert("GPT 語音播放失敗：" + e.message);
     }finally{
       if(btn){ btn.disabled = false; btn.classList.remove('speaking'); }
     }
-    return;
+    return myGeneration === speakGeneration;
   }
-  ++speakGeneration; // 跟 GPT 分支共用同一個世代編號，讓 speakRepeat 判斷有沒有被打斷時不用管目前是哪種語音來源
-  if(!('speechSynthesis' in window)){ alert('這個瀏覽器不支援語音播放'); return; }
+  if(!('speechSynthesis' in window)){ alert('這個瀏覽器不支援語音播放'); return myGeneration === speakGeneration; }
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = info.speechLang;
@@ -547,6 +546,7 @@ async function speak(text, btn, langOverride, recordingOverrideKey){
     };
     speechSynthesis.speak(utter);
   });
+  return myGeneration === speakGeneration;
 }
 
 function delayMs(ms){ return new Promise((resolve) => setTimeout(resolve, ms)); }
@@ -554,12 +554,19 @@ function delayMs(ms){ return new Promise((resolve) => setTimeout(resolve, ms)); 
 // 面板的發音按鈕（只唸一次）分開，不共用這個邏輯。
 async function speakRepeat(text, btn, times, langOverride, recordingOverrideKey){
   for(let i = 0; i < times; i++){
-    const beforeGeneration = speakGeneration;
-    await speak(text, btn, langOverride, recordingOverrideKey);
-    // 播放途中如果使用者點了別的字（世代編號被別的呼叫又往前推了），代表這個字
-    // 已經被取代了，不要再繼續剩下的重複次數，也不用再去碰共用的播放元件。
-    if(speakGeneration !== beforeGeneration + 1) break;
-    if(i < times - 1) await delayMs(400);
+    // speak() 自己回報這次有沒有全程都是最新的請求；播放途中被打斷的話，
+    // 這裡直接就抓得到，不用另外算世代編號的差值。
+    const stillCurrent = await speak(text, btn, langOverride, recordingOverrideKey);
+    if(!stillCurrent) break;
+    if(i < times - 1){
+      const generationBeforeGap = speakGeneration;
+      await delayMs(400);
+      // 兩次重複中間的 400ms 空檔沒有東西在播，如果使用者的點擊剛好落在
+      // 這段空檔裡，光靠 speak() 自己的世代檢查抓不到（那時候根本沒有
+      // 呼叫 speak()），要在這裡另外補一次檢查，不然空檔一過就會若無其事
+      // 地接著播下一次重複，變成使用者按了別的字卻沒反應。
+      if(speakGeneration !== generationBeforeGap) break;
+    }
   }
 }
 
