@@ -137,6 +137,7 @@
     <button id="btnJumpToActions">⬇ 跳到最下面（開始 Flash Card／測驗／跑步模式）</button>
     <input type="number" id="jumpToIdInput" placeholder="編號" min="1" step="1" style="max-width:90px; flex:0 0 auto;">
     <button id="btnJumpToId">🔎 跳到這個編號的字</button>
+    <button id="btnRegenerateAudioById">🔄 清除這個編號的發音快取並重新生成</button>
   </div>
   <div class="sub">從單字清單勾選要複習的內容，開始 Flashcard 或測驗</div>
 
@@ -150,6 +151,7 @@
       <button id="btnClearMastered">🔄 清空所有已學會</button>
       <button id="btnClearWordList">🗑️ 清空目前單字表</button>
       <button id="btnDedupByMeaning">🧹 合併真正重複的字（拼法不同但背後同一個字）</button>
+      <button id="btnRenumber">🔢 重新編號（讓編號連續）</button>
     </div>
     <div class="list hidden" id="dedupReviewPanel" style="padding:14px;"></div>
     <div class="toolbar">
@@ -624,6 +626,16 @@ async function setCachedAudio(key, blob){
     tx.onerror = () => reject(tx.error);
   });
 }
+async function deleteCachedAudio(key){
+  const db = await openTTSDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(TTS_STORE_NAME, "readwrite");
+    tx.objectStore(TTS_STORE_NAME).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function ttsCacheKey(text, instructions){ return `${TTS_MODEL}::${instructions || ""}::${text}`; }
 
 async function fetchTTSAudio(text, instructions){
   const key = getOpenaiKey();
@@ -646,7 +658,7 @@ async function fetchTTSAudio(text, instructions){
 }
 
 async function getTTSAudioBlob(text, instructions){
-  const cacheKey = `${TTS_MODEL}::${instructions || ""}::${text}`;
+  const cacheKey = ttsCacheKey(text, instructions);
   // IndexedDB can fail outright on some mobile browsers (e.g. Safari Private
   // Browsing blocks it, sometimes with an unhelpfully blank error message).
   // Caching is just an optimization, so never let a cache failure take down
@@ -1580,6 +1592,33 @@ function doJumpToIdInput(){
 document.getElementById("btnJumpToId").addEventListener("click", (e) => { e.preventDefault(); doJumpToIdInput(); });
 document.getElementById("jumpToIdInput").addEventListener("keydown", (e) => {
   if(e.key === "Enter"){ e.preventDefault(); doJumpToIdInput(); }
+});
+document.getElementById("btnRegenerateAudioById").addEventListener("click", async () => {
+  const id = Number(document.getElementById("jumpToIdInput").value);
+  if(!id){ alert("請輸入編號"); return; }
+  const w = allWords.find(x => x.id === id);
+  if(!w){ alert(`找不到編號 ${id} 的字。`); return; }
+  if(document.getElementById("voiceSource").value !== "gpt"){
+    alert("這個功能只適用於「GPT 語音」——電腦內建語音每次都是現場唸，沒有快取可以清。");
+    return;
+  }
+  const data = lookup(w.text);
+  const speechText = getSpeechText(w);
+  const btn = document.getElementById("btnRegenerateAudioById");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "清除快取、重新生成中...";
+  try{
+    await deleteCachedAudio(ttsCacheKey(speechText, L().ttsInstructions));
+    if(data && data.zh) await deleteCachedAudio(ttsCacheKey(data.zh, TTS_INSTRUCTIONS_ZH));
+    await speak(speechText, null);
+    alert(`已清除編號 ${id}（${w.text}）的發音快取並重新生成，剛剛應該有播放新版本。如果還是不對，可能是這個文字本身 AI 就是會念錯，可以考慮用「錄音取代」功能。`);
+  }catch(err){
+    alert("重新生成失敗：" + err.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 });
 function renderTappableSentence(sentence){
   const wrap = document.createElement("span");
@@ -2680,6 +2719,40 @@ function showDedupReviewPanel(dupGroups){
   panel.appendChild(actions);
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+document.getElementById("btnRenumber").onclick = () => {
+  if(allWords.length === 0) return;
+  const alreadySequential = allWords.every((w, i) => w.id === i + 1);
+  if(alreadySequential){ alert("編號本來就是連續的，不用重新編號。"); return; }
+  if(!confirm(`確定要重新編號嗎？會照目前編號大小排序，重新編成 1~${allWords.length} 連續的號碼（文字順序跟資料都不會變，只有編號本身會變）。如果你在別的地方（例如 Obsidian 筆記）用舊編號記過東西，對照關係會跟著失效。這個動作沒辦法復原，確定嗎？`)) return;
+  // 照目前編號排序（不是照文字），保留原本的相對順序，只是把編號改成連續的。
+  const sorted = allWords.slice().sort((a, b) => a.id - b.id);
+  const idMap = new Map();
+  sorted.forEach((w, i) => { idMap.set(w.id, i + 1); });
+  sorted.forEach((w, i) => { w.id = i + 1; });
+  allWords = sorted;
+  function remapIdSet(set){ return new Set([...set].map(id => idMap.get(id)).filter(id => id !== undefined)); }
+  selected = remapIdSet(selected);
+  cardMasteredIds = remapIdSet(cardMasteredIds);
+  quizMasteredIds = remapIdSet(quizMasteredIds);
+  pronFlagIds = remapIdSet(pronFlagIds);
+  useRecordingIds = remapIdSet(useRecordingIds);
+  // 比對清單、剛匯入清單只是這次瀏覽階段暫時用的標記，編號全部變了之後
+  // 對應不上，直接清空比留著錯誤的對應關係安全。
+  compareSet = new Set();
+  showCompareOnly = false;
+  newlyImportedIds = new Set();
+  showNewlyImportedOnly = false;
+  saveWordList(allWords);
+  saveSelected();
+  saveCardMastered();
+  saveQuizMastered();
+  savePronFlag();
+  saveUseRecordingIds();
+  updateCompareToggleLabel();
+  updateNewlyImportedToggleLabel();
+  renderList();
+  alert(`重新編號完成，現在是 1~${allWords.length} 連續編號。`);
+};
 document.getElementById("btnRandomSelect").onclick = () => {
   const raw = Number(document.getElementById("randomCount").value);
   const pool = getVisibleWords(); // 篩了難度/搜尋的話，只從篩出來的裡面抽
