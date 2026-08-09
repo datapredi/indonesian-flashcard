@@ -1347,6 +1347,44 @@ async function getToneMarks(text, nativeScript){
   return parsed.marked;
 }
 
+const VI_TONE_MARKS_CACHE_LS = "flashcard_vi_tone_marks_cache_v1"; // 越南文專用：南部（胡志明）口音 5 聲調 MFRLS 標記
+let viToneMarksCache = {};
+try{ viToneMarksCache = JSON.parse(localStorage.getItem(lsKey(VI_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ viToneMarksCache = {}; }
+function saveViToneMarksCache(){ localStorage.setItem(lsKey(VI_TONE_MARKS_CACHE_LS), JSON.stringify(viToneMarksCache)); }
+
+async function getViToneMarks(text, nativeScript){
+  if(viToneMarksCache[text]) return viToneMarksCache[text];
+  const schema = {
+    type: "object",
+    properties: { marked: { type: "string" } },
+    required: ["marked"],
+    additionalProperties: false
+  };
+  const prompt = `你是越南語老師，教的是南部（胡志明市/西貢）口音。南部口音只分 5 個聲調（北部原本的 hỏi 跟 ngã 兩個調，南部念起來合併成同一個）。
+
+請幫這個越南文羅馬拼音（不帶重音符號的版本）標上聲調，讓學生知道每個音節的聲調，用南部口音的 5 聲調系統，聲調字母只用這 5 種：
+- M：ngang 平聲（原生文字不標符號，例如 a）
+- F：huyền 降調（例如 à）
+- R：sắc 升調（例如 á）
+- L：hỏi/ngã 合併（先降後升，南部念起來像同一個調，例如 ả 或 ã）
+- S：nặng 重聲（短促、喉塞、突然停住，例如 ạ）
+
+越南文原生文字（帶重音符號）：${nativeScript || text}
+不帶重音符號的羅馬拼音：${text}
+
+請用這個格式：把羅馬拼音依照音節切開，每個音節後面加上上標括號＋聲調字母（M/F/R/L/S），上標括號用 Unicode 字元 ⁽ ⁾（不是普通括號）。
+
+範例：原生文字是「xin chào」，不帶符號拼音是「xin chao」，要標成 xin⁽M⁾ chao⁽F⁾
+
+請直接根據越南文原生文字（帶重音符號）的實際聲調來標（南部口音，hỏi/ngã 都標成 L），音節切分盡量貼近原本給的羅馬拼音。
+
+請回傳 marked：標好聲調的完整字串。`;
+  const parsed = await callClaude(prompt, schema, 512);
+  viToneMarksCache[text] = parsed.marked;
+  saveViToneMarksCache();
+  return parsed.marked;
+}
+
 const NATIVE_TONE_MARKS_CACHE_LS = "flashcard_native_tone_marks_cache_v1"; // 泰文專用：把 HLMRF 標在泰文原生字母上，不是羅馬拼音
 let nativeToneMarksCache = {};
 try{ nativeToneMarksCache = JSON.parse(localStorage.getItem(lsKey(NATIVE_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ nativeToneMarksCache = {}; }
@@ -1375,6 +1413,42 @@ async function getNativeToneMarks(text, nativeScript){
   const parsed = await callClaude(prompt, schema, 512);
   nativeToneMarksCache[text] = parsed.marked;
   saveNativeToneMarksCache();
+  return parsed.marked;
+}
+
+const VI_NATIVE_TONE_MARKS_CACHE_LS = "flashcard_vi_native_tone_marks_cache_v1"; // 越南文專用：把 MFRLS 標在帶重音符號的越南文原生拼法上
+let viNativeToneMarksCache = {};
+try{ viNativeToneMarksCache = JSON.parse(localStorage.getItem(lsKey(VI_NATIVE_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ viNativeToneMarksCache = {}; }
+function saveViNativeToneMarksCache(){ localStorage.setItem(lsKey(VI_NATIVE_TONE_MARKS_CACHE_LS), JSON.stringify(viNativeToneMarksCache)); }
+
+async function getViNativeToneMarks(text, nativeScript){
+  if(viNativeToneMarksCache[text]) return viNativeToneMarksCache[text];
+  const schema = {
+    type: "object",
+    properties: { marked: { type: "string" } },
+    required: ["marked"],
+    additionalProperties: false
+  };
+  const prompt = `你是越南語老師，教的是南部（胡志明市/西貢）口音，南部口音只分 5 個聲調（hỏi 跟 ngã 合併成同一個）。
+
+請幫這個越南文「原生文字」（帶重音符號的正確越南文拼法，不要拿掉重音符號）額外標上聲調字母，讓學生更清楚每個音節的聲調，聲調字母只用這 5 種：
+- M：ngang 平聲
+- F：huyền 降調
+- R：sắc 升調
+- L：hỏi/ngã 合併
+- S：nặng 重聲（短促喉塞）
+
+越南文原生文字（帶重音符號）：${nativeScript || text}
+羅馬拼音（僅供你判斷音節切分，不要用在輸出裡）：${text}
+
+請用這個格式：把越南文原生文字（保留重音符號）依照音節切開，每個音節後面加上上標括號＋聲調字母，上標括號用 Unicode 字元 ⁽ ⁾（不是普通括號）。輸出裡的文字本身一律保留原本的重音符號，不要拿掉。
+
+範例：「xin chào」要標成 xin⁽M⁾ chào⁽F⁾
+
+請回傳 marked：標好聲調的完整字串（保留重音符號＋聲調字母標記）。`;
+  const parsed = await callClaude(prompt, schema, 512);
+  viNativeToneMarksCache[text] = parsed.marked;
+  saveViNativeToneMarksCache();
   return parsed.marked;
 }
 
@@ -2320,6 +2394,13 @@ function createWordItem(w){
   });
   row.appendChild(antonymsBtn);
 
+  // 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。兩種語言
+  // 用同一套按鈕/面板/快取機制，只是呼叫的 AI 函式跟顯示文字不同。
+  const toneLangActive = currentLang === "th" || (currentLang === "vi" && viDialect === "nam");
+  const getToneMarksFn = currentLang === "vi" ? getViToneMarks : getToneMarks;
+  const getNativeToneMarksFn = currentLang === "vi" ? getViNativeToneMarks : getNativeToneMarks;
+  const toneLetterLabel = currentLang === "vi" ? "MFRLS" : "HLMRF";
+
   const tonePanel = document.createElement("div");
   tonePanel.className = "usage-panel hidden";
 
@@ -2327,9 +2408,9 @@ function createWordItem(w){
   toneBtn.type = "button";
   toneBtn.className = "usage-btn";
   toneBtn.textContent = "🎵";
-  toneBtn.title = "AI 標註聲調（HLMRF）";
+  toneBtn.title = `AI 標註聲調（${toneLetterLabel}）`;
   toneBtn.setAttribute("aria-label", `AI 標註 ${w.text} 的聲調`);
-  if(currentLang !== "th"){
+  if(!toneLangActive){
     toneBtn.style.display = "none";
   }
   async function loadTonePanel(){
@@ -2337,7 +2418,7 @@ function createWordItem(w){
     if(!getApiKey()){ tonePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
     tonePanel.textContent = "標註中...";
     try{
-      const marked = await getToneMarks(w.text, data ? data.nativeScript : "");
+      const marked = await getToneMarksFn(w.text, data ? data.nativeScript : "");
       tonePanel.textContent = marked;
       tonePanel.dataset.loaded = "1";
     }catch(err){
@@ -2355,9 +2436,8 @@ function createWordItem(w){
   });
   row.appendChild(toneBtn);
   // 標記過「⚠️ 發音待複習」的字，代表使用者本來就是想看聲調的，直接先展開、
-  // 先生成好，不用使用者自己再點一次 🎵。只在泰文模式生效（其他語言還沒有
-  // 這個聲調標記功能）。
-  if(currentLang === "th" && pronFlagIds.has(w.id)){
+  // 先生成好，不用使用者自己再點一次 🎵。
+  if(toneLangActive && pronFlagIds.has(w.id)){
     tonePanel.classList.remove("hidden");
     loadTonePanel();
   }
@@ -2368,10 +2448,10 @@ function createWordItem(w){
   const nativeToneBtn = document.createElement("button");
   nativeToneBtn.type = "button";
   nativeToneBtn.className = "usage-btn";
-  nativeToneBtn.textContent = "ก";
-  nativeToneBtn.title = "AI 在泰文字母上標註聲調（HLMRF）";
-  nativeToneBtn.setAttribute("aria-label", `AI 在 ${w.text} 的泰文字母上標註聲調`);
-  if(currentLang !== "th"){
+  nativeToneBtn.textContent = currentLang === "vi" ? "Ư" : "ก";
+  nativeToneBtn.title = `AI 在原生文字上標註聲調（${toneLetterLabel}）`;
+  nativeToneBtn.setAttribute("aria-label", `AI 在 ${w.text} 的原生文字上標註聲調`);
+  if(!toneLangActive){
     nativeToneBtn.style.display = "none";
   }
   nativeToneBtn.addEventListener("click", async (e) => {
@@ -2383,10 +2463,10 @@ function createWordItem(w){
     nativeTonePanel.classList.remove("hidden");
     if(nativeTonePanel.dataset.loaded === "1") return;
     if(!getApiKey()){ nativeTonePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
-    if(!data || !data.nativeScript){ nativeTonePanel.textContent = "這個字還沒有泰文原生文字資料，沒辦法標註。"; return; }
+    if(!data || !data.nativeScript){ nativeTonePanel.textContent = "這個字還沒有原生文字資料，沒辦法標註。"; return; }
     nativeTonePanel.textContent = "標註中...";
     try{
-      const marked = await getNativeToneMarks(w.text, data.nativeScript);
+      const marked = await getNativeToneMarksFn(w.text, data.nativeScript);
       nativeTonePanel.textContent = marked;
       nativeTonePanel.dataset.loaded = "1";
     }catch(err){
