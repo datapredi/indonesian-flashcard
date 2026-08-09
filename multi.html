@@ -133,6 +133,10 @@
     <button id="btnToggleThaiAlphabet">📖 泰文子音／母音對照表</button>
   </div>
   <div class="list hidden" id="thaiAlphabetPanel" style="padding:14px;"></div>
+  <div class="toolbar hidden" id="viAlphabetBar">
+    <button id="btnToggleViAlphabet">📖 越南文母音／子音對照表</button>
+  </div>
+  <div class="list hidden" id="viAlphabetPanel" style="padding:14px;"></div>
   <div class="toolbar hidden" id="viDialectBar">
     <label for="viDialect" style="align-self:center;">越南語口音</label>
     <select id="viDialect">
@@ -462,6 +466,8 @@ function updateLangButtons(){
   document.getElementById("viDialectBar").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("thaiAlphabetBar").classList.toggle("hidden", currentLang !== "th");
   if(currentLang !== "th") document.getElementById("thaiAlphabetPanel").classList.add("hidden");
+  document.getElementById("viAlphabetBar").classList.toggle("hidden", currentLang !== "vi");
+  if(currentLang !== "vi") document.getElementById("viAlphabetPanel").classList.add("hidden");
   document.getElementById("btnGenerateAllTones").classList.toggle("hidden", currentLang !== "th");
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", currentLang !== "th");
 }
@@ -1363,7 +1369,7 @@ const THAI_CONSONANT_CLASSES = [
 // 做一個小小的「文字＋喇叭」列，點喇叭就照 text 用泰文發音唸出來——子音／
 // 母音對照表本身是寫死的參考資料，但發音還是交給現有的 speak()（跟單字表
 // 共用同一套 GPT/瀏覽器語音邏輯），不用另外自己接 TTS。
-function makeSpeakableLabel(text, fontSize){
+function makeSpeakableLabel(text, fontSize, lang){
   const wrap = document.createElement("span");
   wrap.style.cssText = "display:inline-flex; align-items:center; gap:2px;";
   const label = document.createElement("span");
@@ -1374,7 +1380,7 @@ function makeSpeakableLabel(text, fontSize){
   btn.className = "speak-btn";
   btn.textContent = "🔊";
   btn.style.cssText = "padding:2px 5px; font-size:0.8rem;";
-  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(text, btn, "th"); });
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(text, btn, lang); });
   wrap.appendChild(label);
   wrap.appendChild(btn);
   return wrap;
@@ -1394,9 +1400,9 @@ function renderThaiAlphabetPanel(){
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
     const row = document.createElement("div");
-    row.appendChild(makeSpeakableLabel(v.short, "1.1rem"));
+    row.appendChild(makeSpeakableLabel(v.short, "1.1rem", "th"));
     row.appendChild(document.createTextNode(" / "));
-    row.appendChild(makeSpeakableLabel(v.long, "1.1rem"));
+    row.appendChild(makeSpeakableLabel(v.long, "1.1rem", "th"));
     item.appendChild(row);
     const sound = document.createElement("div");
     sound.className = "usage-note";
@@ -1417,9 +1423,9 @@ function renderThaiAlphabetPanel(){
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
     const row = document.createElement("div");
-    row.appendChild(makeSpeakableLabel(v.short, "1.1rem"));
+    row.appendChild(makeSpeakableLabel(v.short, "1.1rem", "th"));
     row.appendChild(document.createTextNode(" / "));
-    row.appendChild(makeSpeakableLabel(v.long, "1.1rem"));
+    row.appendChild(makeSpeakableLabel(v.long, "1.1rem", "th"));
     item.appendChild(row);
     const sound = document.createElement("div");
     sound.className = "usage-note";
@@ -1441,7 +1447,7 @@ function renderThaiAlphabetPanel(){
     cls.letters.forEach(([letter, name, sound]) => {
       const item = document.createElement("div");
       item.style.cssText = `border:1px solid ${classColors[cls.key]}; border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;`;
-      item.appendChild(makeSpeakableLabel(letter, "1.2rem"));
+      item.appendChild(makeSpeakableLabel(letter, "1.2rem", "th"));
       const info = document.createElement("div");
       info.className = "usage-note";
       info.innerHTML = `${name}<br>${sound}`;
@@ -1463,6 +1469,109 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
     return;
   }
   if(panel.innerHTML === "") renderThaiAlphabetPanel();
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// ================= 越南文母音／子音對照表（南部/胡志明市口音，純靜態參考資料） =================
+const VI_VOWELS = [
+  { letter: "a", sound: "a（短）" },
+  { letter: "ă", sound: "a（更短）" },
+  { letter: "â", sound: "ơ（短）" },
+  { letter: "e", sound: "ae" },
+  { letter: "ê", sound: "e" },
+  { letter: "i / y", sound: "i" },
+  { letter: "o", sound: "o（開）" },
+  { letter: "ô", sound: "o（閉，像喔）" },
+  { letter: "ơ", sound: "er（不捲舌）" },
+  { letter: "u", sound: "u" },
+  { letter: "ư", sound: "跟 u 嘴型一樣但不圓唇" }
+];
+const VI_DIPHTHONGS = [
+  { form: "ia / iê / yê", sound: "ia" },
+  { form: "ua / uô", sound: "ua" },
+  { form: "ưa / ươ", sound: "uea" }
+];
+const VI_CONSONANTS = [
+  ["b","b"], ["c / k / q","k"], ["ch","tʃ（接近 j）"], ["d","南部念像 y"], ["đ","d"],
+  ["g / gh","g"], ["gi","南部念像 y"], ["h","h"], ["kh","kh（喉音）"], ["l","l"],
+  ["m","m"], ["n","n"], ["ng / ngh","ng"], ["nh","ny（像中文的ㄋㄧ連著念）"], ["p","p"],
+  ["ph","f"], ["r","南部念像捲舌 r，接近國語ㄖ"], ["s","南部念捲舌 s，跟 x 有分"], ["t","t"],
+  ["th","th（送氣）"], ["tr","南部念捲舌，接近 ch"], ["v","北部像 v，南部常念像 y"], ["x","s（不捲舌）"]
+];
+function renderViAlphabetPanel(){
+  const panel = document.getElementById("viAlphabetPanel");
+  panel.innerHTML = "";
+
+  const vowelHeader = document.createElement("div");
+  vowelHeader.style.fontWeight = "600";
+  vowelHeader.textContent = "單母音";
+  panel.appendChild(vowelHeader);
+
+  const vowelGrid = document.createElement("div");
+  vowelGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+  VI_VOWELS.forEach(v => {
+    const item = document.createElement("div");
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;";
+    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi"));
+    const sound = document.createElement("div");
+    sound.className = "usage-note";
+    sound.textContent = v.sound;
+    item.appendChild(sound);
+    vowelGrid.appendChild(item);
+  });
+  panel.appendChild(vowelGrid);
+
+  const diphHeader = document.createElement("div");
+  diphHeader.style.fontWeight = "600";
+  diphHeader.textContent = "常見複合母音（滑音）";
+  panel.appendChild(diphHeader);
+
+  const diphGrid = document.createElement("div");
+  diphGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+  VI_DIPHTHONGS.forEach(v => {
+    const item = document.createElement("div");
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
+    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi"));
+    const sound = document.createElement("div");
+    sound.className = "usage-note";
+    sound.textContent = v.sound;
+    item.appendChild(sound);
+    diphGrid.appendChild(item);
+  });
+  panel.appendChild(diphGrid);
+
+  const consHeader = document.createElement("div");
+  consHeader.style.fontWeight = "600";
+  consHeader.textContent = "子音（標了「南部念...」的地方是南部/胡志明市口音特有的念法，跟北部不一樣）";
+  panel.appendChild(consHeader);
+
+  const consGrid = document.createElement("div");
+  consGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+  VI_CONSONANTS.forEach(([letter, sound]) => {
+    const item = document.createElement("div");
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;";
+    item.appendChild(makeSpeakableLabel(letter, "1.1rem", "vi"));
+    const info = document.createElement("div");
+    info.className = "usage-note";
+    info.textContent = sound;
+    item.appendChild(info);
+    consGrid.appendChild(item);
+  });
+  panel.appendChild(consGrid);
+
+  const note = document.createElement("div");
+  note.className = "usage-note";
+  note.textContent = "越南文不像泰文有「子音 class 決定聲調」這種規則，這張表主要是幫你認拼法對應的大概發音，尤其是南部（胡志情市）口音特有、容易搞混的幾組（d/gi/v、r、s/x、tr）。發音是唸單一個字母/拼法本身，跟它在真正單字裡的唸法可能會有點不一樣，僅供參考。";
+  panel.appendChild(note);
+}
+document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
+  const panel = document.getElementById("viAlphabetPanel");
+  if(!panel.classList.contains("hidden")){
+    panel.classList.add("hidden");
+    return;
+  }
+  if(panel.innerHTML === "") renderViAlphabetPanel();
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
