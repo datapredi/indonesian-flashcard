@@ -170,6 +170,7 @@
         <input type="checkbox" id="forceReconvert">
         強制重新轉換（忽略已轉換記錄）
       </label>
+      <button id="btnExportWordListTxt">🔤 匯出目前語言單字（純文字，給轉到其他語言用）</button>
     </div>
     <div class="note hidden" id="convertNote"></div>
     <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
@@ -3007,6 +3008,29 @@ function exportBackup(){
   URL.revokeObjectURL(url);
 }
 document.getElementById("btnExportBackup").addEventListener("click", exportBackup);
+
+// 把目前語言的單字清單匯出成一份純文字檔（一行一個字，hasScript 語言用
+// 原生文字，這樣拿去給另一個語言的「匯入並自動生成資料」用時，AI 才能
+// 直接讀懂原本的字是什麼、準確翻成新語言，不用只靠羅馬拼音自己猜。用來
+// 支援「這個語言已經累積很多字了，想直接拿去幫另一個語言補字」這種需求。
+document.getElementById("btnExportWordListTxt").addEventListener("click", () => {
+  if(allWords.length === 0){ alert("目前語言還沒有任何字可以匯出。"); return; }
+  const hasScript = L().hasScript;
+  const lines = allWords.map(w => {
+    if(!hasScript) return w.text;
+    const data = lookup(w.text);
+    return (data && data.nativeScript) || w.text;
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${L().label}_words_${new Date().toISOString().slice(0, 10)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
 
 document.getElementById("btnImportBackupTrigger").addEventListener("click", () => {
   document.getElementById("fileInputBackup").click();
