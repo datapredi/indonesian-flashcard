@@ -3038,11 +3038,19 @@ document.getElementById("btnDedupByMeaning").onclick = () => {
     alert(`${L().label}沒有另外的原生文字欄位可以比對，這個工具只適用於有原生文字的語言（泰文、越南文、日文、韓文）。`);
     return;
   }
+  // 整句話（不只是單字）常常會有結尾標點符號不一致的情況（同一句有沒有問號、
+  // 句尾有沒有句號），直接比對原始字串會漏掉——分組前先把結尾標點跟大小寫
+  // 正規化掉，這樣「cai nay bao nhieu tien」跟「cai nay bao nhieu tien?」
+  // 這種只差標點的才會被抓成同一組。
+  function normalizeForDedupGrouping(s){
+    return s.trim().toLowerCase().replace(/[?？!！.。,，;；:：\s]+$/g, "");
+  }
   const groups = {};
   allWords.forEach(w => {
     const data = lookup(w.text);
     if(!data || !data.nativeScript) return;
-    (groups[data.nativeScript] = groups[data.nativeScript] || []).push(w);
+    const key = normalizeForDedupGrouping(data.nativeScript);
+    (groups[key] = groups[key] || []).push(w);
   });
   const dupGroups = Object.values(groups).filter(g => g.length > 1);
   dupGroups.forEach(g => g.sort((a, b) => a.id - b.id));
