@@ -1474,18 +1474,20 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
 });
 
 // ================= 越南文母音／子音對照表（南部/胡志明市口音，純靜態參考資料） =================
+// tones：M/F/R/L/S 五個聲調字母對應的重音符號寫法，L 是南部合併的 hỏi/ngã
+// 兩種拼法（念起來一樣，但字還是要拼對，所以兩個都列出來）。
 const VI_VOWELS = [
-  { letter: "a", sound: "a（短）" },
-  { letter: "ă", sound: "a（更短）" },
-  { letter: "â", sound: "ơ（短）" },
-  { letter: "e", sound: "ae" },
-  { letter: "ê", sound: "e" },
-  { letter: "i / y", sound: "i" },
-  { letter: "o", sound: "o（開）" },
-  { letter: "ô", sound: "o（閉，像喔）" },
-  { letter: "ơ", sound: "er（不捲舌）" },
-  { letter: "u", sound: "u" },
-  { letter: "ư", sound: "跟 u 嘴型一樣但不圓唇" }
+  { letter: "a", sound: "a（短）", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
+  { letter: "ă", sound: "a（更短）", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
+  { letter: "â", sound: "ơ（短）", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
+  { letter: "e", sound: "ae", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
+  { letter: "ê", sound: "e", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
+  { letter: "i / y", sound: "i", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } },
+  { letter: "o", sound: "o（開）", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
+  { letter: "ô", sound: "o（閉，像喔）", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
+  { letter: "ơ", sound: "er（不捲舌）", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
+  { letter: "u", sound: "u", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
+  { letter: "ư", sound: "跟 u 嘴型一樣但不圓唇", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } }
 ];
 const VI_DIPHTHONGS = [
   { form: "ia / iê / yê", sound: "ia" },
@@ -1499,6 +1501,30 @@ const VI_CONSONANTS = [
   ["ph","f"], ["r","南部念像捲舌 r，接近國語ㄖ"], ["s","南部念捲舌 s，跟 x 有分"], ["t","t"],
   ["th","th（送氣）"], ["tr","南部念捲舌，接近 ch"], ["v","北部像 v，南部常念像 y"], ["x","s（不捲舌）"]
 ];
+// 母音的 5 個聲調變化（M/F/R/L/S）小標籤列，每個都能點下去聽發音——直接
+// 把重音符號寫法跟聲調字母放在一起看，比只看字母抽象的說明更直覺。
+function renderToneRow(tones){
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:4px;";
+  ["M", "F", "R", "L", "S"].forEach(letter => {
+    const raw = tones[letter];
+    const speakText = raw.split("/")[0]; // L 是南部合併的 hỏi/ngã 兩種拼法，念起來一樣，取第一個來唸就好
+    const badge = document.createElement("span");
+    badge.style.cssText = "display:inline-flex; align-items:center; gap:2px; border:1px solid var(--border); border-radius:6px; padding:1px 4px; font-size:0.85rem;";
+    const label = document.createElement("span");
+    label.textContent = `${raw}⁽${letter}⁾`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "speak-btn";
+    btn.textContent = "🔊";
+    btn.style.cssText = "padding:1px 4px; font-size:0.7rem;";
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText, btn, "vi"); });
+    badge.appendChild(label);
+    badge.appendChild(btn);
+    row.appendChild(badge);
+  });
+  return row;
+}
 function renderViAlphabetPanel(){
   const panel = document.getElementById("viAlphabetPanel");
   panel.innerHTML = "";
@@ -1512,12 +1538,13 @@ function renderViAlphabetPanel(){
   vowelGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
   VI_VOWELS.forEach(v => {
     const item = document.createElement("div");
-    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;";
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:170px; text-align:center;";
     item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi"));
     const sound = document.createElement("div");
     sound.className = "usage-note";
     sound.textContent = v.sound;
     item.appendChild(sound);
+    if(v.tones) item.appendChild(renderToneRow(v.tones));
     vowelGrid.appendChild(item);
   });
   panel.appendChild(vowelGrid);
