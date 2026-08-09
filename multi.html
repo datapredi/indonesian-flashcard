@@ -129,6 +129,10 @@
     <button class="lang-btn" data-lang="ko">🇰🇷 韓文</button>
     <button class="lang-btn" data-lang="yue">🇭🇰 粵語</button>
   </div>
+  <div class="toolbar hidden" id="thaiAlphabetBar">
+    <button id="btnToggleThaiAlphabet">📖 泰文子音／母音對照表</button>
+  </div>
+  <div class="list hidden" id="thaiAlphabetPanel" style="padding:14px;"></div>
   <div class="toolbar hidden" id="viDialectBar">
     <label for="viDialect" style="align-self:center;">越南語口音</label>
     <select id="viDialect">
@@ -456,6 +460,8 @@ function updateLangButtons(){
   document.getElementById("btnImportConvertTh").textContent = `📥 匯入並自動生成${L().label}資料（新增不覆蓋）`;
   document.getElementById("convertNote").textContent = `不管你匯入的檔案原本是${L().label}羅馬拼音、${L().label}原生文字、還是其他語言，都會用 AI 判斷意思，補上羅馬拼音＋中英文意思＋發音用的原生文字，加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入、也不會覆蓋掉原本的清單。`;
   document.getElementById("viDialectBar").classList.toggle("hidden", currentLang !== "vi");
+  document.getElementById("thaiAlphabetBar").classList.toggle("hidden", currentLang !== "th");
+  if(currentLang !== "th") document.getElementById("thaiAlphabetPanel").classList.add("hidden");
   document.getElementById("btnGenerateAllTones").classList.toggle("hidden", currentLang !== "th");
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", currentLang !== "th");
 }
@@ -1315,6 +1321,112 @@ async function getAntonyms(text, zh, nativeScript){
   saveAntonymsCache();
   return parsed.antonyms;
 }
+
+// ================= 泰文子音／母音對照表（純靜態參考資料，不是 AI 生成） =================
+// 這種東西是固定不變的語言學事實（44 個子音、classes 怎麼分都是既有規則），
+// 用寫死的表格比每次問 AI 可靠，出錯風險也低很多。母音長短會影響聲調規則
+// 跟意思（很多字只差長短母音），所以放在子音前面。
+const THAI_VOWEL_PAIRS = [
+  { short: "อะ", long: "อา", sound: "a / aa" },
+  { short: "อิ", long: "อี", sound: "i / ii" },
+  { short: "อึ", long: "อื", sound: "ue / ueh" },
+  { short: "อุ", long: "อู", sound: "u / uu" },
+  { short: "เอะ", long: "เอ", sound: "e / eh" },
+  { short: "แอะ", long: "แอ", sound: "ae / aeh" },
+  { short: "โอะ", long: "โอ", sound: "o / oh" },
+  { short: "เอาะ", long: "ออ", sound: "o / aw" }
+];
+const THAI_DIPHTHONGS = [
+  { short: "เอียะ", long: "เอีย", sound: "ia" },
+  { short: "เอือะ", long: "เอือ", sound: "uea" },
+  { short: "อัวะ", long: "อัว", sound: "ua" }
+];
+const THAI_CONSONANT_CLASSES = [
+  { key: "mid", label: "中音 กลาง（Mid Class）", letters: [
+    ["ก","gor gai","g"], ["จ","jor jaan","j"], ["ฎ","dor chada","d"], ["ฏ","tor patak","t"],
+    ["ด","dor dek","d"], ["ต","tor tao","t"], ["บ","bor baimai","b"], ["ป","por pla","p"], ["อ","o ang","（無聲／母音載體）"]
+  ]},
+  { key: "high", label: "高音 สูง（High Class）", letters: [
+    ["ข","khor khai","kh"], ["ฉ","chor ching","ch"], ["ฐ","thor thaan","th"], ["ถ","thor thung","th"],
+    ["ผ","phor phueng","ph"], ["ฝ","for fa","f"], ["ศ","sor sala","s"], ["ษ","sor reusi","s"],
+    ["ส","sor suea","s"], ["ห","hor hip","h"]
+  ]},
+  { key: "low", label: "低音 ต่ำ（Low Class）", letters: [
+    ["ค","khor khwaai","kh"], ["ฆ","khor rakhang","kh"], ["ง","ngor ngu","ng"], ["ช","chor chang","ch"],
+    ["ซ","sor so","s"], ["ฌ","chor choe","ch"], ["ญ","yor ying","y"], ["ฑ","thor montho","th"],
+    ["ฒ","thor phuthao","th"], ["ณ","nor nen","n"], ["ท","thor thahaan","th"], ["ธ","thor thong","th"],
+    ["น","nor nu","n"], ["พ","phor phaan","ph"], ["ฟ","for fan","f"], ["ภ","phor samphao","ph"],
+    ["ม","mor ma","m"], ["ย","yor yak","y"], ["ร","ror ruea","r"], ["ล","lor ling","l"],
+    ["ว","wor waen","w"], ["ฬ","lor chula","l"], ["ฮ","hor nokhuk","h"]
+  ]}
+];
+function renderThaiAlphabetPanel(){
+  const panel = document.getElementById("thaiAlphabetPanel");
+  panel.innerHTML = "";
+
+  const vowelHeader = document.createElement("div");
+  vowelHeader.style.fontWeight = "600";
+  vowelHeader.textContent = "母音（短音／長音，長短會影響聲調規則、也常常是意思不同的關鍵）";
+  panel.appendChild(vowelHeader);
+
+  const vowelGrid = document.createElement("div");
+  vowelGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+  THAI_VOWEL_PAIRS.forEach(v => {
+    const item = document.createElement("div");
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:110px; text-align:center;";
+    item.innerHTML = `<div style="font-size:1.1rem;">${v.short} / ${v.long}</div><div class="usage-note">${v.sound}</div>`;
+    vowelGrid.appendChild(item);
+  });
+  panel.appendChild(vowelGrid);
+
+  const diphHeader = document.createElement("div");
+  diphHeader.style.fontWeight = "600";
+  diphHeader.textContent = "複合母音（滑音，短音／長音）";
+  panel.appendChild(diphHeader);
+
+  const diphGrid = document.createElement("div");
+  diphGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+  THAI_DIPHTHONGS.forEach(v => {
+    const item = document.createElement("div");
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:110px; text-align:center;";
+    item.innerHTML = `<div style="font-size:1.1rem;">${v.short} / ${v.long}</div><div class="usage-note">${v.sound}</div>`;
+    diphGrid.appendChild(item);
+  });
+  panel.appendChild(diphGrid);
+
+  const classColors = { mid: "var(--accent2)", high: "var(--danger)", low: "#c9a227" };
+  THAI_CONSONANT_CLASSES.forEach(cls => {
+    const header = document.createElement("div");
+    header.style.cssText = `font-weight:600; color:${classColors[cls.key]};`;
+    header.textContent = cls.label;
+    panel.appendChild(header);
+
+    const grid = document.createElement("div");
+    grid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+    cls.letters.forEach(([letter, name, sound]) => {
+      const item = document.createElement("div");
+      item.style.cssText = `border:1px solid ${classColors[cls.key]}; border-radius:8px; padding:6px 10px; min-width:80px; text-align:center;`;
+      item.innerHTML = `<div style="font-size:1.2rem;">${letter}</div><div class="usage-note">${name}<br>${sound}</div>`;
+      grid.appendChild(item);
+    });
+    panel.appendChild(grid);
+  });
+
+  const note = document.createElement("div");
+  note.className = "usage-note";
+  note.textContent = "子音分成中／高／低三個 class 是因為同一個聲調符號、在不同 class 的子音上唸出來的聲調不一樣，這張表主要是給你查子音屬於哪個 class 用的參考資料，不是 AI 生成的。";
+  panel.appendChild(note);
+}
+document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () => {
+  const panel = document.getElementById("thaiAlphabetPanel");
+  if(!panel.classList.contains("hidden")){
+    panel.classList.add("hidden");
+    return;
+  }
+  if(panel.innerHTML === "") renderThaiAlphabetPanel();
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 const TONE_MARKS_CACHE_LS = "flashcard_tone_marks_cache_v1"; // 泰文專用：HLMRF 聲調標記，只在泰文模式使用
 let toneMarksCache = {};
