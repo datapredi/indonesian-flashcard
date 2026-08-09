@@ -1360,6 +1360,25 @@ const THAI_CONSONANT_CLASSES = [
     ["ว","wor waen","w"], ["ฬ","lor chula","l"], ["ฮ","hor nokhuk","h"]
   ]}
 ];
+// 做一個小小的「文字＋喇叭」列，點喇叭就照 text 用泰文發音唸出來——子音／
+// 母音對照表本身是寫死的參考資料，但發音還是交給現有的 speak()（跟單字表
+// 共用同一套 GPT/瀏覽器語音邏輯），不用另外自己接 TTS。
+function makeSpeakableLabel(text, fontSize){
+  const wrap = document.createElement("span");
+  wrap.style.cssText = "display:inline-flex; align-items:center; gap:2px;";
+  const label = document.createElement("span");
+  label.style.fontSize = fontSize;
+  label.textContent = text;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "speak-btn";
+  btn.textContent = "🔊";
+  btn.style.cssText = "padding:2px 5px; font-size:0.8rem;";
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(text, btn, "th"); });
+  wrap.appendChild(label);
+  wrap.appendChild(btn);
+  return wrap;
+}
 function renderThaiAlphabetPanel(){
   const panel = document.getElementById("thaiAlphabetPanel");
   panel.innerHTML = "";
@@ -1373,8 +1392,16 @@ function renderThaiAlphabetPanel(){
   vowelGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
   THAI_VOWEL_PAIRS.forEach(v => {
     const item = document.createElement("div");
-    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:110px; text-align:center;";
-    item.innerHTML = `<div style="font-size:1.1rem;">${v.short} / ${v.long}</div><div class="usage-note">${v.sound}</div>`;
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
+    const row = document.createElement("div");
+    row.appendChild(makeSpeakableLabel(v.short, "1.1rem"));
+    row.appendChild(document.createTextNode(" / "));
+    row.appendChild(makeSpeakableLabel(v.long, "1.1rem"));
+    item.appendChild(row);
+    const sound = document.createElement("div");
+    sound.className = "usage-note";
+    sound.textContent = v.sound;
+    item.appendChild(sound);
     vowelGrid.appendChild(item);
   });
   panel.appendChild(vowelGrid);
@@ -1388,8 +1415,16 @@ function renderThaiAlphabetPanel(){
   diphGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
   THAI_DIPHTHONGS.forEach(v => {
     const item = document.createElement("div");
-    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:110px; text-align:center;";
-    item.innerHTML = `<div style="font-size:1.1rem;">${v.short} / ${v.long}</div><div class="usage-note">${v.sound}</div>`;
+    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
+    const row = document.createElement("div");
+    row.appendChild(makeSpeakableLabel(v.short, "1.1rem"));
+    row.appendChild(document.createTextNode(" / "));
+    row.appendChild(makeSpeakableLabel(v.long, "1.1rem"));
+    item.appendChild(row);
+    const sound = document.createElement("div");
+    sound.className = "usage-note";
+    sound.textContent = v.sound;
+    item.appendChild(sound);
     diphGrid.appendChild(item);
   });
   panel.appendChild(diphGrid);
@@ -1405,8 +1440,12 @@ function renderThaiAlphabetPanel(){
     grid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
     cls.letters.forEach(([letter, name, sound]) => {
       const item = document.createElement("div");
-      item.style.cssText = `border:1px solid ${classColors[cls.key]}; border-radius:8px; padding:6px 10px; min-width:80px; text-align:center;`;
-      item.innerHTML = `<div style="font-size:1.2rem;">${letter}</div><div class="usage-note">${name}<br>${sound}</div>`;
+      item.style.cssText = `border:1px solid ${classColors[cls.key]}; border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;`;
+      item.appendChild(makeSpeakableLabel(letter, "1.2rem"));
+      const info = document.createElement("div");
+      info.className = "usage-note";
+      info.innerHTML = `${name}<br>${sound}`;
+      item.appendChild(info);
       grid.appendChild(item);
     });
     panel.appendChild(grid);
@@ -1414,7 +1453,7 @@ function renderThaiAlphabetPanel(){
 
   const note = document.createElement("div");
   note.className = "usage-note";
-  note.textContent = "子音分成中／高／低三個 class 是因為同一個聲調符號、在不同 class 的子音上唸出來的聲調不一樣，這張表主要是給你查子音屬於哪個 class 用的參考資料，不是 AI 生成的。";
+  note.textContent = "子音分成中／高／低三個 class 是因為同一個聲調符號、在不同 class 的子音上唸出來的聲調不一樣，這張表主要是給你查子音屬於哪個 class 用的參考資料，不是 AI 生成的。發音是唸單一個字母本身（沒有搭配其他母音），跟它在真正單字裡的唸法可能會有點不一樣，僅供參考。"
   panel.appendChild(note);
 }
 document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () => {
