@@ -443,6 +443,10 @@ document.getElementById("viDialect").value = viDialect;
 document.getElementById("viDialect").addEventListener("change", (e) => {
   viDialect = e.target.value;
   localStorage.setItem(VI_DIALECT_LS, viDialect);
+  // 聲調標記功能只在南部口音生效（MFRLS 是照南部 5 聲調設計的），切換口音要
+  // 立刻更新按鈕顯示/隱藏，不用重新整理頁面才看得到變化。
+  updateLangButtons();
+  renderList();
 });
 function updateLangButtons(){
   document.querySelectorAll(".lang-btn").forEach(btn => {
@@ -468,8 +472,11 @@ function updateLangButtons(){
   if(currentLang !== "th") document.getElementById("thaiAlphabetPanel").classList.add("hidden");
   document.getElementById("viAlphabetBar").classList.toggle("hidden", currentLang !== "vi");
   if(currentLang !== "vi") document.getElementById("viAlphabetPanel").classList.add("hidden");
-  document.getElementById("btnGenerateAllTones").classList.toggle("hidden", currentLang !== "th");
-  document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", currentLang !== "th");
+  const toneLangActiveTop = currentLang === "th" || (currentLang === "vi" && viDialect === "nam");
+  document.getElementById("btnGenerateAllTones").classList.toggle("hidden", !toneLangActiveTop);
+  document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", !toneLangActiveTop);
+  document.getElementById("btnGenerateAllTones").textContent = "🎵 全部生成聲調標記";
+  document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -2408,6 +2415,8 @@ document.getElementById("btnGenerateAllTones").onclick = async () => {
   if(list.length === 0){ alert("目前沒有勾選任何字，請先勾選要標聲調的字。"); return; }
   const btn = document.getElementById("btnGenerateAllTones");
   const originalLabel = btn.textContent;
+  const cache = currentLang === "vi" ? viToneMarksCache : toneMarksCache;
+  const fn = currentLang === "vi" ? getViToneMarks : getToneMarks;
   btn.disabled = true;
   await acquireWakeLock();
   try{
@@ -2417,7 +2426,7 @@ document.getElementById("btnGenerateAllTones").onclick = async () => {
       const data = lookup(w.text);
       btn.textContent = `生成聲調標記中... (${done}/${list.length})`;
       try{
-        if(!toneMarksCache[w.text]) await getToneMarks(w.text, data ? data.nativeScript : "");
+        if(!cache[w.text]) await fn(w.text, data ? data.nativeScript : "");
       }catch(e){ failCount++; }
       done++;
     }
@@ -2435,6 +2444,8 @@ document.getElementById("btnGenerateAllNativeTones").onclick = async () => {
   if(list.length === 0){ alert("目前沒有勾選任何字，請先勾選要標聲調的字。"); return; }
   const btn = document.getElementById("btnGenerateAllNativeTones");
   const originalLabel = btn.textContent;
+  const cache = currentLang === "vi" ? viNativeToneMarksCache : nativeToneMarksCache;
+  const fn = currentLang === "vi" ? getViNativeToneMarks : getNativeToneMarks;
   btn.disabled = true;
   await acquireWakeLock();
   try{
@@ -2443,16 +2454,16 @@ document.getElementById("btnGenerateAllNativeTones").onclick = async () => {
     let failCount = 0;
     for(const w of list){
       const data = lookup(w.text);
-      btn.textContent = `生成泰文字母聲調中... (${done}/${list.length})`;
+      btn.textContent = `生成原生文字聲調中... (${done}/${list.length})`;
       if(!data || !data.nativeScript){ skipped++; done++; continue; }
       try{
-        if(!nativeToneMarksCache[w.text]) await getNativeToneMarks(w.text, data.nativeScript);
+        if(!cache[w.text]) await fn(w.text, data.nativeScript);
       }catch(e){ failCount++; }
       done++;
     }
     btn.disabled = false;
     btn.textContent = originalLabel;
-    alert(`完成，處理了 ${done} 個字。${skipped > 0 ? `有 ${skipped} 個字還沒有泰文原生文字資料，跳過了。` : ""}${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
+    alert(`完成，處理了 ${done} 個字。${skipped > 0 ? `有 ${skipped} 個字還沒有原生文字資料，跳過了。` : ""}${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
   } finally {
     releaseWakeLock();
   }
