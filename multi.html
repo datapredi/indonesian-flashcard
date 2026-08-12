@@ -1376,7 +1376,11 @@ const THAI_CONSONANT_CLASSES = [
 // 做一個小小的「文字＋喇叭」列，點喇叭就照 text 用泰文發音唸出來——子音／
 // 母音對照表本身是寫死的參考資料，但發音還是交給現有的 speak()（跟單字表
 // 共用同一套 GPT/瀏覽器語音邏輯），不用另外自己接 TTS。
-function makeSpeakableLabel(text, fontSize, lang){
+// speakText 可選：顯示的文字（text）跟實際唸出來的文字不用一定一樣，
+// 例如孤立的單一母音字母 TTS 常常唸不準，改唸一個包著這個母音的常見單字
+// 準確度好很多，但畫面上還是要顯示字母本身，不是顯示那個範例單字。
+// 沒特別給 speakText 就照舊唸 text 本身。
+function makeSpeakableLabel(text, fontSize, lang, speakText){
   const wrap = document.createElement("span");
   wrap.style.cssText = "display:inline-flex; align-items:center; gap:2px;";
   const label = document.createElement("span");
@@ -1387,7 +1391,7 @@ function makeSpeakableLabel(text, fontSize, lang){
   btn.className = "speak-btn";
   btn.textContent = "🔊";
   btn.style.cssText = "padding:2px 5px; font-size:0.8rem;";
-  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(text, btn, lang); });
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang); });
   wrap.appendChild(label);
   wrap.appendChild(btn);
   return wrap;
@@ -1483,23 +1487,27 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
 // ================= 越南文母音／子音對照表（南部/胡志明市口音，純靜態參考資料） =================
 // tones：M/F/R/L/S 五個聲調字母對應的重音符號寫法，L 是南部合併的 hỏi/ngã
 // 兩種拼法（念起來一樣，但字還是要拼對，所以兩個都列出來）。
+// example：一個常見、單獨拿掉聲調也還算清楚的字，TTS 唸孤立的單一母音字母
+// （尤其是 ă/â/ơ/ư 這種帶變音符號、平常不會單獨出現的字母）常常會唸不準或
+// 亂猜，包在一個真正常見的單字裡唸，準確度好非常多，所以 🔊 按鈕實際上是
+// 唸這個範例字，不是唸孤立的字母本身；字母本身還是照樣大大顯示在上面。
 const VI_VOWELS = [
-  { letter: "a", sound: "a（短）", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
-  { letter: "ă", sound: "a（更短）", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
-  { letter: "â", sound: "ơ（短）", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
-  { letter: "e", sound: "ae", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
-  { letter: "ê", sound: "e", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
-  { letter: "i / y", sound: "i", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } },
-  { letter: "o", sound: "o（開）", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
-  { letter: "ô", sound: "o（閉，像喔）", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
-  { letter: "ơ", sound: "er（不捲舌）", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
-  { letter: "u", sound: "u", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
-  { letter: "ư", sound: "跟 u 嘴型一樣但不圓唇", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } }
+  { letter: "a", sound: "a（短）", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
+  { letter: "ă", sound: "a（更短）", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
+  { letter: "â", sound: "ơ（短）", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
+  { letter: "e", sound: "ae", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
+  { letter: "ê", sound: "e", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
+  { letter: "i / y", sound: "i", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } },
+  { letter: "o", sound: "o（開）", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
+  { letter: "ô", sound: "o（閉，像喔）", example: "tô", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
+  { letter: "ơ", sound: "er（不捲舌）", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
+  { letter: "u", sound: "u", example: "thu", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
+  { letter: "ư", sound: "跟 u 嘴型一樣但不圓唇", example: "thư", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } }
 ];
 const VI_DIPHTHONGS = [
-  { form: "ia / iê / yê", sound: "ia" },
-  { form: "ua / uô", sound: "ua" },
-  { form: "ưa / ươ", sound: "uea" }
+  { form: "ia / iê / yê", sound: "ia", example: "chia" },
+  { form: "ua / uô", sound: "ua", example: "mua" },
+  { form: "ưa / ươ", sound: "uea", example: "chưa" }
 ];
 const VI_CONSONANTS = [
   ["b","b"], ["c / k / q","k"], ["ch","tʃ（接近 j）"], ["d","南部念像 y"], ["đ","d"],
@@ -1546,10 +1554,10 @@ function renderViAlphabetPanel(){
   VI_VOWELS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:170px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi"));
+    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi", v.example));
     const sound = document.createElement("div");
     sound.className = "usage-note";
-    sound.textContent = v.sound;
+    sound.textContent = v.example ? `${v.sound}（🔊 唸範例字「${v.example}」）` : v.sound;
     item.appendChild(sound);
     if(v.tones) item.appendChild(renderToneRow(v.tones));
     vowelGrid.appendChild(item);
@@ -1566,10 +1574,10 @@ function renderViAlphabetPanel(){
   VI_DIPHTHONGS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi"));
+    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi", v.example));
     const sound = document.createElement("div");
     sound.className = "usage-note";
-    sound.textContent = v.sound;
+    sound.textContent = v.example ? `${v.sound}（🔊 唸範例字「${v.example}」）` : v.sound;
     item.appendChild(sound);
     diphGrid.appendChild(item);
   });
