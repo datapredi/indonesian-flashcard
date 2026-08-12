@@ -2080,9 +2080,24 @@ document.getElementById("btnRegenerateAudioById").addEventListener("click", asyn
     btn.textContent = originalLabel;
   }
 });
+function stripEdgePunctuation(s){
+  return s.trim().replace(/^[?？!！.。,，;；:："“”'‘’\-]+|[?？!！.。,，;；:："“”'‘’\-]+$/g, "");
+}
 function renderTappableSentence(sentence, sentenceNativeScript){
   const wrap = document.createElement("span");
   const tokens = sentence.split(/(\s+)/);
+  // id（羅馬拼音）跟 nativeScript（原生文字）本來就是同一句話的兩種寫法，
+  // 越南文這種有空白分字的語言，字的順序、字數通常完全對得上，可以直接
+  // 照位置一個蘿蔔一個坑配對，不用另外問 AI（免費、也不用等）。字數對不上
+  // （常見於泰文——泰文原生文字本來就沒有空白，跟羅馬拼音字數不會一樣）
+  // 才在點擊當下退回去問 AI。
+  let nativeWords = null;
+  if(sentenceNativeScript){
+    const tappableCount = tokens.filter(t => t && !/^\s+$/.test(t) && t.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "")).length;
+    const candidate = sentenceNativeScript.trim().split(/\s+/).filter(Boolean);
+    if(candidate.length === tappableCount) nativeWords = candidate;
+  }
+  let wordIndex = 0;
   tokens.forEach(tok => {
     if(tok === "" || /^\s+$/.test(tok)){
       wrap.appendChild(document.createTextNode(tok));
@@ -2093,6 +2108,8 @@ function renderTappableSentence(sentence, sentenceNativeScript){
       wrap.appendChild(document.createTextNode(tok));
       return;
     }
+    const positionalNative = nativeWords ? stripEdgePunctuation(nativeWords[wordIndex]) : null;
+    wordIndex++;
     const wSpan = document.createElement("span");
     wSpan.className = "usage-word" + (isWordInList(clean) ? " in-list" : "");
     wSpan.textContent = tok;
@@ -2101,33 +2118,36 @@ function renderTappableSentence(sentence, sentenceNativeScript){
       e.preventDefault(); e.stopPropagation();
       if(wSpan.classList.contains("in-list")){
         // 拼音撞在一起、但背後其實是不同字的情況很常見（越南文「đường phố」
-        // 街道裡的 phố，拿掉聲調就跟已經加過的 phở 河粉拼音一樣）。有原生
-        // 文字句子可以核對、也有 API Key 的話，先問一次 AI 這個字在這句話
-        // 裡實際對應的原生文字，跟已經加過的字比對，確認是不是真的同一個字。
-        if(L().hasScript && sentenceNativeScript && getApiKey()){
-          wSpan.style.opacity = "0.5";
-          try{
-            const resolved = await getWordInContext(clean, sentence, sentenceNativeScript);
-            if(resolved && resolved.nativeScript && !isNativeScriptInList(resolved.nativeScript)){
-              // 背後不是同一個字，不能當成重複跳過去——改成新增這個字，
-              // 順便把剛剛問到的原生文字/中英文意思直接存進去，不用使用者
-              // 之後再手動補資料。跟 convert-import 一樣的碰撞安全編號規則。
-              let text = clean;
-              if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
-                let suffix = 2;
-                while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
-                text = `${text} (${suffix})`;
-              }
-              if(addWordToList(text)){
+        // 街道裡的 phố，拿掉聲調就跟已經加過的 phở 河粉拼音一樣），不能只憑
+        // 拼音相同就當作是同一個字，要核對背後真正的原生文字是不是一樣。
+        if(L().hasScript && getApiKey()){
+          let resolved = positionalNative ? { nativeScript: positionalNative } : null;
+          if(!resolved && sentenceNativeScript){
+            wSpan.style.opacity = "0.5";
+            try{ resolved = await getWordInContext(clean, sentence, sentenceNativeScript); }
+            catch(err){ /* AI 核對失敗就照舊直接跳過去，不要卡住使用者 */ }
+            wSpan.style.opacity = "1";
+          }
+          if(resolved && resolved.nativeScript && !isNativeScriptInList(resolved.nativeScript)){
+            // 背後不是同一個字，不能當成重複跳過去——改成新增這個字。位置
+            // 對應算出來的只有 nativeScript（沒有 zh/en，這不用額外呼叫 AI，
+            // 免費換來的資訊本來就有限），問 AI 那條路徑則會順便拿到 zh/en
+            // 一起存進去，兩種情況都跟 convert-import 一樣用碰撞安全編號。
+            let text = clean;
+            if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
+              let suffix = 2;
+              while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+              text = `${text} (${suffix})`;
+            }
+            if(addWordToList(text)){
+              if(resolved.zh || resolved.en){
                 customDB[text] = { nativeScript: resolved.nativeScript, zh: resolved.zh, en: resolved.en };
                 saveCustomDB();
-                wSpan.classList.add("in-list");
               }
-              wSpan.style.opacity = "1";
-              return;
+              wSpan.classList.add("in-list");
             }
-          }catch(err){ /* AI 核對失敗就照舊直接跳過去，不要卡住使用者 */ }
-          wSpan.style.opacity = "1";
+            return;
+          }
         }
         jumpToWord(clean);
         return;
