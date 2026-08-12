@@ -1907,6 +1907,40 @@ function isNativeScriptInList(nativeScript){
     return d && d.nativeScript === nativeScript;
   });
 }
+
+// 點例句裡的字，判斷「是不是已經在單字表裡」原本只比對拼音字串，但拼音撞在
+// 一起、背後其實是不同字的情況很常見（例如越南文 "đường phố" 街道裡的 "phố"
+// 拿掉聲調就是 "pho"，會被誤判成單字表裡已經有的 "phở" 河粉）。這個函式在
+// 真的撞到拼音的時候，才額外問一次 AI：根據這句話的上下文，這個字實際對應
+// 的原生文字（含聲調符號）是什麼，再拿去跟 isNativeScriptInList 比對，
+// 這樣才知道是真的重複、還是拼音剛好撞在一起的不同字。用句子＋這個字組合
+// 當快取 key（同一個字在不同句子裡上下文可能不同，不能只用字本身快取）。
+const WORD_IN_CONTEXT_CACHE_LS = "flashcard_word_in_context_cache_v1";
+let wordInContextCache = {};
+try{ wordInContextCache = JSON.parse(localStorage.getItem(lsKey(WORD_IN_CONTEXT_CACHE_LS))) || {}; }catch(e){ wordInContextCache = {}; }
+function saveWordInContextCache(){ localStorage.setItem(lsKey(WORD_IN_CONTEXT_CACHE_LS), JSON.stringify(wordInContextCache)); }
+async function getWordInContext(cleanRomanized, sentenceRomanized, sentenceNativeScript){
+  const key = `${cleanRomanized.toLowerCase()}||${sentenceRomanized}`;
+  if(wordInContextCache[key]) return wordInContextCache[key];
+  const schema = {
+    type: "object",
+    properties: {
+      nativeScript: { type: "string" },
+      zh: { type: "string" },
+      en: { type: "string" }
+    },
+    required: ["nativeScript", "zh", "en"],
+    additionalProperties: false
+  };
+  const prompt = `你是${L().teacher}。這是一句${L().label}例句的羅馬拼音（不含聲調符號）：「${sentenceRomanized}」，對應的${L().label}原生文字是：「${sentenceNativeScript}」。
+
+請找出這句話裡，對應到「${cleanRomanized}」（羅馬拼音，可能省略了聲調）這個字的部分，回傳：
+{ nativeScript：那個字對應的${L().label}原生文字（從上面給的原生文字句子裡摘取正確對應的部分，保留正確的聲調符號拼字）, zh：那個字在這句話裡的中文意思, en：那個字在這句話裡的英文意思 }`;
+  const parsed = await callClaude(prompt, schema, 512);
+  wordInContextCache[key] = parsed;
+  saveWordInContextCache();
+  return parsed;
+}
 // 點已經在單字表裡的字：跳到那個字在清單裡的位置並閃一下提示，而不是靜靜沒反應。
 // 如果目前的搜尋/篩選/只顯示已選取/只顯示比對清單會讓那個字不在畫面上，
 // 就先清掉篩選讓它顯示出來，再捲過去。
@@ -2038,7 +2072,7 @@ document.getElementById("btnRegenerateAudioById").addEventListener("click", asyn
     btn.textContent = originalLabel;
   }
 });
-function renderTappableSentence(sentence){
+function renderTappableSentence(sentence, sentenceNativeScript){
   const wrap = document.createElement("span");
   const tokens = sentence.split(/(\s+)/);
   tokens.forEach(tok => {
@@ -2055,9 +2089,41 @@ function renderTappableSentence(sentence){
     wSpan.className = "usage-word" + (isWordInList(clean) ? " in-list" : "");
     wSpan.textContent = tok;
     wSpan.title = isWordInList(clean) ? "已在單字表裡，點一下跳過去看" : "點一下加入單字表";
-    wSpan.addEventListener("click", (e) => {
+    wSpan.addEventListener("click", async (e) => {
       e.preventDefault(); e.stopPropagation();
-      if(wSpan.classList.contains("in-list")){ jumpToWord(clean); return; }
+      if(wSpan.classList.contains("in-list")){
+        // 拼音撞在一起、但背後其實是不同字的情況很常見（越南文「đường phố」
+        // 街道裡的 phố，拿掉聲調就跟已經加過的 phở 河粉拼音一樣）。有原生
+        // 文字句子可以核對、也有 API Key 的話，先問一次 AI 這個字在這句話
+        // 裡實際對應的原生文字，跟已經加過的字比對，確認是不是真的同一個字。
+        if(L().hasScript && sentenceNativeScript && getApiKey()){
+          wSpan.style.opacity = "0.5";
+          try{
+            const resolved = await getWordInContext(clean, sentence, sentenceNativeScript);
+            if(resolved && resolved.nativeScript && !isNativeScriptInList(resolved.nativeScript)){
+              // 背後不是同一個字，不能當成重複跳過去——改成新增這個字，
+              // 順便把剛剛問到的原生文字/中英文意思直接存進去，不用使用者
+              // 之後再手動補資料。跟 convert-import 一樣的碰撞安全編號規則。
+              let text = clean;
+              if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
+                let suffix = 2;
+                while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+                text = `${text} (${suffix})`;
+              }
+              if(addWordToList(text)){
+                customDB[text] = { nativeScript: resolved.nativeScript, zh: resolved.zh, en: resolved.en };
+                saveCustomDB();
+                wSpan.classList.add("in-list");
+              }
+              wSpan.style.opacity = "1";
+              return;
+            }
+          }catch(err){ /* AI 核對失敗就照舊直接跳過去，不要卡住使用者 */ }
+          wSpan.style.opacity = "1";
+        }
+        jumpToWord(clean);
+        return;
+      }
       if(addWordToList(clean)) wSpan.classList.add("in-list");
     });
     wrap.appendChild(wSpan);
@@ -2073,7 +2139,7 @@ function renderUsagePanel(panel, examples){
 
     const idLine = document.createElement("div");
     idLine.className = "usage-id";
-    idLine.appendChild(renderTappableSentence(ex.id));
+    idLine.appendChild(renderTappableSentence(ex.id, ex.nativeScript));
     const speakBtn = document.createElement("button");
     speakBtn.type = "button";
     speakBtn.className = "speak-btn";
