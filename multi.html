@@ -2213,7 +2213,8 @@ function renderUsagePanel(panel, examples){
     addSentenceBtn.type = "button";
     addSentenceBtn.className = "speak-btn";
     const alreadyAdded = isWordInList(ex.id);
-    addSentenceBtn.textContent = alreadyAdded ? "已加入整句" : "➕ 加入單字表";
+    addSentenceBtn.textContent = alreadyAdded ? "✓" : "➕";
+    addSentenceBtn.title = alreadyAdded ? "已加入整句" : "把這句話整句加入單字表";
     if(alreadyAdded) addSentenceBtn.disabled = true;
     addSentenceBtn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -2228,7 +2229,8 @@ function renderUsagePanel(panel, examples){
           customDB[text] = { nativeScript: ex.nativeScript, zh: ex.zh };
           saveCustomDB();
         }
-        addSentenceBtn.textContent = "已加入整句";
+        addSentenceBtn.textContent = "✓";
+        addSentenceBtn.title = "已加入整句";
         addSentenceBtn.disabled = true;
       }
     });
