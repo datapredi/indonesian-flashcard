@@ -473,7 +473,7 @@ function updateLangButtons(){
   if(currentLang !== "th") document.getElementById("thaiAlphabetPanel").classList.add("hidden");
   document.getElementById("viAlphabetBar").classList.toggle("hidden", currentLang !== "vi");
   if(currentLang !== "vi") document.getElementById("viAlphabetPanel").classList.add("hidden");
-  const toneLangActiveTop = currentLang === "th" || (currentLang === "vi" && viDialect === "nam");
+  const toneLangActiveTop = isToneLangActive();
   document.getElementById("btnGenerateAllTones").classList.toggle("hidden", !toneLangActiveTop);
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", !toneLangActiveTop);
   document.getElementById("btnGenerateAllTones").textContent = "🎵 全部生成聲調標記";
@@ -1630,6 +1630,14 @@ document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
+
+// 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。共用這個判斷，
+// 單字表的按鈕跟跑步聽力模式要不要顯示聲調標記都靠它，不要各自重複判斷邏輯。
+function isToneLangActive(){
+  return currentLang === "th" || (currentLang === "vi" && viDialect === "nam");
+}
+function toneMarksCacheForCurrentLang(){ return currentLang === "vi" ? viToneMarksCache : toneMarksCache; }
+function getToneMarksFnForCurrentLang(){ return currentLang === "vi" ? getViToneMarks : getToneMarks; }
 
 const TONE_MARKS_CACHE_LS = "flashcard_tone_marks_cache_v1"; // 泰文專用：HLMRF 聲調標記，只在泰文模式使用
 let toneMarksCache = {};
@@ -2932,8 +2940,8 @@ function createWordItem(w){
 
   // 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。兩種語言
   // 用同一套按鈕/面板/快取機制，只是呼叫的 AI 函式跟顯示文字不同。
-  const toneLangActive = currentLang === "th" || (currentLang === "vi" && viDialect === "nam");
-  const getToneMarksFn = currentLang === "vi" ? getViToneMarks : getToneMarks;
+  const toneLangActive = isToneLangActive();
+  const getToneMarksFn = getToneMarksFnForCurrentLang();
   const getNativeToneMarksFn = currentLang === "vi" ? getViNativeToneMarks : getNativeToneMarks;
   const toneLetterLabel = currentLang === "vi" ? "MFRLS" : "HLMRF";
 
@@ -4312,7 +4320,20 @@ async function runListenLoop(){
     listenSkipRequested = false;
     document.getElementById("btnListenKnowIt").disabled = false;
     document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
-    document.getElementById("listenWord").textContent = w.text;
+    // 泰文／越南文（南部口音）跑步模式也顯示聲調標記，不用只靠耳朵聽——先看
+    // 快取有沒有（用過 🎵 按鈕或首頁批次生成過的話就有），沒有才問一次 AI，
+    // 失敗或沒有 API Key 就顯示原本的羅馬拼音，不會卡住整個播放流程。
+    let displayWord = w.text;
+    if(isToneLangActive() && getApiKey()){
+      const toneCache = toneMarksCacheForCurrentLang();
+      if(toneCache[w.text]){
+        displayWord = toneCache[w.text];
+      } else {
+        try{ displayWord = await getToneMarksFnForCurrentLang()(w.text, data ? data.nativeScript : ""); }
+        catch(err){ /* 拿不到聲調標記就先顯示原本的羅馬拼音，不要卡住跑步模式 */ }
+      }
+    }
+    document.getElementById("listenWord").textContent = displayWord;
     document.getElementById("listenZh").textContent = "";
 
     // 播放這個字（重複3次＋思考停頓＋中文意思）獨立包成一個函式，中途要提早
