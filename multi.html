@@ -2243,12 +2243,15 @@ function renderTappableSentence(sentence, sentenceNativeScript){
     e.preventDefault(); e.stopPropagation();
     if(selectedIndices.size === 0) return;
     const ordered = [...selectedIndices].sort((a, b) => a - b);
-    let text = ordered.map(i => wordMeta[i].clean).join(" ").trim();
+    const text = ordered.map(i => wordMeta[i].clean).join(" ").trim();
     if(!text) return;
-    if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
-      let suffix = 2;
-      while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
-      text = `${text} (${suffix})`;
+    // 選的這幾個字組成的片語如果一字不差已經存在，就直接跳過去，不要加編號
+    // 生出一個重複的新項目——這是完全一樣的片語，不是拼音撞到的不同字。
+    const existing = allWords.find(w => w.text.toLowerCase() === text.toLowerCase());
+    if(existing){
+      exitPhraseMode();
+      jumpToWordObj(existing);
+      return;
     }
     if(addWordToList(text)) exitPhraseMode();
   });
