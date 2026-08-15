@@ -2213,7 +2213,7 @@ function renderUsagePanel(panel, examples){
     addSentenceBtn.type = "button";
     addSentenceBtn.className = "speak-btn";
     const alreadyAdded = isWordInList(ex.id);
-    addSentenceBtn.textContent = alreadyAdded ? "已加入整句" : "➕ 這句值得背，加入單字表";
+    addSentenceBtn.textContent = alreadyAdded ? "已加入整句" : "➕ 加入單字表";
     if(alreadyAdded) addSentenceBtn.disabled = true;
     addSentenceBtn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
