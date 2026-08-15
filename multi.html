@@ -1959,6 +1959,18 @@ function jumpToWord(clean){
   if(!target) return;
   jumpToWordObj(target);
 }
+// 已經確認過背後原生文字真的一樣（不是只憑拼音）的情況下用這個跳轉——拼音
+// 相同的字表裡可能同時存在好幾個（例如越南文 đặt「點餐」、đắt「貴」都拼成
+// dat，分別存成 dat、dat (2)），純文字找可能找到錯的那個，一定要照原生文字
+// 去找真正對應的那一筆，找不到才退回純文字找當保底。
+function jumpToWordByNativeScript(nativeScript, fallbackClean){
+  const target = allWords.find(w => {
+    const d = lookup(w.text);
+    return d && d.nativeScript === nativeScript;
+  });
+  if(target){ jumpToWordObj(target); return; }
+  jumpToWord(fallbackClean);
+}
 // 用編號跳轉（首頁「跳到編號」框框用）：跟點例句裡的字跳過去共用同一套
 // 篩選記憶／捲動／閃爍邏輯，只是找目標字的方式不同（用 id 而不是拼字）。
 function jumpToWordById(id){
@@ -2128,7 +2140,16 @@ function renderTappableSentence(sentence, sentenceNativeScript){
             catch(err){ /* AI 核對失敗就照舊直接跳過去，不要卡住使用者 */ }
             wSpan.style.opacity = "1";
           }
-          if(resolved && resolved.nativeScript && !isNativeScriptInList(resolved.nativeScript)){
+          if(resolved && resolved.nativeScript){
+            if(isNativeScriptInList(resolved.nativeScript)){
+              // 真的是同一個字（背後原生文字一樣）——但拼音相同的字，單字表
+              // 裡可能同時存在好幾個不同的字（例如越南文 đặt「點餐」、đắt
+              // 「貴」都拼成 dat，分別存成 dat、dat (2)），這裡一定要照
+              // 剛剛核對出來的原生文字去找對應那一筆，不能再用純拼音找，
+              // 不然還是可能跳到同音但意思不同的另一個字。
+              jumpToWordByNativeScript(resolved.nativeScript, clean);
+              return;
+            }
             // 背後不是同一個字，不能當成重複跳過去——改成新增這個字。位置
             // 對應算出來的只有 nativeScript（沒有 zh/en，這不用額外呼叫 AI，
             // 免費換來的資訊本來就有限），問 AI 那條路徑則會順便拿到 zh/en
