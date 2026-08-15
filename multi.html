@@ -71,6 +71,7 @@
   .usage-word{cursor:pointer; border-radius:4px; padding:0 1px;}
   .usage-word:hover{background:var(--bg);}
   .usage-word.in-list{color:var(--accent2); text-decoration:underline; text-decoration-style:dotted;}
+  .usage-word.phrase-selected{background:var(--accent); color:#fff;}
   .item.jump-highlight{animation:jumpFlash 1.6s ease-out;}
   @keyframes jumpFlash{ 0%{background:rgba(255,196,0,0.55);} 100%{background:transparent;} }
   .jump-back-btn{position:fixed; right:16px; bottom:16px; z-index:50; border-radius:999px; padding:10px 16px; box-shadow:0 2px 10px rgba(0,0,0,0.25);}
@@ -952,9 +953,12 @@ let selected = savedSelected
 let showSelectedOnly = false;
 let sortAZ = false;
 // 比對清單跟「已選取（練習用）」故意分開——這個只是暫時釘選幾個字方便你跨搜尋
-// 收集起來比對發音，不會動到你原本為了練習勾選的那份清單。只存在這次瀏覽階段，
-// 重新整理頁面就會清空，不用另外存 localStorage。
-let compareSet = new Set();
+// 收集起來比對發音，不會動到你原本為了練習勾選的那份清單。原本設計成只存在
+// 當次瀏覽階段，但使用者實際用起來會希望重新整理、關掉再打開都還在，所以
+// 改成跟已學會/⚠️標記一樣存進 localStorage。
+const COMPARE_SET_LS = "flashcard_compare_set_v1";
+let compareSet = loadMasteredSet(lsKey(COMPARE_SET_LS));
+function saveCompareSet(){ saveMasteredSet(lsKey(COMPARE_SET_LS), compareSet); }
 let showCompareOnly = false;
 let showPronFlagOnly = false;
 // 每次「匯入並自動生成資料」成功後自動記住這批處理到的字，畫面預設只顯示
@@ -2105,6 +2109,8 @@ function stripEdgePunctuation(s){
   return s.trim().replace(/^[?？!！.。,，;；:："“”'‘’\-]+|[?？!！.。,，;；:："“”'‘’\-]+$/g, "");
 }
 function renderTappableSentence(sentence, sentenceNativeScript){
+  const container = document.createElement("span");
+  container.style.cssText = "display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap;";
   const wrap = document.createElement("span");
   const tokens = sentence.split(/(\s+)/);
   // id（羅馬拼音）跟 nativeScript（原生文字）本來就是同一句話的兩種寫法，
@@ -2118,6 +2124,13 @@ function renderTappableSentence(sentence, sentenceNativeScript){
     const candidate = sentenceNativeScript.trim().split(/\s+/).filter(Boolean);
     if(candidate.length === tappableCount) nativeWords = candidate;
   }
+  // 片語模式：有些字要好幾個連在一起才是完整的意思（例如越南文「thế nào」
+  // 才是完整的「怎麼樣」，單獨點 the 或 nào 都不對）。開啟這個模式後，點字
+  // 只是切換選取（反白），不會立刻加入/跳轉，選好之後按 ➕ 才把選到的字
+  // 依照原本在句子裡的順序組成一個片語，一起加進單字表。
+  let phraseMode = false;
+  const selectedIndices = new Set();
+  const wordMeta = [];
   let wordIndex = 0;
   tokens.forEach(tok => {
     if(tok === "" || /^\s+$/.test(tok)){
@@ -2129,14 +2142,27 @@ function renderTappableSentence(sentence, sentenceNativeScript){
       wrap.appendChild(document.createTextNode(tok));
       return;
     }
-    const positionalNative = nativeWords ? stripEdgePunctuation(nativeWords[wordIndex]) : null;
+    const myIndex = wordIndex;
+    const positionalNative = nativeWords ? stripEdgePunctuation(nativeWords[myIndex]) : null;
     wordIndex++;
     const wSpan = document.createElement("span");
     wSpan.className = "usage-word" + (isWordInList(clean) ? " in-list" : "");
     wSpan.textContent = tok;
     wSpan.title = isWordInList(clean) ? "已在單字表裡，點一下跳過去看" : "點一下加入單字表";
+    wordMeta.push({ clean, wSpan });
     wSpan.addEventListener("click", async (e) => {
       e.preventDefault(); e.stopPropagation();
+      if(phraseMode){
+        if(selectedIndices.has(myIndex)){
+          selectedIndices.delete(myIndex);
+          wSpan.classList.remove("phrase-selected");
+        } else {
+          selectedIndices.add(myIndex);
+          wSpan.classList.add("phrase-selected");
+        }
+        confirmBtn.style.display = selectedIndices.size > 0 ? "" : "none";
+        return;
+      }
       if(wSpan.classList.contains("in-list")){
         // 拼音撞在一起、但背後其實是不同字的情況很常見（越南文「đường phố」
         // 街道裡的 phố，拿掉聲調就跟已經加過的 phở 河粉拼音一樣），不能只憑
@@ -2186,7 +2212,51 @@ function renderTappableSentence(sentence, sentenceNativeScript){
     });
     wrap.appendChild(wSpan);
   });
-  return wrap;
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "speak-btn";
+  toggleBtn.textContent = "🔗";
+  toggleBtn.title = "片語模式：點好幾個字組成一個片語一起加入單字表";
+  const confirmBtn = document.createElement("button");
+  confirmBtn.type = "button";
+  confirmBtn.className = "speak-btn";
+  confirmBtn.textContent = "➕";
+  confirmBtn.title = "把選取的字依照原本順序組成片語，加入單字表";
+  confirmBtn.style.display = "none";
+  function exitPhraseMode(){
+    phraseMode = false;
+    toggleBtn.style.background = "";
+    toggleBtn.style.color = "";
+    selectedIndices.forEach(i => wordMeta[i].wSpan.classList.remove("phrase-selected"));
+    selectedIndices.clear();
+    confirmBtn.style.display = "none";
+  }
+  toggleBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(phraseMode){ exitPhraseMode(); return; }
+    phraseMode = true;
+    toggleBtn.style.background = "var(--accent)";
+    toggleBtn.style.color = "#fff";
+  });
+  confirmBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(selectedIndices.size === 0) return;
+    const ordered = [...selectedIndices].sort((a, b) => a - b);
+    let text = ordered.map(i => wordMeta[i].clean).join(" ").trim();
+    if(!text) return;
+    if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
+      let suffix = 2;
+      while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+      text = `${text} (${suffix})`;
+    }
+    if(addWordToList(text)) exitPhraseMode();
+  });
+
+  container.appendChild(wrap);
+  container.appendChild(toggleBtn);
+  container.appendChild(confirmBtn);
+  return container;
 }
 
 function renderUsagePanel(panel, examples){
@@ -3024,6 +3094,7 @@ function createWordItem(w){
   compareBtn.addEventListener("click", (e) => {
     e.preventDefault(); e.stopPropagation();
     if(compareSet.has(w.id)) compareSet.delete(w.id); else compareSet.add(w.id);
+    saveCompareSet();
     refreshCompareBtn();
     updateCompareToggleLabel();
     if(showCompareOnly) renderList();
@@ -3327,10 +3398,9 @@ document.getElementById("btnRenumber").onclick = () => {
   quizMasteredIds = remapIdSet(quizMasteredIds);
   pronFlagIds = remapIdSet(pronFlagIds);
   useRecordingIds = remapIdSet(useRecordingIds);
-  // 比對清單、剛匯入清單只是這次瀏覽階段暫時用的標記，編號全部變了之後
-  // 對應不上，直接清空比留著錯誤的對應關係安全。
-  compareSet = new Set();
-  showCompareOnly = false;
+  compareSet = remapIdSet(compareSet);
+  // 剛匯入清單只是這次瀏覽階段暫時用的標記，編號全部變了之後對應不上，
+  // 直接清空比留著錯誤的對應關係安全。
   newlyImportedIds = new Set();
   showNewlyImportedOnly = false;
   saveWordList(allWords);
@@ -3339,6 +3409,7 @@ document.getElementById("btnRenumber").onclick = () => {
   saveQuizMastered();
   savePronFlag();
   saveUseRecordingIds();
+  saveCompareSet();
   updateCompareToggleLabel();
   updateNewlyImportedToggleLabel();
   renderList();
@@ -3374,6 +3445,7 @@ document.getElementById("btnToggleCompareOnly").addEventListener("click", () => 
 document.getElementById("btnClearCompare").addEventListener("click", () => {
   if(compareSet.size === 0) return;
   compareSet = new Set();
+  saveCompareSet();
   showCompareOnly = false;
   updateCompareToggleLabel();
   renderList();
