@@ -988,6 +988,15 @@ function lookup(text){
   const db = currentLang === "id" ? WORD_DB : EMPTY_DB;
   return customDB[text] || db[text] || null;
 }
+// 「AI 自動生成缺少的翻譯」原本只看有沒有資料（lookup 傳回真值就跳過），
+// 但有幾個地方（例句上下文核對、加整句到單字表）為了省一次額外的 AI 呼叫，
+// 只會先存 nativeScript/zh 這種局部資料，沒有 quizEn/correct/distractors，
+// 用 !lookup(w.text) 判斷「缺資料」會誤判成「已經完整」而永遠不會被
+// 這個按鈕補齊，測驗模式也會少資料壞掉。改用這個檢查資料是不是真的完整。
+function needsGeneration(w){
+  const data = lookup(w.text);
+  return !data || !data.quizEn;
+}
 
 // 跨語言查詢：不同語言的單字表是各自獨立的，沒有天生的「這是同一個概念」連結
 // （編號在不同語言之間也對不上，見使用者跟我的討論），唯一能拿來比對的線索是
@@ -2196,6 +2205,35 @@ function renderUsagePanel(panel, examples){
     speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak((L().hasScript && ex.nativeScript) || ex.id, speakBtn); });
     idLine.appendChild(speakBtn);
 
+    // 覺得整句話值得背（不只是單一個字），直接把整句加進單字表，可以像
+    // 其他字一樣勾選複習、跑步聽力模式播放。先存 nativeScript/zh（已經有
+    // 現成資料，不用多問 AI），quizEn/en 等測驗需要的完整資料留給「AI
+    // 自動生成缺少的翻譯」按鈕之後補（needsGeneration 會抓到這種半成品）。
+    const addSentenceBtn = document.createElement("button");
+    addSentenceBtn.type = "button";
+    addSentenceBtn.className = "speak-btn";
+    const alreadyAdded = isWordInList(ex.id);
+    addSentenceBtn.textContent = alreadyAdded ? "已加入整句" : "➕ 這句值得背，加入單字表";
+    if(alreadyAdded) addSentenceBtn.disabled = true;
+    addSentenceBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      let text = ex.id.trim();
+      if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
+        let suffix = 2;
+        while(allWords.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+        text = `${text} (${suffix})`;
+      }
+      if(addWordToList(text)){
+        if(ex.nativeScript || ex.zh){
+          customDB[text] = { nativeScript: ex.nativeScript, zh: ex.zh };
+          saveCustomDB();
+        }
+        addSentenceBtn.textContent = "已加入整句";
+        addSentenceBtn.disabled = true;
+      }
+    });
+    idLine.appendChild(addSentenceBtn);
+
     const zhLine = document.createElement("div");
     zhLine.className = "usage-zh";
     zhLine.textContent = ex.zh;
@@ -2441,7 +2479,7 @@ document.getElementById("btnGenerate").onclick = async () => {
     alert("請先輸入並儲存 API Key。");
     return;
   }
-  const missing = allWords.filter(w => !lookup(w.text));
+  const missing = allWords.filter(needsGeneration);
   if(missing.length === 0){
     alert("目前清單裡的單字都已經有翻譯了！");
     return;
@@ -2487,7 +2525,7 @@ document.getElementById("btnGenerateAll").onclick = async () => {
   try{
     // 第一階段：先確保每個字都有基本翻譯資料（跟「✨ AI 自動生成缺少的翻譯」一樣），
     // 沒有這個，例句/發音都無從生成起。
-    const missing = list.filter(w => !lookup(w.text));
+    const missing = list.filter(needsGeneration);
     if(missing.length > 0){
       const batches = chunkArr(missing, 8);
       let doneBase = 0;
@@ -2629,7 +2667,7 @@ function createWordItem(w){
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
       <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
-      <div class="meaning">${data ? (data.zh + " · " + data.en) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "")) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
     </div>
   `;
   row.querySelector("input").addEventListener("change", (e) => {
