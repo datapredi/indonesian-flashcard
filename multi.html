@@ -181,6 +181,10 @@
       </label>
       <button id="btnExportWordListTxt">📋 複製目前語言單字（給貼到 Obsidian 或轉到其他語言用）</button>
     </div>
+    <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
+      <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入" rows="4" style="flex:1 1 260px;"></textarea>
+      <button id="btnImportConvertPaste">📥 轉換貼上的文字</button>
+    </div>
     <div class="note hidden" id="convertNote"></div>
     <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
     <div class="toolbar hidden" id="pendingSyncBar">
@@ -462,6 +466,7 @@ function updateLangButtons(){
   // 「匯入並自動生成資料」對印尼文也有用（例如從泰文或英文檔案轉成印尼文），
   // 不是只有其他語言才需要，所以每種語言都顯示。
   document.getElementById("convertBar").classList.remove("hidden");
+  document.getElementById("convertPasteBar").classList.remove("hidden");
   document.getElementById("convertNote").classList.remove("hidden");
   // 全部語言統一只用「匯入並自動生成資料」——其他語言本來就沒有「跟著來源
   // 刪除」這個能力也一樣用得好好的，代表這不是必要功能，印尼文沒必要特例。
@@ -3697,16 +3702,12 @@ function showConvertResult(msg){
   try{ alert(msg); }catch(e){}
 }
 
-document.getElementById("btnImportConvertTh").onclick = () => {
-  if(!getApiKey()){ alert("這個功能需要用 AI 轉換，請先在上面輸入並儲存 Anthropic API Key。"); return; }
-  document.getElementById("fileInputConvertTh").click();
-};
-document.getElementById("fileInputConvertTh").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = async (ev) => {
-    const lines = ev.target.result.split(/\r?\n/);
+// 匯入並自動生成資料的核心處理邏輯，跟輸入來源（選檔案、還是直接貼上文字）
+// 分開，這樣「匯入檔案」跟「貼上文字」兩個按鈕可以共用同一套轉換/去重/
+// 碰撞處理規則，不用維護兩份幾乎一樣的邏輯。
+async function processConvertImportText(rawText){
+  {
+    const lines = rawText.split(/\r?\n/);
     const indoWords = [];
     const seen = new Set();
     lines.forEach(line => {
@@ -3761,8 +3762,18 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
       showConvertResult(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。`);
       return;
     }
-    const btn = document.getElementById("btnImportConvertTh");
-    const originalLabel = btn.textContent;
+    // 匯入檔案、貼上文字兩個按鈕都可能觸發這個函式，處理中的進度／禁用狀態
+    // 兩顆按鈕都要一起更新，不然從「貼上文字」觸發時，進度只會顯示在檔案
+    // 匯入那顆按鈕上，貼上文字那顆看起來完全沒反應。用一個小代理物件把
+    // .textContent／.disabled 的賦值同時套用到兩顆按鈕，各自的原始文字
+    // 分開記住，不要共用同一個字串。
+    const realBtns = [document.getElementById("btnImportConvertTh"), document.getElementById("btnImportConvertPaste")];
+    const originalLabels = realBtns.map(b => b.textContent);
+    const btn = {
+      set textContent(v){ realBtns.forEach(b => { b.textContent = v; }); },
+      set disabled(v){ realBtns.forEach(b => { b.disabled = v; }); }
+    };
+    function restoreOriginalLabels(){ realBtns.forEach((b, i) => { b.textContent = originalLabels[i]; }); }
     btn.disabled = true;
     const batches = chunkArr(wordsToConvert, 8);
     let done = 0;
@@ -3874,19 +3885,39 @@ document.getElementById("fileInputConvertTh").addEventListener("change", (e) => 
       }
     }catch(err){
       btn.disabled = false;
-      btn.textContent = originalLabel;
+      restoreOriginalLabels();
       showConvertResult(`轉換到一半失敗：${err.message}\n\n已經轉好、加進清單的 ${addedCount} 個不會不見，也已經記住轉過了。可以重新選同一個檔案再匯入一次，只會補剩下沒轉到的。`);
       return;
     }
     btn.disabled = false;
-    btn.textContent = originalLabel;
+    restoreOriginalLabels();
     const staleNote = staleCount > 0 ? `，並清掉 ${staleCount} 個殘留的原文字` : "";
     const skipNote = alreadyDoneCount > 0 ? `${alreadyDoneCount} 個之前轉換過已跳過，` : "";
     const updatedNote = updatedCount > 0 ? `，用新結果更新了 ${updatedCount} 個原本就存在的字` : "";
     const unmatchedNote = unmatchedCount > 0 ? `\n\n有 ${unmatchedCount} 個字這次沒有成功對應到結果，還沒被標記為已轉換，重新匯入同一個檔案時會自動再試一次。` : "";
     showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${updatedNote}${staleNote}。${unmatchedNote}`);
-  };
+  }
+}
+
+document.getElementById("btnImportConvertTh").onclick = () => {
+  if(!getApiKey()){ alert("這個功能需要用 AI 轉換，請先在上面輸入並儲存 Anthropic API Key。"); return; }
+  document.getElementById("fileInputConvertTh").click();
+};
+document.getElementById("fileInputConvertTh").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => { processConvertImportText(ev.target.result); };
   reader.readAsText(file, "UTF-8");
+});
+
+// 貼上文字直接匯入：跟選檔案匯入共用 processConvertImportText，只是輸入來源
+// 是文字框而不是檔案，不用先存成 .txt 檔案再選檔，貼上就能直接轉換。
+document.getElementById("btnImportConvertPaste").addEventListener("click", () => {
+  if(!getApiKey()){ alert("這個功能需要用 AI 轉換，請先在上面輸入並儲存 Anthropic API Key。"); return; }
+  const text = document.getElementById("convertPasteInput").value;
+  if(!text.trim()){ alert("請先貼上要匯入的內容。"); return; }
+  processConvertImportText(text);
 });
 
 // ================= Flash Card =================
