@@ -1298,8 +1298,8 @@ let usageCache = {};
 try{ usageCache = JSON.parse(localStorage.getItem(lsKey(USAGE_CACHE_LS))) || {}; }catch(e){ usageCache = {}; }
 function saveUsageCache(){ localStorage.setItem(lsKey(USAGE_CACHE_LS), JSON.stringify(usageCache)); }
 
-async function getUsageExamples(text, zh){
-  if(usageCache[text]) return usageCache[text];
+async function getUsageExamples(text, zh, force){
+  if(!force && usageCache[text]) return usageCache[text];
   const hasScript = L().hasScript;
   // hasScript 語言例句多一個 nativeScript 欄位（真正原生文字），例句面板的
   // 🔊 才唸得準；印尼文本身就是拉丁字母，例句文字直接拿去唸就好，不需要這個欄位。
@@ -2306,7 +2306,7 @@ function renderTappableSentence(sentence, sentenceNativeScript){
   return container;
 }
 
-function renderUsagePanel(panel, examples){
+function renderUsagePanel(panel, examples, onRegenerate){
   panel.innerHTML = "";
   examples.forEach(ex => {
     const item = document.createElement("div");
@@ -2366,6 +2366,15 @@ function renderUsagePanel(panel, examples){
     item.appendChild(noteLine);
     panel.appendChild(item);
   });
+  if(onRegenerate){
+    const regenBtn = document.createElement("button");
+    regenBtn.type = "button";
+    regenBtn.className = "speak-btn";
+    regenBtn.textContent = "🔄 重新生成";
+    regenBtn.title = "不滿意這幾句例句？重新問一次 AI（會蓋掉目前存的版本）";
+    regenBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); onRegenerate(); });
+    panel.appendChild(regenBtn);
+  }
 }
 
 function renderAntonymsPanel(panel, antonyms){
@@ -2925,6 +2934,18 @@ function createWordItem(w){
   usageBtn.className = "usage-btn";
   usageBtn.textContent = "💬";
   usageBtn.setAttribute("aria-label", `AI 補充 ${w.text} 的口語用法`);
+  async function loadUsagePanel(force){
+    if(!force && usagePanel.dataset.loaded === "1") return;
+    if(!getApiKey()){ usagePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+    usagePanel.textContent = "生成中...";
+    try{
+      const examples = await getUsageExamples(w.text, data ? data.zh : "", force);
+      renderUsagePanel(usagePanel, examples, () => loadUsagePanel(true));
+      usagePanel.dataset.loaded = "1";
+    }catch(err){
+      usagePanel.textContent = "生成失敗：" + err.message;
+    }
+  }
   usageBtn.addEventListener("click", async (e) => {
     e.preventDefault(); e.stopPropagation();
     if(!usagePanel.classList.contains("hidden")){
@@ -2932,16 +2953,7 @@ function createWordItem(w){
       return;
     }
     usagePanel.classList.remove("hidden");
-    if(usagePanel.dataset.loaded === "1") return;
-    if(!getApiKey()){ usagePanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
-    usagePanel.textContent = "生成中...";
-    try{
-      const examples = await getUsageExamples(w.text, data ? data.zh : "");
-      renderUsagePanel(usagePanel, examples);
-      usagePanel.dataset.loaded = "1";
-    }catch(err){
-      usagePanel.textContent = "生成失敗：" + err.message;
-    }
+    await loadUsagePanel(false);
   });
   row.appendChild(usageBtn);
 
