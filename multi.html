@@ -129,6 +129,7 @@
     <button class="lang-btn" data-lang="ja">🇯🇵 日文</button>
     <button class="lang-btn" data-lang="ko">🇰🇷 韓文</button>
     <button class="lang-btn" data-lang="yue">🇭🇰 粵語</button>
+    <button class="lang-btn" data-lang="en">🇺🇸 英文</button>
   </div>
   <div class="toolbar hidden" id="thaiAlphabetBar">
     <button id="btnToggleThaiAlphabet">📖 泰文子音／母音對照表</button>
@@ -361,7 +362,7 @@
 // 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
 // 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
 const LANG_LS = "flashcard_lang_v1";
-const LANG_ORDER = ["id", "th", "vi", "ja", "ko", "yue"];
+const LANG_ORDER = ["id", "th", "vi", "ja", "ko", "yue", "en"];
 let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
 function lsKey(base){ return lsKeyForLang(base, currentLang); }
 function lsKeyForLang(base, lang){ return lang === "id" ? base : `${base}_${lang}`; }
@@ -410,6 +411,12 @@ const LANG_INFO = {
     speechLang: "zh-HK",
     ttsInstructions: "Speak in authentic Cantonese (Hong Kong / Guangzhou dialect), not Mandarin, with natural Cantonese pronunciation, intonation, and tones, as a native Cantonese speaker would.",
     hasScript: true
+  },
+  en: {
+    label: "英文", flag: "🇺🇸", teacher: "英語老師",
+    speechLang: "en-US",
+    ttsInstructions: "Speak in natural American English pronunciation and intonation, as a native English speaker would.",
+    hasScript: false // 英文本身就是拉丁字母，顯示文字就可以直接拿去發音，跟印尼文一樣不需要另外的原生文字欄位
   }
 };
 function L(){ return LANG_INFO[currentLang]; } // 目前語言的設定物件（跟 speakAsync(text, lang) 的參數 lang 是兩回事，故意取不同名字避免混淆）
