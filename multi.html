@@ -3585,12 +3585,15 @@ function extractIndonesianLine(raw){
 // 「匯入並自動生成資料」來源語言不限，不能只認目前目標語言允許的文字腳本
 // （那組規則是給「內容已經是目標語言」的一般匯入用的）。這裡放寬：泰文、
 // 韓文諺文、日文假名、拉丁字母固定允許（這些跟中文字不會搞混，可以放心開）。
-// 漢字（Han）維持只有目標語言是日文時才開放，不然會跟同一行後面貼的中文
-// 意思註解切不乾淨（日文本來就用漢字，中文意思註解也是漢字，這兩種情況本來
-// 就沒辦法只靠文字腳本分辨，算是既有的已知限制）。
+// 漢字（Han）只有目標語言是日文/粵語，或目標語言本身不用漢字書寫（目前是
+// 英文）才開放——日文/粵語是因為原生文字本來就用漢字；英文則是因為使用者
+// 常常會直接貼中文想翻成英文，中文字如果被這裡濾掉，內容根本連進到 AI
+// 那一步都到不了。開放 Han 之後，同一行後面貼的中文意思註解會切不乾淨
+// （日文/粵語/英文都一樣，中文字跟中文意思註解本來就沒辦法只靠文字腳本
+// 分辨，算是既有的已知限制）。
 function scriptsForConvertImport(){
   const scripts = ["Latin", "Thai", "Hangul", "Hiragana", "Katakana"];
-  if(currentLang === "ja" || currentLang === "yue") scripts.push("Han");
+  if(currentLang === "ja" || currentLang === "yue" || currentLang === "en") scripts.push("Han");
   return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
 function nonWordCharReConvert(){
