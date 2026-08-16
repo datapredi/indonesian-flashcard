@@ -1054,7 +1054,10 @@ async function generateWordData(words){
   const hasScript = L().hasScript;
   // hasScript 語言（泰文、越南文）用 nativeScript（真正原生文字，給語音朗讀用）
   // 取代印尼文的 pron（KBBI 標音）欄位——這些語言顯示的本來就是羅馬拼音，不需要
-  // 另外標音，但需要真正的原生文字才能唸對。
+  // 另外標音，但需要真正的原生文字才能唸對。pron 這個 KBBI e 母音標注規則是
+  // 印尼文專屬的，其他沒有原生文字欄位的語言（例如英文）不需要、也不適用這套
+  // 規則，直接不用這個欄位，顯示文字本身就可以拿去發音。
+  const isIndo = currentLang === "id";
   const schema = {
     type: "object",
     properties: {
@@ -1064,16 +1067,17 @@ async function generateWordData(words){
           type: "object",
           properties: Object.assign(
             { zh: { type: "string" }, en: { type: "string" } },
-            hasScript ? { nativeScript: { type: "string" } } : { pron: { type: "string" } },
+            hasScript ? { nativeScript: { type: "string" } } : (isIndo ? { pron: { type: "string" } } : {}),
             {
               quizEn: { type: "string" },
               correct: { type: "string" },
               distractors: { type: "array", items: { type: "string" } }
             }
           ),
-          required: hasScript
-            ? ["zh", "en", "nativeScript", "quizEn", "correct", "distractors"]
-            : ["zh", "en", "pron", "quizEn", "correct", "distractors"],
+          required: (hasScript
+            ? ["zh", "en", "nativeScript"]
+            : (isIndo ? ["zh", "en", "pron"] : ["zh", "en"])
+          ).concat(["quizEn", "correct", "distractors"]),
           additionalProperties: false
         }
       }
@@ -1082,7 +1086,9 @@ async function generateWordData(words){
     additionalProperties: false
   };
   const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
-  const prompt = hasScript ? `你是${L().teacher}，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。學生不想學${L().label}的原生文字，下面每一項是他自己用英文字母寫下的${L().label}羅馬拼音（拼法可能不標準、不一致，請你自行判斷他實際想表達的是什麼）。針對每一項依序提供：
+  let prompt;
+  if(hasScript){
+    prompt = `你是${L().teacher}，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。學生不想學${L().label}的原生文字，下面每一項是他自己用英文字母寫下的${L().label}羅馬拼音（拼法可能不標準、不一致，請你自行判斷他實際想表達的是什麼）。針對每一項依序提供：
 - zh：繁體中文意思
 - en：英文意思
 - nativeScript：這個字/句子對應、最正確常用的${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）。這是把學生自己打的羅馬拼音轉成正確的原生文字書寫，是同一句話的另一種寫法，不是翻譯或新造句——學生原文用的代名詞/用字要保留，不要因為下面的說話者身分設定就換掉（那個設定只用在 correct、distractors 這種你自己要新造句子的地方）
@@ -1093,7 +1099,9 @@ async function generateWordData(words){
 請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。${genderNoteForLang()}
 
 單字清單（羅馬拼音）：
-${list}` : `你是印尼語教材編輯，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。針對下面每一個印尼文單字或句子，依序提供：
+${list}`;
+  } else if(isIndo){
+    prompt = `你是印尼語教材編輯，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。針對下面每一個印尼文單字或句子，依序提供：
 - zh：繁體中文意思
 - en：英文意思
 - pron：這個單字/句子的發音標注，採用印尼文詞典 KBBI 的標音慣例——把每個字母 e 依照實際發音標注清楚：
@@ -1109,6 +1117,22 @@ ${list}` : `你是印尼語教材編輯，正在幫一位母語為中文的學�
 
 單字清單：
 ${list}`;
+  } else {
+    // hasScript:false 但不是印尼文（目前是英文）：顯示文字本身就是這個語言
+    // 正常的書寫方式，不需要 nativeScript，也不需要印尼文專屬的 KBBI 標音，
+    // 直接照一般語言教材的方式生成資料就好。
+    prompt = `你是${L().teacher}，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。針對下面每一個${L().label}單字或句子，依序提供：
+- zh：繁體中文意思
+- en：英文意思（如果輸入本身就是英文，這裡就照抄或給一個字典基本形式，不用刻意換句話說）
+- quizEn：一句能表達這個單字/片語意思的英文例句
+- correct：quizEn 對應的、自然的${L().label}翻譯句子（要用到這個目標單字/片語；如果有好幾種同樣正確的說法，選日常生活中最普遍、最多人用的那個）
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（長度和風格接近 correct，但意思不同）
+
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+
+單字清單：
+${list}`;
+  }
 
   const parsed = await callClaude(prompt, schema, 4096);
   return parsed.entries;
@@ -1306,14 +1330,14 @@ async function getUsageExamples(text, zh){
 單字/片語（羅馬拼音）：${text}${zh ? `（中文意思：${zh}）` : ""}
 
 請回傳 examples 陣列，每個元素是：
-{ id：一句自然口語的${L().label}例句，用羅馬拼音寫（要用到這個單字/片語）, nativeScript：這句話對應的正確${L().label}原生文字書寫（純粹給語音朗讀用）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }${genderNoteForLang()}` : `你是印尼語老師。請針對這個印尼文單字/片語，提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
+{ id：一句自然口語的${L().label}例句，用羅馬拼音寫（要用到這個單字/片語）, nativeScript：這句話對應的正確${L().label}原生文字書寫（純粹給語音朗讀用）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }${genderNoteForLang()}` : `你是${L().teacher}。請針對這個${L().label}單字/片語，提供 2-3 個道地、口語、日常會話裡真的會用到的例句，讓學生知道它實際怎麼被使用。
 
-程度限制：學生是印尼語初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
+程度限制：學生是${L().label}初學者（CEFR A1-A2），例句本身除了目標單字/片語以外，其餘用字跟句型都要簡單、基礎、初學者程度看得懂，不要用進階字彙或複雜子句結構。
 
 單字/片語：${text}${zh ? `（中文意思：${zh}）` : ""}
 
 請回傳 examples 陣列，每個元素是：
-{ id：一句自然口語的印尼文例句（要用到這個單字/片語）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }`;
+{ id：一句自然口語的${L().label}例句（要用到這個單字/片語）, zh：這句話的中文翻譯, note：用繁體中文簡短說明這句的使用情境或語氣，1句話就好 }`;
   const parsed = await callClaude(prompt, schema, 1024);
   usageCache[text] = parsed.examples;
   saveUsageCache();
