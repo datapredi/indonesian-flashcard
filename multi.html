@@ -1980,7 +1980,7 @@ function isNativeScriptInList(nativeScript){
 // 的原生文字（含聲調符號）是什麼，再拿去跟 isNativeScriptInList 比對，
 // 這樣才知道是真的重複、還是拼音剛好撞在一起的不同字。用句子＋這個字組合
 // 當快取 key（同一個字在不同句子裡上下文可能不同，不能只用字本身快取）。
-const WORD_IN_CONTEXT_CACHE_LS = "flashcard_word_in_context_cache_v2"; // v2: 改用「數位置＋自我核對」的提示詞，避免短的、去聲調後常撞在一起的字（例如越南文 lắm/làm/lảm）判斷錯誤，順便清掉舊版可能存錯的結果
+const WORD_IN_CONTEXT_CACHE_LS = "flashcard_word_in_context_cache_v3"; // v2: 改用「數位置＋自我核對」的提示詞；v3: 發現 nativeScript 判斷對了、zh/en 卻又跳回去憑拼音本身猜（跟 nativeScript 對不上），明確要求 zh/en 一定要照 nativeScript 的意思寫
 let wordInContextCache = {};
 try{ wordInContextCache = JSON.parse(localStorage.getItem(lsKey(WORD_IN_CONTEXT_CACHE_LS))) || {}; }catch(e){ wordInContextCache = {}; }
 function saveWordInContextCache(){ localStorage.setItem(lsKey(WORD_IN_CONTEXT_CACHE_LS), JSON.stringify(wordInContextCache)); }
@@ -2006,8 +2006,10 @@ async function getWordInContext(cleanRomanized, sentenceRomanized, sentenceNativ
 
 ${cleanRomanized} 這種拿掉聲調的拼法在${L().label}裡常常同時對應好幾個完全不同的字（意思差很多），只能靠上面這個「數位置」的方法才能準確判斷是哪一個，不能單憑這個拼法本身去猜最常見的意思。
 
+4. 最後、也是最容易出錯的一步：zh 跟 en 一定要是你在第 1-3 步驟找出來的「那個原生文字」的意思，不是「${cleanRomanized}」這個拼音本身最常見的意思。這兩件事常常不一樣——你可能已經正確數出位置、找到聲調正確的字了，但寫 zh/en 的時候又不小心跳回去憑「${cleanRomanized}」這個拼音直接查意思，選了另一個更常見但聲調不同、意思完全不對的字的意思。寫 zh/en 之前，重新看一次你第 2 步驟選出來的那個帶聲調的原生文字，意思要跟著那個字走，不能跟著拼音走。
+
 回傳：
-{ nativeScript：那個字對應的${L().label}原生文字（照上面的位置比對方式找出來，保留正確的聲調符號拼字）, zh：那個字在這句話裡的中文意思, en：那個字在這句話裡的英文意思 }`;
+{ nativeScript：那個字對應的${L().label}原生文字（照上面的位置比對方式找出來，保留正確的聲調符號拼字）, zh：nativeScript 那個字（不是拼音本身）在這句話裡的中文意思, en：nativeScript 那個字（不是拼音本身）在這句話裡的英文意思 }`;
   const parsed = await callClaude(prompt, schema, 512);
   wordInContextCache[key] = parsed;
   saveWordInContextCache();
