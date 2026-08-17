@@ -2247,10 +2247,15 @@ function renderTappableSentence(sentence, sentenceNativeScript){
               text = `${text} (${suffix})`;
             }
             if(addWordToList(text)){
-              if(resolved.zh || resolved.en){
-                customDB[text] = { nativeScript: resolved.nativeScript, zh: resolved.zh, en: resolved.en };
-                saveCustomDB();
-              }
+              // nativeScript 一定要存，就算位置對應那條路（免費、不用問 AI）沒有
+              // zh/en 也一樣要存——不然這個字沒有 nativeScript 可以比對，下次
+              // 再點同一個字，isNativeScriptInList 永遠找不到它，會一直誤判成
+              // 「還沒加過」、每次都新增一個新的重複字，而不是跳到已經加過的那個。
+              customDB[text] = Object.assign(
+                { nativeScript: resolved.nativeScript },
+                (resolved.zh || resolved.en) ? { zh: resolved.zh, en: resolved.en } : {}
+              );
+              saveCustomDB();
               wSpan.classList.add("in-list");
             }
             return;
