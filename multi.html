@@ -1013,6 +1013,63 @@ function needsGeneration(w){
   const data = lookup(w.text);
   return !data || !data.quizEn;
 }
+// 這個字目前處於哪個補資料階段：
+// - "known"：意思已經確定（hasScript 語言要連原生文字都有才算，那才是背後真正
+//   判斷出來的那個字），只缺測驗資料，只能補測驗題，不能整包重新生成蓋掉意思。
+// - "scriptKnown"：原生文字已經確定（例如例句點字時用位置比對出來的，免了一次
+//   AI 呼叫），但意思還沒查過。這種字絕對不能丟給 generateWordData 用羅馬拼音
+//   重新判斷意思——羅馬拼音去掉聲調常常同時對應好幾個字，重新判斷容易翻回去
+//   這個拼音最常見、但其實是錯的那個意思，等於白白浪費掉已經確定的原生文字
+//   （實測發生過：越南文 lam 已經正確判斷成 lắm「非常」，結果被這樣蓋成
+//   làm「做」）。要根據已經確定的原生文字去查意思，不能重新提羅馬拼音。
+// - "unknown"：什麼都還沒有，才整包從頭生成（含猜原生文字）。
+function wordGenerationTier(w){
+  const data = lookup(w.text);
+  if(data && data.zh && (!L().hasScript || data.nativeScript)) return "known";
+  if(data && data.nativeScript && L().hasScript) return "scriptKnown";
+  return "unknown";
+}
+// 「補齊缺少的資料」共用邏輯，給 btnGenerate/btnGenerateAll 共用，依上面三種
+// 階段分開處理，避免蓋掉已經確定的原生文字/意思。
+async function completeMissingWordData(missing, btn, labelPrefix){
+  const batches = chunkArr(missing, 8);
+  let done = 0;
+  for(const batch of batches){
+    btn.textContent = `${labelPrefix}... (${done}/${missing.length})`;
+    const known = batch.filter(w => wordGenerationTier(w) === "known");
+    const scriptKnown = batch.filter(w => wordGenerationTier(w) === "scriptKnown");
+    const unknown = batch.filter(w => wordGenerationTier(w) === "unknown");
+    if(known.length > 0){
+      const items = known.map(w => {
+        const d = lookup(w.text);
+        return { text: w.text, nativeScript: d.nativeScript, zh: d.zh, en: d.en };
+      });
+      const entries = await generateQuizDataForKnownWords(items);
+      known.forEach((w, i) => {
+        if(!entries[i]) return;
+        customDB[w.text] = Object.assign({}, lookup(w.text), entries[i]);
+      });
+    }
+    if(scriptKnown.length > 0){
+      const items = scriptKnown.map(w => {
+        const d = lookup(w.text);
+        return { text: w.text, nativeScript: d.nativeScript };
+      });
+      const entries = await generateMeaningForKnownScript(items);
+      scriptKnown.forEach((w, i) => {
+        if(!entries[i]) return;
+        customDB[w.text] = Object.assign({}, lookup(w.text), entries[i]);
+      });
+    }
+    if(unknown.length > 0){
+      const entries = await generateWordData(unknown.map(w => w.text));
+      unknown.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
+    }
+    saveCustomDB();
+    done += batch.length;
+    renderList();
+  }
+}
 
 // 跨語言查詢：不同語言的單字表是各自獨立的，沒有天生的「這是同一個概念」連結
 // （編號在不同語言之間也對不上，見使用者跟我的討論），唯一能拿來比對的線索是
@@ -1136,6 +1193,86 @@ ${list}`;
 
   const parsed = await callClaude(prompt, schema, 4096);
   return parsed.entries;
+}
+
+// 專門補測驗資料（quizEn/correct/distractors）用，給已經確定好正確意思的字——
+// 例如例句點字新增的字，意思是根據那句話的上下文判斷出來的，比孤立看這個字
+// 本身準確很多。如果這種字缺測驗資料時也丟給 generateWordData 補齊，它只看
+// 孤立的字本身重新翻譯一次，容易翻回去這個拼音最常見、但其實是錯的那個意思，
+// 等於把已經正確的資料蓋掉（實測發生過：越南文 lam 已經正確判斷成 lắm「非常」，
+// 結果被這個流程蓋成 làm「做」）。這裡完全不重新判斷 nativeScript/zh/en，
+// 直接拿現成的意思當前提出測驗題，不會有蓋掉正確資料的風險。
+async function generateQuizDataForKnownWords(items){
+  const hasScript = L().hasScript;
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            quizEn: { type: "string" },
+            correct: { type: "string" },
+            distractors: { type: "array", items: { type: "string" } }
+          },
+          required: ["quizEn", "correct", "distractors"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  const list = items.map((it, i) => `${i + 1}. ${L().label}：${(hasScript && it.nativeScript) || it.text}（羅馬拼音：${it.text}${it.zh ? `，中文意思：${it.zh}` : ""}）`).join("\n");
+  const prompt = `你是${L().teacher}，正在幫學生準備測驗題。下面每一項的${L().label}原生文字跟中文意思都已經確定好了，不用重新判斷、猜測、或翻譯，直接照給定的內容出題就好。針對每一項提供：
+- quizEn：一句能表達這個字/片語意思的英文例句
+- correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語，意思一定要跟給定的中文意思一致，不要憑拼音本身另外猜一個不同的意思）
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
+
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。${genderNoteForLang()}
+
+單字/片語清單：
+${list}`;
+  const parsed = await callClaude(prompt, schema, 4096);
+  return parsed.entries;
+}
+
+// 專門給「原生文字已經確定，但意思還沒查過」的字用（例如例句點字時用位置比對
+// 免了一次 AI 呼叫，只存了 nativeScript）。查意思這一步完全不提羅馬拼音，只給
+// 已經確定的原生文字，避免模型看到羅馬拼音又被帶偏回去最常見、但其實是錯的
+// 那個意思（跟 getWordInContext 曾經遇到的問題一樣）。查完意思後直接沿用
+// generateQuizDataForKnownWords 出測驗題，不用再重新判斷一次意思。
+async function generateMeaningForKnownScript(items){
+  const meaningSchema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { zh: { type: "string" }, en: { type: "string" } },
+          required: ["zh", "en"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  const list = items.map((it, i) => `${i + 1}. ${it.nativeScript}`).join("\n");
+  const meaningPrompt = `你是${L().teacher}。下面每一項都是一個${L().label}原生文字寫成的單字/片語，請針對每一項給出：
+- zh：繁體中文意思
+- en：英文意思
+
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+
+單字/片語清單（${L().label}原生文字）：
+${list}`;
+  const meaningParsed = await callClaude(meaningPrompt, meaningSchema, 2048);
+  const withMeaning = items.map((it, i) => Object.assign({}, it, meaningParsed.entries[i]));
+  const quizEntries = await generateQuizDataForKnownWords(withMeaning);
+  return withMeaning.map((it, i) => Object.assign({ zh: it.zh, en: it.en }, quizEntries[i]));
 }
 
 // 通用轉換：來源語言不限（AI 自己判斷這批字原本是什麼語言），一律轉成「目前
@@ -2644,30 +2781,17 @@ document.getElementById("btnGenerate").onclick = async () => {
     return;
   }
   const btn = document.getElementById("btnGenerate");
+  const originalLabel = btn.textContent;
   btn.disabled = true;
   await acquireWakeLock();
   try{
-    const batches = chunkArr(missing, 8);
-    let done = 0;
-    for(const batch of batches){
-      btn.textContent = `生成中... (${done}/${missing.length})`;
-      try{
-        const entries = await generateWordData(batch.map(w => w.text));
-        batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
-        saveCustomDB();
-        done += batch.length;
-        renderList();
-      }catch(e){
-        alert("生成失敗：" + e.message);
-        btn.disabled = false;
-        btn.textContent = "✨ AI 自動生成缺少的翻譯";
-        return;
-      }
-    }
-    btn.disabled = false;
-    btn.textContent = "✨ AI 自動生成缺少的翻譯";
+    await completeMissingWordData(missing, btn, "生成中");
     renderList();
+  }catch(e){
+    alert("生成失敗：" + e.message);
   } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
     releaseWakeLock();
   }
 };
@@ -2686,22 +2810,13 @@ document.getElementById("btnGenerateAll").onclick = async () => {
     // 沒有這個，例句/發音都無從生成起。
     const missing = list.filter(needsGeneration);
     if(missing.length > 0){
-      const batches = chunkArr(missing, 8);
-      let doneBase = 0;
-      for(const batch of batches){
-        btn.textContent = `補基本翻譯中... (${doneBase}/${missing.length})`;
-        try{
-          const entries = await generateWordData(batch.map(w => w.text));
-          batch.forEach((w, i) => { if(entries[i]) customDB[w.text] = entries[i]; });
-          saveCustomDB();
-          doneBase += batch.length;
-          renderList();
-        }catch(e){
-          alert("補基本翻譯失敗：" + e.message + "\n\n已經完成的部分不會不見，可以再按一次繼續。");
-          btn.disabled = false;
-          btn.textContent = originalLabel;
-          return;
-        }
+      try{
+        await completeMissingWordData(missing, btn, "補基本翻譯中");
+      }catch(e){
+        alert("補基本翻譯失敗：" + e.message + "\n\n已經完成的部分不會不見，可以再按一次繼續。");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        return;
       }
     }
 
