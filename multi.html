@@ -2821,7 +2821,11 @@ function getVisibleWords(){
 function createWordItem(w){
   const data = lookup(w.text);
   const row = document.createElement("label");
-  row.className = "item" + (data ? "" : " no-data");
+  // 紅字提示「還需要生成資料」要跟 needsGeneration() 用同一套標準——不能只看
+  // 「有沒有 data」，因為例句點字新增的字現在一定會先存 nativeScript（就算
+  // 還沒有中英文意思也一樣），data 會是真值，但其實還是不完整、還是需要按
+  // 「AI 自動生成缺少的翻譯」才會有測驗需要的完整資料。
+  row.className = "item" + (needsGeneration(w) ? " no-data" : "");
   row.innerHTML = `
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
