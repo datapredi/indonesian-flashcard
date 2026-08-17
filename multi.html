@@ -3277,6 +3277,8 @@ function updateCount(){
   document.getElementById("selCount").textContent = parts.join("・");
 }
 function deleteWord(id){
+  const target = allWords.find(w => w.id === id);
+  if(target && !confirm(`確定要刪除「${target.text}」嗎？這個動作沒辦法復原。`)) return;
   allWords = allWords.filter(w => w.id !== id);
   saveWordList(allWords);
   selected.delete(id);
