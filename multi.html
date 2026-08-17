@@ -1980,37 +1980,54 @@ function isNativeScriptInList(nativeScript){
 // 的原生文字（含聲調符號）是什麼，再拿去跟 isNativeScriptInList 比對，
 // 這樣才知道是真的重複、還是拼音剛好撞在一起的不同字。用句子＋這個字組合
 // 當快取 key（同一個字在不同句子裡上下文可能不同，不能只用字本身快取）。
-const WORD_IN_CONTEXT_CACHE_LS = "flashcard_word_in_context_cache_v3"; // v2: 改用「數位置＋自我核對」的提示詞；v3: 發現 nativeScript 判斷對了、zh/en 卻又跳回去憑拼音本身猜（跟 nativeScript 對不上），明確要求 zh/en 一定要照 nativeScript 的意思寫
+const WORD_IN_CONTEXT_CACHE_LS = "flashcard_word_in_context_cache_v4"; // v2: 改用「數位置＋自我核對」的提示詞；v3: 提示詞裡加一段話要求 zh/en 要照 nativeScript 寫（測試後發現同一次生成裡還是會跳回去用拼音本身猜，沒用）；v4: 改成拆兩次獨立呼叫，第二次完全不提拼音本身，只給已確定的原生文字問意思，結構上杜絕跳回去的可能
 let wordInContextCache = {};
 try{ wordInContextCache = JSON.parse(localStorage.getItem(lsKey(WORD_IN_CONTEXT_CACHE_LS))) || {}; }catch(e){ wordInContextCache = {}; }
 function saveWordInContextCache(){ localStorage.setItem(lsKey(WORD_IN_CONTEXT_CACHE_LS), JSON.stringify(wordInContextCache)); }
+// 拆成兩次獨立呼叫，不要一次問完：第一次只問「這個位置對應的原生文字是
+// 什麼」，第二次只給「已經確定好、帶聲調符號的原生文字」去問意思，完全不
+// 再提到拼音本身。這是因為實測發現單一次呼叫時，就算 nativeScript 判斷對了
+// （例如越南文正確判斷出 lắm），zh/en 卻常常「跳回去」用拼音本身（lam）最
+// 常見的意思去答（例如錯填成 làm 的「做」），同一次生成裡兩個欄位對不上；
+// 拆成兩次、第二次完全不讓拼音本身出現在提示詞裡，讓模型沒有機會「跳回去」
+// 用拼音的常見意思回答，才能真正解決這個問題。
 async function getWordInContext(cleanRomanized, sentenceRomanized, sentenceNativeScript){
   const key = `${cleanRomanized.toLowerCase()}||${sentenceRomanized}`;
   if(wordInContextCache[key]) return wordInContextCache[key];
-  const schema = {
+
+  const nativeScriptSchema = {
     type: "object",
-    properties: {
-      nativeScript: { type: "string" },
-      zh: { type: "string" },
-      en: { type: "string" }
-    },
-    required: ["nativeScript", "zh", "en"],
+    properties: { nativeScript: { type: "string" } },
+    required: ["nativeScript"],
     additionalProperties: false
   };
-  const prompt = `你是${L().teacher}。這是一句${L().label}例句的羅馬拼音（不含聲調符號）：「${sentenceRomanized}」，對應的${L().label}原生文字是：「${sentenceNativeScript}」。這兩句話是同一句話的兩種寫法，應該逐字對應。
+  const nativeScriptPrompt = `這是一句${L().label}例句的羅馬拼音（不含聲調符號）：「${sentenceRomanized}」，對應的${L().label}原生文字是：「${sentenceNativeScript}」。這兩句話是同一句話的兩種寫法，應該逐字對應。
 
-請找出這句話裡，對應到「${cleanRomanized}」（羅馬拼音，可能省略了聲調）這個字的部分。做法：
+請找出這句話裡，對應到「${cleanRomanized}」（羅馬拼音，可能省略了聲調）這個字的部分：
 1. 先在羅馬拼音句子裡找到「${cleanRomanized}」是第幾個字（照順序數，從 1 開始）。
 2. 再到原生文字句子裡，數到同一個位置的那個字，那就是答案。
-3. 自我檢查：把你選出來的原生文字字去掉所有聲調符號/變音符號後，一定要跟「${cleanRomanized}」完全一樣（不分大小寫）；如果不一樣，代表你數錯位置了，重新數一次，不要憑語意亂猜或憑印象選一個看起來合理但位置對不上的字。
+3. 自我檢查：把你選出來的原生文字字去掉所有聲調符號/變音符號後，一定要跟「${cleanRomanized}」完全一樣（不分大小寫）；如果不一樣，代表你數錯位置了，重新數一次。
 
-${cleanRomanized} 這種拿掉聲調的拼法在${L().label}裡常常同時對應好幾個完全不同的字（意思差很多），只能靠上面這個「數位置」的方法才能準確判斷是哪一個，不能單憑這個拼法本身去猜最常見的意思。
+${cleanRomanized} 這種拿掉聲調的拼法在${L().label}裡常常同時對應好幾個完全不同的字，只能靠上面這個「數位置」的方法才能準確判斷是哪一個。
 
-4. 最後、也是最容易出錯的一步：zh 跟 en 一定要是你在第 1-3 步驟找出來的「那個原生文字」的意思，不是「${cleanRomanized}」這個拼音本身最常見的意思。這兩件事常常不一樣——你可能已經正確數出位置、找到聲調正確的字了，但寫 zh/en 的時候又不小心跳回去憑「${cleanRomanized}」這個拼音直接查意思，選了另一個更常見但聲調不同、意思完全不對的字的意思。寫 zh/en 之前，重新看一次你第 2 步驟選出來的那個帶聲調的原生文字，意思要跟著那個字走，不能跟著拼音走。
+回傳：{ nativeScript：那個字對應的${L().label}原生文字（照上面的位置比對方式找出來，保留正確的聲調符號拼字） }`;
+  const nativeScriptParsed = await callClaude(nativeScriptPrompt, nativeScriptSchema, 256);
+  const resolvedNativeScript = nativeScriptParsed.nativeScript;
 
-回傳：
-{ nativeScript：那個字對應的${L().label}原生文字（照上面的位置比對方式找出來，保留正確的聲調符號拼字）, zh：nativeScript 那個字（不是拼音本身）在這句話裡的中文意思, en：nativeScript 那個字（不是拼音本身）在這句話裡的英文意思 }`;
-  const parsed = await callClaude(prompt, schema, 512);
+  const meaningSchema = {
+    type: "object",
+    properties: { zh: { type: "string" }, en: { type: "string" } },
+    required: ["zh", "en"],
+    additionalProperties: false
+  };
+  // 這裡刻意完全不提「${cleanRomanized}」這個拼音，只給已經確定、帶聲調符號
+  // 的原生文字，避免模型又聯想回拼音本身最常見的意思。
+  const meaningPrompt = `你是${L().teacher}。這是一句${L().label}例句：「${sentenceNativeScript}」。
+
+請問這句話裡的「${resolvedNativeScript}」是什麼意思？回傳：{ zh：這個字在這句話裡的中文意思, en：這個字在這句話裡的英文意思 }`;
+  const meaningParsed = await callClaude(meaningPrompt, meaningSchema, 256);
+
+  const parsed = { nativeScript: resolvedNativeScript, zh: meaningParsed.zh, en: meaningParsed.en };
   wordInContextCache[key] = parsed;
   saveWordInContextCache();
   return parsed;
