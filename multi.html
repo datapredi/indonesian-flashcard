@@ -1146,9 +1146,16 @@ ${hasScript ? `- nativeScript：跟 text 是同一句話的${info.label}原生�
   let db = {};
   try{ db = JSON.parse(localStorage.getItem(dbKey)) || {}; }catch(e){ db = {}; }
 
-  const text = parsed.text;
+  // 意思比對沒找到（不然不會走到這裡），但生成出來的拼字可能剛好跟這個語言
+  // 裡「不同意思」的既有字撞名（同拼字不同概念）。之前這種情況會直接放棄不加
+  // 入，結果使用者按了「補齊」，這個語言的字沒真的加進去、面板刷新後還是顯示
+  // 缺這個語言，再按一次又撞名又放棄，變成永遠卡住、按幾次都沒用。改成跟句子
+  // 點字新增一樣的做法：撞名就自動加編號，還是把這個新概念加進去，不會卡住。
+  let text = parsed.text;
   if(words.some(w => w.text.toLowerCase() === text.toLowerCase())){
-    return { lang, skipped: true, text };
+    let suffix = 2;
+    while(words.some(w => w.text.toLowerCase() === `${text} (${suffix})`.toLowerCase())) suffix++;
+    text = `${text} (${suffix})`;
   }
 
   const nextId = words.length ? Math.max(...words.map(w => w.id)) + 1 : 1;
