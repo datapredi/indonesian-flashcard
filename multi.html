@@ -424,17 +424,18 @@ function L(){ return LANG_INFO[currentLang]; } // 目前語言的設定物件（
 // 有些語言的代名詞/語氣詞會依說話者（有時候還要看對方）的性別、年齡而不同，
 // 所有會生成該語言句子的 AI 提示都要附上對應的設定，確保生成的版本符合使用者
 // 實際的身分，不會生成不適用的性別/稱謂版本。
-function genderNoteForLang(){
-  if(currentLang === "th"){
+function genderNoteForLang(lang){
+  lang = lang || currentLang;
+  if(lang === "th"){
     // 泰文語氣詞 ครับ/ค่ะ、第一人稱代名詞 ผม/ฉัน・ดิฉัน 依說話者性別而定，使用者是男性。
     return "\n\n使用者（說話者）是男性，句子裡任何需要區分性別的語氣詞或代名詞都要用男性版本：語氣詞用「ครับ」不要用「ค่ะ」，第一人稱代名詞用「ผม」不要用「ฉัน」或「ดิฉัน」。";
   }
-  if(currentLang === "vi"){
+  if(lang === "vi"){
     // 越南文的代名詞是看雙方年齡跟性別決定（類似親屬稱謂），使用者是 45 歲男性，
     // 句子裡預設對話對象是 25 歲女性，這種年齡差下自稱通常用「anh」、稱對方用「em」。
     return "\n\n使用者（說話者）是 45 歲男性，句子裡如果需要用到人稱代名詞，除非情境明顯不適用（例如對象明顯是長輩、小孩、或已經指定其他身分），預設對話對象是 25 歲女性：自稱用「anh」，稱呼對方用「em」，不要用其他年齡/性別組合的代名詞（例如 tôi、chị、cô、ông、bà 之類）。";
   }
-  if(currentLang === "ja"){
+  if(lang === "ja"){
     // 日文的性別標記沒有泰文/越南文那麼強制（不影響文法正確性），但口語第一人稱
     // 代名詞、語尾語氣還是有陽性/陰性傾向，使用者是男性。
     return "\n\n使用者（說話者）是男性，如果句子自然會用到第一人稱代名詞，優先用「僕」或中性的「私」，避免使用明顯偏女性化的用詞或語尾（例如「わ」結尾、「かしら」等）。";
@@ -1074,16 +1075,17 @@ async function completeMissingWordData(missing, btn, labelPrefix){
 // 跨語言查詢：不同語言的單字表是各自獨立的，沒有天生的「這是同一個概念」連結
 // （編號在不同語言之間也對不上，見使用者跟我的討論），唯一能拿來比對的線索是
 // 中文或英文意思是否完全一樣（兩個都試，中文不同但英文剛好一樣也算配到）。
-// 這是盡力而為，兩邊用詞都不同就配不到，不保證每個字都找得到。
-function getCrossLangMatches(zhMeaning, enMeaning){
+// 這是盡力而為，兩邊用詞都不同就配不到，不保證每個字都找得到。回傳每個其他
+// 語言的狀態（找到了 found:true，沒找到 found:false），讓呼叫端可以針對沒
+// 找到的語言提供「直接幫我產生」的功能，不用手動切過去每個語言貼一次。
+function getCrossLangStatus(zhMeaning, enMeaning){
   if(!zhMeaning && !enMeaning) return [];
   const results = [];
   LANG_ORDER.forEach((lang) => {
     if(lang === currentLang) return;
     try{
       const wordsRaw = localStorage.getItem(lsKeyForLang(LS_KEY, lang));
-      if(!wordsRaw) return;
-      const words = JSON.parse(wordsRaw);
+      const words = wordsRaw ? JSON.parse(wordsRaw) : [];
       let customOther = {};
       try{ customOther = JSON.parse(localStorage.getItem(lsKeyForLang(CUSTOM_DB_LS, lang))) || {}; }catch(e){}
       const builtIn = lang === "id" ? WORD_DB : EMPTY_DB;
@@ -1094,11 +1096,71 @@ function getCrossLangMatches(zhMeaning, enMeaning){
       });
       if(match){
         const data = customOther[match.text] || builtIn[match.text];
-        results.push({ lang, text: match.text, nativeScript: data.nativeScript || null });
+        results.push({ lang, found: true, text: match.text, nativeScript: data.nativeScript || null });
+      } else {
+        results.push({ lang, found: false });
       }
-    }catch(e){ /* 那個語言的資料格式壞掉就跳過，不影響其他語言 */ }
+    }catch(e){ results.push({ lang, found: false }); /* 那個語言的資料格式壞掉就當作沒找到，不影響其他語言 */ }
   });
   return results;
+}
+
+// 把已經確定好中文/英文意思的詞，直接生成成另一個語言的版本並加進那個語言
+// 自己的單字表（localStorage），不用手動切過去那個語言一個個貼上。跟
+// generateMeaningForKnownScript 一樣的保護邏輯：意思是已知的前提，AI 只需要
+// 負責翻譯成目標語言，不用重新判斷意思。目標語言不是目前選的語言，所以不能用
+// L()／currentLang，全部從傳進來的 lang 查 LANG_INFO；同理寫入的也是目標語言
+// 自己的 localStorage key，不是目前的 allWords/customDB。
+async function addWordToOtherLang(lang, zhMeaning, enMeaning){
+  const info = LANG_INFO[lang];
+  const hasScript = info.hasScript;
+  const isIndo = lang === "id";
+  const schema = {
+    type: "object",
+    properties: Object.assign(
+      { text: { type: "string" } },
+      hasScript ? { nativeScript: { type: "string" } } : (isIndo ? { pron: { type: "string" } } : {}),
+      {
+        quizEn: { type: "string" },
+        correct: { type: "string" },
+        distractors: { type: "array", items: { type: "string" } }
+      }
+    ),
+    required: ["text"].concat(
+      hasScript ? ["nativeScript"] : (isIndo ? ["pron"] : [])
+    ).concat(["quizEn", "correct", "distractors"]),
+    additionalProperties: false
+  };
+  const prompt = `你是${info.teacher}，正在幫學生把一個已經確定好意思的詞/片語加進${info.label} Flash Card 單字表。這個詞的中文意思是「${zhMeaning || ""}」${enMeaning ? `，英文意思是「${enMeaning}」` : ""}（意思已經確定，不用重新猜，直接照這個意思翻譯成${info.label}）。請提供：
+- text：${hasScript ? `這個詞/片語最自然的${info.label}羅馬拼音寫法（口語、初學者程度、日常生活最常用的說法）` : `這個詞/片語最自然的${info.label}寫法（口語、初學者程度、日常生活最常用的說法）`}
+${hasScript ? `- nativeScript：跟 text 是同一句話的${info.label}原生文字書寫（給語音朗讀引擎用）\n` : ""}${isIndo ? `- pron：這個詞的發音標注，採用印尼文詞典 KBBI 的標音慣例——e 依照實際發音標成一般 e／é／è，其餘字母照原樣\n` : ""}- quizEn：一句能表達這個詞意思的英文例句
+- correct：quizEn 對應的${info.label}翻譯句子${hasScript ? "，用羅馬拼音寫" : ""}，要用到這個目標單字/片語
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${info.label}句子選項${hasScript ? "（一樣用羅馬拼音寫）" : ""}，長度和風格接近 correct，但意思不同${genderNoteForLang(lang)}`;
+
+  const parsed = await callClaude(prompt, schema, 1024);
+
+  const wordsKey = lsKeyForLang(LS_KEY, lang);
+  const dbKey = lsKeyForLang(CUSTOM_DB_LS, lang);
+  let words = [];
+  try{ words = JSON.parse(localStorage.getItem(wordsKey)) || []; }catch(e){ words = []; }
+  let db = {};
+  try{ db = JSON.parse(localStorage.getItem(dbKey)) || {}; }catch(e){ db = {}; }
+
+  const text = parsed.text;
+  if(words.some(w => w.text.toLowerCase() === text.toLowerCase())){
+    return { lang, skipped: true, text };
+  }
+
+  const nextId = words.length ? Math.max(...words.map(w => w.id)) + 1 : 1;
+  words.push({ id: nextId, text });
+  const entry = { zh: zhMeaning || "", en: enMeaning || "", quizEn: parsed.quizEn, correct: parsed.correct, distractors: parsed.distractors };
+  if(hasScript) entry.nativeScript = parsed.nativeScript;
+  if(isIndo) entry.pron = parsed.pron;
+  db[text] = entry;
+
+  localStorage.setItem(wordsKey, JSON.stringify(words));
+  localStorage.setItem(dbKey, JSON.stringify(db));
+  return { lang, skipped: false, text, nativeScript: entry.nativeScript || null };
 }
 
 function chunkArr(arr, size){
@@ -3340,7 +3402,66 @@ function createWordItem(w){
   crossLangBtn.type = "button";
   crossLangBtn.className = "usage-btn";
   crossLangBtn.textContent = "🌐";
-  crossLangBtn.title = "看看這個字在其他語言怎麼說（用中文意思比對，找不到的語言不會顯示）";
+  crossLangBtn.title = "看看這個字在其他語言怎麼說（用中文意思比對），也可以直接幫沒有的語言產生";
+  function renderCrossLangPanel(){
+    const zh = data ? data.zh : null;
+    const en = data ? data.en : null;
+    crossLangPanel.innerHTML = "";
+    if(!zh && !en){
+      crossLangPanel.textContent = "這個字還沒有中文/英文意思，請先產生翻譯再查其他語言。";
+      return;
+    }
+    const status = getCrossLangStatus(zh, en);
+    const found = status.filter(s => s.found);
+    const missing = status.filter(s => !s.found);
+    if(found.length === 0){
+      const noneLine = document.createElement("div");
+      noneLine.textContent = "沒有找到其他語言裡中文意思一樣的字。";
+      crossLangPanel.appendChild(noneLine);
+    } else {
+      found.forEach((m) => {
+        const line = document.createElement("div");
+        line.className = "usage-example";
+        const label = document.createElement("span");
+        label.textContent = `${LANG_INFO[m.lang].flag} ${m.text}`;
+        const speakBtn = document.createElement("button");
+        speakBtn.type = "button";
+        speakBtn.className = "speak-btn";
+        speakBtn.textContent = "🔊";
+        speakBtn.addEventListener("click", (ev) => {
+          ev.preventDefault(); ev.stopPropagation();
+          speak((LANG_INFO[m.lang].hasScript && m.nativeScript) || m.text, speakBtn, m.lang);
+        });
+        line.appendChild(label);
+        line.appendChild(speakBtn);
+        crossLangPanel.appendChild(line);
+      });
+    }
+    if(missing.length > 0){
+      const genBtn = document.createElement("button");
+      genBtn.type = "button";
+      genBtn.className = "usage-btn";
+      genBtn.textContent = `🤖 幫我補齊其他 ${missing.length} 個語言（${missing.map(m => LANG_INFO[m.lang].flag).join("")}）`;
+      genBtn.addEventListener("click", async (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        if(!getApiKey()){ alert("請先輸入並儲存 API Key。"); return; }
+        genBtn.disabled = true;
+        const originalLabel = genBtn.textContent;
+        let done = 0;
+        let failCount = 0;
+        for(const m of missing){
+          genBtn.textContent = `補齊中... (${done}/${missing.length})`;
+          try{
+            await addWordToOtherLang(m.lang, zh, en);
+          }catch(err){ failCount++; }
+          done++;
+        }
+        if(failCount > 0) alert(`有 ${failCount} 個語言產生失敗（可能是網路不穩），可以再按一次補齊。`);
+        renderCrossLangPanel();
+      });
+      crossLangPanel.appendChild(genBtn);
+    }
+  }
   crossLangBtn.addEventListener("click", (e) => {
     e.preventDefault(); e.stopPropagation();
     if(!crossLangPanel.classList.contains("hidden")){
@@ -3348,29 +3469,7 @@ function createWordItem(w){
       return;
     }
     crossLangPanel.classList.remove("hidden");
-    const matches = getCrossLangMatches(data ? data.zh : null, data ? data.en : null);
-    crossLangPanel.innerHTML = "";
-    if(matches.length === 0){
-      crossLangPanel.textContent = "沒有找到其他語言裡中文意思一樣的字。";
-      return;
-    }
-    matches.forEach((m) => {
-      const line = document.createElement("div");
-      line.className = "usage-example";
-      const label = document.createElement("span");
-      label.textContent = `${LANG_INFO[m.lang].flag} ${m.text}`;
-      const speakBtn = document.createElement("button");
-      speakBtn.type = "button";
-      speakBtn.className = "speak-btn";
-      speakBtn.textContent = "🔊";
-      speakBtn.addEventListener("click", (ev) => {
-        ev.preventDefault(); ev.stopPropagation();
-        speak((LANG_INFO[m.lang].hasScript && m.nativeScript) || m.text, speakBtn, m.lang);
-      });
-      line.appendChild(label);
-      line.appendChild(speakBtn);
-      crossLangPanel.appendChild(line);
-    });
+    renderCrossLangPanel();
   });
   row.appendChild(crossLangBtn);
 
