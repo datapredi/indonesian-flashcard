@@ -211,7 +211,9 @@
       <button id="btnGenerateAll">🚀 全部生成例句＋發音（出發前先跑一輪，離線也能用）</button>
       <button id="btnGenerateAllTones" class="hidden">🎵 全部生成聲調標記</button>
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
+      <button id="btnBackfillRegisterCefr">🏷️ 補齊口語/難易度標籤</button>
     </div>
+    <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
     <div class="toolbar">
       <input type="text" id="wordSearch" placeholder="搜尋印尼文或中文...">
@@ -1328,6 +1330,38 @@ ${registerCefrPromptLines(L().label)}- quizEn：一句能表達這個字/片語�
 單字/片語清單：
 ${list}`;
   const parsed = await callClaude(prompt, schema, 4096);
+  return parsed.entries;
+}
+
+// 專門補口語/難易度標籤（register/cefr）用，給已經有完整資料（意思、例句、
+// 測驗題都好了）但還沒有這兩個欄位的舊單字——這兩個欄位是後來才加的功能，
+// 之前生成的字不會自動有。只問 register/cefr，完全不碰其他已經正確的資料。
+async function generateRegisterCefrForKnownWords(items){
+  const hasScript = L().hasScript;
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: REGISTER_CEFR_SCHEMA_PROPS,
+          required: ["register", "cefr"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  const list = items.map((it, i) => `${i + 1}. ${L().label}：${(hasScript && it.nativeScript) || it.text}（羅馬拼音：${it.text}${it.zh ? `，中文意思：${it.zh}` : ""}）`).join("\n");
+  const prompt = `你是${L().teacher}。下面每一項的意思都已經確定好了，不用重新判斷、猜測、或翻譯。針對每一項提供：
+${registerCefrPromptLines(L().label)}
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+
+單字/片語清單：
+${list}`;
+  const parsed = await callClaude(prompt, schema, 2048);
   return parsed.entries;
 }
 
@@ -2997,6 +3031,46 @@ document.getElementById("btnGenerateAllNativeTones").onclick = async () => {
     btn.disabled = false;
     btn.textContent = originalLabel;
     alert(`完成，處理了 ${done} 個字。${skipped > 0 ? `有 ${skipped} 個字還沒有原生文字資料，跳過了。` : ""}${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
+  } finally {
+    releaseWakeLock();
+  }
+};
+
+document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  const list = allWords.filter(w => selected.has(w.id)).filter(w => {
+    const data = lookup(w.text);
+    return data && data.zh && (!data.register || !data.cefr);
+  });
+  if(list.length === 0){ alert("勾選的字裡面，沒有「已經有意思、但缺口語/難易度標籤」的字（可以先按上面的「全選」再試一次）。"); return; }
+  const btn = document.getElementById("btnBackfillRegisterCefr");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  await acquireWakeLock();
+  try{
+    const batches = chunkArr(list, 20);
+    let done = 0;
+    let failCount = 0;
+    for(const batch of batches){
+      btn.textContent = `補標籤中... (${done}/${list.length})`;
+      try{
+        const items = batch.map(w => {
+          const d = lookup(w.text);
+          return { text: w.text, nativeScript: d.nativeScript, zh: d.zh };
+        });
+        const entries = await generateRegisterCefrForKnownWords(items);
+        batch.forEach((w, i) => {
+          if(!entries[i]) return;
+          customDB[w.text] = Object.assign({}, lookup(w.text), entries[i]);
+        });
+        saveCustomDB();
+      }catch(e){ failCount += batch.length; }
+      done += batch.length;
+      renderList();
+    }
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 個失敗（可能是網路不穩），可以再按一次補齊，已經成功的不會重跑。` : "全部成功。"}`);
   } finally {
     releaseWakeLock();
   }
