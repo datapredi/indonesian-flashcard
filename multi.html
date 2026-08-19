@@ -62,6 +62,7 @@
   .badge-row{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
   .badge{font-size:0.72rem; padding:3px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--border); color:var(--muted);}
   .badge:hover{border-color:var(--accent); color:var(--accent);}
+  .reg-cefr-tag{font-size:0.72rem; padding:1px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--border); color:var(--muted); margin-left:6px; white-space:nowrap; display:inline-block;}
   .usage-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
   .usage-panel{padding:10px 14px 14px; border-bottom:1px solid var(--border); background:var(--bg); font-size:0.88rem;}
   .usage-panel.hidden{display:none;}
@@ -1111,6 +1112,22 @@ function getCrossLangStatus(zhMeaning, enMeaning){
 // 負責翻譯成目標語言，不用重新判斷意思。目標語言不是目前選的語言，所以不能用
 // L()／currentLang，全部從傳進來的 lang 查 LANG_INFO；同理寫入的也是目標語言
 // 自己的 localStorage key，不是目前的 allWords/customDB。
+// 口語/難易度標註共用的 schema 欄位跟提示文字，給所有會生成單字基本資料的
+// 函式共用（generateWordData、generateQuizDataForKnownWords、
+// convertWordsToTargetLang、addWordToOtherLang）。CEFR 原本是給歐洲語言用
+// 的分級標準，泰文/越南文/粵語沒有官方 CEFR 資料，但這裡讓 AI 直接比照
+// CEFR 的定義（字彙難度、使用頻率、學習階段）給一個最佳判斷值，當作粗略
+// 的難易度參考就好，不是真的官方認證等級。
+const REGISTER_CEFR_SCHEMA_PROPS = {
+  register: { type: "string", enum: ["口語", "中性", "正式"] },
+  cefr: { type: "string", enum: ["A1", "A2", "B1", "B2", "C1", "C2"] }
+};
+function registerCefrPromptLines(label){
+  return `- register：這個字/片語的語域，只能是「口語」「中性」「正式」三選一——「口語」是日常對話、朋友間會用的說法；「正式」是書面、正式場合、新聞用語；不確定就選「中性」
+- cefr：這個字/片語對應的 CEFR 難易度等級（A1/A2/B1/B2/C1/C2）。${label}如果沒有官方 CEFR 分級資料，就比照 CEFR 的定義（字彙難度、使用頻率、學習階段）給你自己最佳判斷的等級
+`;
+}
+
 async function addWordToOtherLang(lang, zhMeaning, enMeaning){
   const info = LANG_INFO[lang];
   const hasScript = info.hasScript;
@@ -1120,6 +1137,7 @@ async function addWordToOtherLang(lang, zhMeaning, enMeaning){
     properties: Object.assign(
       { text: { type: "string" } },
       hasScript ? { nativeScript: { type: "string" } } : (isIndo ? { pron: { type: "string" } } : {}),
+      REGISTER_CEFR_SCHEMA_PROPS,
       {
         quizEn: { type: "string" },
         correct: { type: "string" },
@@ -1128,12 +1146,12 @@ async function addWordToOtherLang(lang, zhMeaning, enMeaning){
     ),
     required: ["text"].concat(
       hasScript ? ["nativeScript"] : (isIndo ? ["pron"] : [])
-    ).concat(["quizEn", "correct", "distractors"]),
+    ).concat(["register", "cefr", "quizEn", "correct", "distractors"]),
     additionalProperties: false
   };
   const prompt = `你是${info.teacher}，正在幫學生把一個已經確定好意思的詞/片語加進${info.label} Flash Card 單字表。這個詞的中文意思是「${zhMeaning || ""}」${enMeaning ? `，英文意思是「${enMeaning}」` : ""}（意思已經確定，不用重新猜，直接照這個意思翻譯成${info.label}）。請提供：
 - text：${hasScript ? `這個詞/片語最自然的${info.label}羅馬拼音寫法（口語、初學者程度、日常生活最常用的說法）` : `這個詞/片語最自然的${info.label}寫法（口語、初學者程度、日常生活最常用的說法）`}
-${hasScript ? `- nativeScript：跟 text 是同一句話的${info.label}原生文字書寫（給語音朗讀引擎用）\n` : ""}${isIndo ? `- pron：這個詞的發音標注，採用印尼文詞典 KBBI 的標音慣例——e 依照實際發音標成一般 e／é／è，其餘字母照原樣\n` : ""}- quizEn：一句能表達這個詞意思的英文例句
+${hasScript ? `- nativeScript：跟 text 是同一句話的${info.label}原生文字書寫（給語音朗讀引擎用）\n` : ""}${isIndo ? `- pron：這個詞的發音標注，採用印尼文詞典 KBBI 的標音慣例——e 依照實際發音標成一般 e／é／è，其餘字母照原樣\n` : ""}${registerCefrPromptLines(info.label)}- quizEn：一句能表達這個詞意思的英文例句
 - correct：quizEn 對應的${info.label}翻譯句子${hasScript ? "，用羅馬拼音寫" : ""}，要用到這個目標單字/片語
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${info.label}句子選項${hasScript ? "（一樣用羅馬拼音寫）" : ""}，長度和風格接近 correct，但意思不同${genderNoteForLang(lang)}`;
 
@@ -1160,7 +1178,7 @@ ${hasScript ? `- nativeScript：跟 text 是同一句話的${info.label}原生�
 
   const nextId = words.length ? Math.max(...words.map(w => w.id)) + 1 : 1;
   words.push({ id: nextId, text });
-  const entry = { zh: zhMeaning || "", en: enMeaning || "", quizEn: parsed.quizEn, correct: parsed.correct, distractors: parsed.distractors };
+  const entry = { zh: zhMeaning || "", en: enMeaning || "", register: parsed.register, cefr: parsed.cefr, quizEn: parsed.quizEn, correct: parsed.correct, distractors: parsed.distractors };
   if(hasScript) entry.nativeScript = parsed.nativeScript;
   if(isIndo) entry.pron = parsed.pron;
   db[text] = entry;
@@ -1194,6 +1212,7 @@ async function generateWordData(words){
           properties: Object.assign(
             { zh: { type: "string" }, en: { type: "string" } },
             hasScript ? { nativeScript: { type: "string" } } : (isIndo ? { pron: { type: "string" } } : {}),
+            REGISTER_CEFR_SCHEMA_PROPS,
             {
               quizEn: { type: "string" },
               correct: { type: "string" },
@@ -1203,7 +1222,7 @@ async function generateWordData(words){
           required: (hasScript
             ? ["zh", "en", "nativeScript"]
             : (isIndo ? ["zh", "en", "pron"] : ["zh", "en"])
-          ).concat(["quizEn", "correct", "distractors"]),
+          ).concat(["register", "cefr", "quizEn", "correct", "distractors"]),
           additionalProperties: false
         }
       }
@@ -1218,7 +1237,7 @@ async function generateWordData(words){
 - zh：繁體中文意思
 - en：英文意思
 - nativeScript：這個字/句子對應、最正確常用的${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）。這是把學生自己打的羅馬拼音轉成正確的原生文字書寫，是同一句話的另一種寫法，不是翻譯或新造句——學生原文用的代名詞/用字要保留，不要因為下面的說話者身分設定就換掉（那個設定只用在 correct、distractors 這種你自己要新造句子的地方）
-- quizEn：一句能表達這個單字/片語意思的英文例句
+${registerCefrPromptLines(L().label)}- quizEn：一句能表達這個單字/片語意思的英文例句
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語；如果有好幾種同樣正確的說法，選日常生活中最普遍、最多人用的那個，不要選比較少用或比較正式的同義詞）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
 
@@ -1235,7 +1254,7 @@ ${list}`;
   - 閉前元音 /e/（例如 "sore"、"meja" 的 e）標成 é
   - 開前元音 /ɛ/（例如 "enak" 的 e、"apel" 的 e）標成 è
   其餘字母照原樣，不用改；如果整個字/句子裡沒有任何 e，pron 就跟原文字一樣
-- quizEn：一句能表達這個單字/片語意思的英文例句
+${registerCefrPromptLines(L().label)}- quizEn：一句能表達這個單字/片語意思的英文例句
 - correct：quizEn 對應的、自然的印尼文翻譯句子（要用到這個目標單字/片語）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的印尼文句子選項（長度和風格接近 correct，但意思不同）
 
@@ -1250,7 +1269,7 @@ ${list}`;
     prompt = `你是${L().teacher}，正在幫一位母語為中文的學生製作 Flash Card 和測驗題。針對下面每一個${L().label}單字或句子，依序提供：
 - zh：繁體中文意思
 - en：英文意思（如果輸入本身就是英文，這裡就照抄或給一個字典基本形式，不用刻意換句話說）
-- quizEn：一句能表達這個單字/片語意思的英文例句
+${registerCefrPromptLines(L().label)}- quizEn：一句能表達這個單字/片語意思的英文例句
 - correct：quizEn 對應的、自然的${L().label}翻譯句子（要用到這個目標單字/片語；如果有好幾種同樣正確的說法，選日常生活中最普遍、最多人用的那個）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（長度和風格接近 correct，但意思不同）
 
@@ -1264,13 +1283,14 @@ ${list}`;
   return parsed.entries;
 }
 
-// 專門補測驗資料（quizEn/correct/distractors）用，給已經確定好正確意思的字——
-// 例如例句點字新增的字，意思是根據那句話的上下文判斷出來的，比孤立看這個字
-// 本身準確很多。如果這種字缺測驗資料時也丟給 generateWordData 補齊，它只看
-// 孤立的字本身重新翻譯一次，容易翻回去這個拼音最常見、但其實是錯的那個意思，
-// 等於把已經正確的資料蓋掉（實測發生過：越南文 lam 已經正確判斷成 lắm「非常」，
-// 結果被這個流程蓋成 làm「做」）。這裡完全不重新判斷 nativeScript/zh/en，
-// 直接拿現成的意思當前提出測驗題，不會有蓋掉正確資料的風險。
+// 專門補測驗資料（quizEn/correct/distractors）跟口語/難易度標註（register/
+// cefr）用，給已經確定好正確意思的字——例如例句點字新增的字，意思是根據
+// 那句話的上下文判斷出來的，比孤立看這個字本身準確很多。如果這種字缺資料時
+// 也丟給 generateWordData 補齊，它只看孤立的字本身重新翻譯一次，容易翻回去
+// 這個拼音最常見、但其實是錯的那個意思，等於把已經正確的資料蓋掉（實測發生
+// 過：越南文 lam 已經正確判斷成 lắm「非常」，結果被這個流程蓋成 làm「做」）。
+// 這裡完全不重新判斷 nativeScript/zh/en，直接拿現成的意思當前提出題、標語域
+// 難易度，不會有蓋掉正確資料的風險。
 async function generateQuizDataForKnownWords(items){
   const hasScript = L().hasScript;
   const schema = {
@@ -1280,12 +1300,16 @@ async function generateQuizDataForKnownWords(items){
         type: "array",
         items: {
           type: "object",
-          properties: {
-            quizEn: { type: "string" },
-            correct: { type: "string" },
-            distractors: { type: "array", items: { type: "string" } }
-          },
-          required: ["quizEn", "correct", "distractors"],
+          properties: Object.assign(
+            {},
+            REGISTER_CEFR_SCHEMA_PROPS,
+            {
+              quizEn: { type: "string" },
+              correct: { type: "string" },
+              distractors: { type: "array", items: { type: "string" } }
+            }
+          ),
+          required: ["register", "cefr", "quizEn", "correct", "distractors"],
           additionalProperties: false
         }
       }
@@ -1295,7 +1319,7 @@ async function generateQuizDataForKnownWords(items){
   };
   const list = items.map((it, i) => `${i + 1}. ${L().label}：${(hasScript && it.nativeScript) || it.text}（羅馬拼音：${it.text}${it.zh ? `，中文意思：${it.zh}` : ""}）`).join("\n");
   const prompt = `你是${L().teacher}，正在幫學生準備測驗題。下面每一項的${L().label}原生文字跟中文意思都已經確定好了，不用重新判斷、猜測、或翻譯，直接照給定的內容出題就好。針對每一項提供：
-- quizEn：一句能表達這個字/片語意思的英文例句
+${registerCefrPromptLines(L().label)}- quizEn：一句能表達這個字/片語意思的英文例句
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語，意思一定要跟給定的中文意思一致，不要憑拼音本身另外猜一個不同的意思）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
 
@@ -1360,6 +1384,7 @@ async function convertWordsToTargetLang(words){
           properties: Object.assign(
             { source: { type: "string" }, romanized: { type: "string" } },
             hasScript ? { nativeScript: { type: "string" } } : {},
+            REGISTER_CEFR_SCHEMA_PROPS,
             {
               zh: { type: "string" },
               en: { type: "string" },
@@ -1371,7 +1396,7 @@ async function convertWordsToTargetLang(words){
           required: (hasScript
             ? ["source", "romanized", "nativeScript"]
             : ["source", "romanized"]
-          ).concat(["zh", "en", "quizEn", "correct", "distractors"]),
+          ).concat(["register", "cefr", "zh", "en", "quizEn", "correct", "distractors"]),
           additionalProperties: false
         }
       }
@@ -1386,7 +1411,7 @@ async function convertWordsToTargetLang(words){
 - romanized：對應的${L().label}，用羅馬拼音（英文字母）寫。**先判斷這一項原本是什麼語言，這個判斷結果決定下面走哪一條規則，兩條規則不能混用：**
   - **情況A／這一項原本就已經是${L().label}（學生自己打的，不是別的語言）**：不用翻譯、不用換句話說、不用「挑一個更常見/更完整/更清楚的說法」，直接把學生打的原文原封不動當作 romanized 輸出，包括代名詞、俚語、非正式縮寫或簡稱（例如「ish」這種口語用法，即使聽起來不是一個「完整」的字，也不要展開/改寫成別的字或片語，例如不能因為「ish」的意思接近「kind of」就換成「kind of」——那是翻譯，不是保留原文）。粗俗、直接、不客氣的用字（髒話、粗話等）也一樣原封不動保留，不要因為比較委婉、禮貌而偷換成別的字。學生很多時候是從電影/影集/歌曲裡聽到某個道地說法特地要背下來，即使是少見、特殊語境的版本也一律照原文保留。唯一可以修正的情況：原文本身文法錯誤、拼字明顯打錯、或意思根本不通，這時候才能修正，而且只能修到「文法/拼字正確」為止，不能進一步換成別的慣用語或別的說法。代名詞也一樣要保留原文本來的用字（例如原文用「tôi」就照樣保留「tôi」，不要因為下面的說話者身分設定換掉——那個設定只用在你自己新造句子的地方，即 correct、distractors，不適用在 romanized/nativeScript 這裡）。
   - **情況B／這一項原本是別的語言，需要翻譯成${L().label}**：找出意思對應的${L().label}。如果這一項只是單一個字/片語、同一個概念有好幾種同樣正確的說法，選日常生活中「最普遍、大多數母語人士第一個會用」的那個版本，不要選比較少用、比較正式、或語氣比較特殊/侷限的同義詞，拼法要口語、初學者好記，不用正式音標系統。如果這一項本身是一整句話（不只是單一個字或片語），請把整句話完整翻譯出來，不能只挑其中一個字或縮短成關鍵字——「選最普遍常用的說法」只適用在同一個概念有多種同義字可以選的情況，不代表可以把一整句話簡化掉、只保留開頭的一部分${scriptLine}
-- zh：繁體中文意思，用字典基本形式（例如原文如果是某個動詞的過去式/複數/其他變化形，也只寫這個字最基本、查字典會查到的那個意思，不要照抄原文的時態/型態）
+${registerCefrPromptLines(L().label)}- zh：繁體中文意思，用字典基本形式（例如原文如果是某個動詞的過去式/複數/其他變化形，也只寫這個字最基本、查字典會查到的那個意思，不要照抄原文的時態/型態）
 - en：英文意思，同樣用字典基本形式（例如原文如果是 "slept"，這裡還是要寫 "sleep"，不要寫成 "slept"）——這個欄位是給之後搜尋、跨語言比對用的，要盡量保持一致、乾淨
 - quizEn：一句能表達這個單字/片語意思的英文例句
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語，一樣要選最普遍常用的說法）
@@ -3004,6 +3029,13 @@ function getVisibleWords(){
   return list;
 }
 
+const REGISTER_ICON = { "口語": "🗣️", "正式": "📖", "中性": "💬" };
+function regCefrTagHtml(data){
+  if(!data || !data.register || !data.cefr) return "";
+  const icon = REGISTER_ICON[data.register] || "💬";
+  return ` <span class="reg-cefr-tag">${icon}${data.register}・${data.cefr}</span>`;
+}
+
 function createWordItem(w){
   const data = lookup(w.text);
   const row = document.createElement("label");
@@ -3016,7 +3048,7 @@ function createWordItem(w){
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
       <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
-      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "")) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
     </div>
   `;
   row.querySelector("input").addEventListener("change", (e) => {
@@ -4130,7 +4162,7 @@ async function processConvertImportText(rawText){
               // 問題、就是想拿新生成的結果覆蓋掉舊的，不是單純跳過。
               if(forceReconvert){
                 customDB[existing.text] = {
-                  zh: entry.zh, en: entry.en,
+                  zh: entry.zh, en: entry.en, register: entry.register, cefr: entry.cefr,
                   quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
                 };
                 convertedMap[sourceKey] = existing.text;
@@ -4146,7 +4178,7 @@ async function processConvertImportText(rawText){
               // 用這次新生成的資料覆蓋掉舊的（原地更新，不新增字、不留舊資料）。
               if(forceReconvert){
                 customDB[existing.text] = {
-                  zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript,
+                  zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr,
                   quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
                 };
                 convertedMap[sourceKey] = existing.text;
@@ -4162,7 +4194,7 @@ async function processConvertImportText(rawText){
           nextId++;
           allWords.push({ id: nextId, text: finalText });
           customDB[finalText] = {
-            zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript,
+            zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr,
             quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
           };
           addedCount++;
