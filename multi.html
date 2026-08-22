@@ -1572,6 +1572,35 @@ let usageCache = {};
 try{ usageCache = JSON.parse(localStorage.getItem(lsKey(USAGE_CACHE_LS))) || {}; }catch(e){ usageCache = {}; }
 function saveUsageCache(){ localStorage.setItem(lsKey(USAGE_CACHE_LS), JSON.stringify(usageCache)); }
 
+// 日文文法解析——只有日文語感上助詞、動詞變化這些對中文母語者比較難懂，
+// 其他語言（尤其印尼文/馬來文這種語序接近中文的）用不太到，先只做日文。
+const GRAMMAR_BREAKDOWN_CACHE_LS = "flashcard_grammar_breakdown_cache_v1";
+let grammarBreakdownCache = {};
+try{ grammarBreakdownCache = JSON.parse(localStorage.getItem(lsKey(GRAMMAR_BREAKDOWN_CACHE_LS))) || {}; }catch(e){ grammarBreakdownCache = {}; }
+function saveGrammarBreakdownCache(){ localStorage.setItem(lsKey(GRAMMAR_BREAKDOWN_CACHE_LS), JSON.stringify(grammarBreakdownCache)); }
+
+async function getGrammarBreakdown(sentenceNative){
+  if(grammarBreakdownCache[sentenceNative]) return grammarBreakdownCache[sentenceNative];
+  const schema = {
+    type: "object",
+    properties: { breakdown: { type: "string" } },
+    required: ["breakdown"],
+    additionalProperties: false
+  };
+  const prompt = `你是日語老師，正在幫一位母語是中文的初學者解析下面這句日文的文法結構。請用繁體中文說明，內容包含：
+- 把句子拆成幾個部分（詞或片語），每個部分標出詞性/角色（例如：主詞、助詞「は」標主題、動詞的て形、被動態等），簡短說明那個部分是什麼意思、為什麼用這個形態
+- 整體句型/文法結構的說明（例如是什麼句型、為什麼這樣排列）
+- 如果有初學者容易搞混或特別值得注意的文法點，額外提醒一下
+
+用清楚、口語化的方式解釋，不用太學術的文法術語堆疊，目標是讓看不懂這句文法的人看完就懂。
+
+日文句子：${sentenceNative}`;
+  const parsed = await callClaude(prompt, schema, 1536);
+  grammarBreakdownCache[sentenceNative] = parsed.breakdown;
+  saveGrammarBreakdownCache();
+  return parsed.breakdown;
+}
+
 async function getUsageExamples(text, zh, force){
   if(!force && usageCache[text]) return usageCache[text];
   const hasScript = L().hasScript;
@@ -2658,6 +2687,41 @@ function renderUsagePanel(panel, examples, onRegenerate){
     });
     idLine.appendChild(addSentenceBtn);
 
+    // 日文文法解析，只有日文才需要（助詞、動詞變化這些對中文母語者比較難懂，
+    // 其他語言語序/文法離中文近很多，用不太到）。
+    let grammarPanel = null;
+    if(currentLang === "ja"){
+      const grammarBtn = document.createElement("button");
+      grammarBtn.type = "button";
+      grammarBtn.className = "speak-btn";
+      grammarBtn.textContent = "🔍";
+      grammarBtn.title = "解析這句的文法";
+      idLine.appendChild(grammarBtn);
+
+      grammarPanel = document.createElement("div");
+      grammarPanel.className = "usage-note hidden";
+      grammarPanel.style.whiteSpace = "pre-wrap";
+
+      grammarBtn.addEventListener("click", async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if(!grammarPanel.classList.contains("hidden")){
+          grammarPanel.classList.add("hidden");
+          return;
+        }
+        grammarPanel.classList.remove("hidden");
+        if(grammarPanel.dataset.loaded === "1") return;
+        if(!getApiKey()){ grammarPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+        grammarPanel.textContent = "解析中...";
+        try{
+          const breakdown = await getGrammarBreakdown(ex.nativeScript || ex.id);
+          grammarPanel.textContent = breakdown;
+          grammarPanel.dataset.loaded = "1";
+        }catch(err){
+          grammarPanel.textContent = "解析失敗：" + err.message;
+        }
+      });
+    }
+
     const zhLine = document.createElement("div");
     zhLine.className = "usage-zh";
     zhLine.textContent = ex.zh;
@@ -2669,6 +2733,7 @@ function renderUsagePanel(panel, examples, onRegenerate){
     item.appendChild(idLine);
     item.appendChild(zhLine);
     item.appendChild(noteLine);
+    if(grammarPanel) item.appendChild(grammarPanel);
     panel.appendChild(item);
   });
   if(onRegenerate){
