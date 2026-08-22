@@ -4315,8 +4315,11 @@ async function processConvertImportText(rawText){
           matchedThisBatch.add(sourceKey);
           // 印尼文/馬來文這種近親語言常常同一個字兩邊拼法完全一樣，標記起來讓
           // 使用者一眼看出「這個不用特別背，兩種語言長得一樣」。純粹字面比對
-          // （不分大小寫），跟意思是否真的相同無關。
-          const sameAsSource = text.toLowerCase() === sourceKey;
+          // （不分大小寫），跟意思是否真的相同無關。這個功能沒有記錄來源是哪個
+          // 語言（貼上的文字本來就沒有語言標籤），只知道現在轉換的目標語言，
+          // 所以只在目標語言是印尼文/馬來文時才判斷，避免英文等其他語言的字剛好
+          // 拼法相同（專有名詞、外來語）也被誤標成「近親語言不用背」。
+          const sameAsSource = (currentLang === "id" || currentLang === "ms") && text.toLowerCase() === sourceKey;
           // 不管這個字是新加的還是本來就存在（同字重複），都記住這個原字對應
           // 到哪個結果字，下次匯入才有辦法確認「這個結果字是不是還在」。
           convertedMap[sourceKey] = text;
