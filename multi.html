@@ -224,6 +224,7 @@
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
+      <button id="btnSortCefr">📊 難易度排序 A1→C2</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
         <option value="S">S 超簡單</option>
@@ -975,6 +976,8 @@ let selected = savedSelected
   : new Set(allWords.map(w => w.id));
 let showSelectedOnly = false;
 let sortAZ = false;
+let sortCefr = false;
+const CEFR_SORT_RANK = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
 // 比對清單跟「已選取（練習用）」故意分開——這個只是暫時釘選幾個字方便你跨搜尋
 // 收集起來比對發音，不會動到你原本為了練習勾選的那份清單。原本設計成只存在
 // 當次瀏覽階段，但使用者實際用起來會希望重新整理、關掉再打開都還在，所以
@@ -3171,7 +3174,17 @@ function getVisibleWords(){
     const haystack = `${w.text} ${data ? data.zh : ""} ${data ? data.en : ""}`.toLowerCase();
     return haystack.includes(query);
   });
-  if(sortAZ) list.sort((a, b) => a.text.localeCompare(b.text, "id"));
+  if(sortCefr){
+    // 沒標過 CEFR 的字排最後面（99），已標的照 A1→C2 排，同等級內再照字母排。
+    list.sort((a, b) => {
+      const ra = CEFR_SORT_RANK[(lookup(a.text) || {}).cefr] || 99;
+      const rb = CEFR_SORT_RANK[(lookup(b.text) || {}).cefr] || 99;
+      if(ra !== rb) return ra - rb;
+      return a.text.localeCompare(b.text, "id");
+    });
+  }else if(sortAZ){
+    list.sort((a, b) => a.text.localeCompare(b.text, "id"));
+  }
   return list;
 }
 
@@ -3978,7 +3991,20 @@ document.getElementById("btnToggleNewlyImportedOnly").addEventListener("click", 
 updateNewlyImportedToggleLabel();
 document.getElementById("btnSortAZ").addEventListener("click", (e) => {
   sortAZ = !sortAZ;
+  if(sortAZ){
+    sortCefr = false;
+    document.getElementById("btnSortCefr").classList.remove("primary");
+  }
   e.currentTarget.classList.toggle("primary", sortAZ);
+  renderList();
+});
+document.getElementById("btnSortCefr").addEventListener("click", (e) => {
+  sortCefr = !sortCefr;
+  if(sortCefr){
+    sortAZ = false;
+    document.getElementById("btnSortAZ").classList.remove("primary");
+  }
+  e.currentTarget.classList.toggle("primary", sortCefr);
   renderList();
 });
 
