@@ -3116,6 +3116,12 @@ function regCefrTagHtml(data){
   const icon = REGISTER_ICON[data.register] || "💬";
   return ` <span class="reg-cefr-tag">${icon}${data.register}・${data.cefr}</span>`;
 }
+// 從其他語言轉換過來、拼法跟原文一模一樣的字（常見於印尼文/馬來文這種近親
+// 語言），標起來讓使用者一眼看出這個不用特別背，兩種語言長得一樣。
+function sameAsSourceTagHtml(data){
+  if(!data || !data.sameAsSource) return "";
+  return ` <span class="reg-cefr-tag" title="從其他語言轉換過來時，拼法跟原文一模一樣">🟰 跟原文相同</span>`;
+}
 
 function createWordItem(w){
   const data = lookup(w.text);
@@ -3129,7 +3135,7 @@ function createWordItem(w){
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
       <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
-      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data) + sameAsSourceTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
     </div>
   `;
   row.querySelector("input").addEventListener("change", (e) => {
@@ -4216,6 +4222,10 @@ async function processConvertImportText(rawText){
           const sourceKey = (entry.source || "").trim().toLowerCase();
           if(!text || !sourceKey || !batchWordSet.has(sourceKey)) return;
           matchedThisBatch.add(sourceKey);
+          // 印尼文/馬來文這種近親語言常常同一個字兩邊拼法完全一樣，標記起來讓
+          // 使用者一眼看出「這個不用特別背，兩種語言長得一樣」。純粹字面比對
+          // （不分大小寫），跟意思是否真的相同無關。
+          const sameAsSource = text.toLowerCase() === sourceKey;
           // 不管這個字是新加的還是本來就存在（同字重複），都記住這個原字對應
           // 到哪個結果字，下次匯入才有辦法確認「這個結果字是不是還在」。
           convertedMap[sourceKey] = text;
@@ -4243,7 +4253,7 @@ async function processConvertImportText(rawText){
               // 問題、就是想拿新生成的結果覆蓋掉舊的，不是單純跳過。
               if(forceReconvert){
                 customDB[existing.text] = {
-                  zh: entry.zh, en: entry.en, register: entry.register, cefr: entry.cefr,
+                  zh: entry.zh, en: entry.en, register: entry.register, cefr: entry.cefr, sameAsSource,
                   quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
                 };
                 convertedMap[sourceKey] = existing.text;
@@ -4259,7 +4269,7 @@ async function processConvertImportText(rawText){
               // 用這次新生成的資料覆蓋掉舊的（原地更新，不新增字、不留舊資料）。
               if(forceReconvert){
                 customDB[existing.text] = {
-                  zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr,
+                  zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, sameAsSource,
                   quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
                 };
                 convertedMap[sourceKey] = existing.text;
@@ -4275,7 +4285,7 @@ async function processConvertImportText(rawText){
           nextId++;
           allWords.push({ id: nextId, text: finalText });
           customDB[finalText] = {
-            zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr,
+            zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, sameAsSource,
             quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
           };
           addedCount++;
