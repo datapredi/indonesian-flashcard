@@ -125,6 +125,7 @@
   <h1 id="pageTitle">🇮🇩 印尼語 Flash Card</h1>
   <div class="toolbar">
     <button class="lang-btn" data-lang="id">🇮🇩 印尼文</button>
+    <button class="lang-btn" data-lang="ms">🇲🇾 馬來文</button>
     <button class="lang-btn" data-lang="th">🇹🇭 泰文</button>
     <button class="lang-btn" data-lang="vi">🇻🇳 越南文</button>
     <button class="lang-btn" data-lang="ja">🇯🇵 日文</button>
@@ -365,7 +366,7 @@
 // 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
 // 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
 const LANG_LS = "flashcard_lang_v1";
-const LANG_ORDER = ["id", "th", "vi", "ja", "ko", "yue", "en"];
+const LANG_ORDER = ["id", "ms", "th", "vi", "ja", "ko", "yue", "en"];
 let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
 function lsKey(base){ return lsKeyForLang(base, currentLang); }
 function lsKeyForLang(base, lang){ return lang === "id" ? base : `${base}_${lang}`; }
@@ -380,6 +381,12 @@ const LANG_INFO = {
     speechLang: "id-ID",
     ttsInstructions: "Speak in authentic Bahasa Indonesia with natural Indonesian pronunciation and intonation, as a native Indonesian speaker would.",
     hasScript: false // 印尼文本身就是拉丁字母，顯示文字就可以直接拿去發音
+  },
+  ms: {
+    label: "馬來文", flag: "🇲🇾", teacher: "馬來語老師",
+    speechLang: "ms-MY",
+    ttsInstructions: "Speak in authentic Bahasa Malaysia (Malaysian Malay) with natural Malaysian pronunciation and intonation, as a native Malaysian speaker would. This is distinct from Indonesian -- use Malaysia-specific vocabulary and usage, not Indonesian loanwords/spelling conventions.",
+    hasScript: false // 馬來文跟印尼文一樣本身就是拉丁字母，顯示文字就可以直接拿去發音
   },
   th: {
     label: "泰文（羅馬拼音）", flag: "🇹🇭", teacher: "泰語老師",
