@@ -1011,6 +1011,35 @@ function setOpenaiKey(k){ localStorage.setItem(OPENAI_KEY_LS, k); }
 
 let customDB = loadCustomDB();
 
+// 一次性清理：sameAsSource 曾經沒限制語言，任何目標語言只要拼法跟原文一樣
+// 就會被標「跟原文相同」，後來改成只有印尼文/馬來文才該標。這裡把非 id/ms
+// 語言裡舊資料殘留的 sameAsSource 清掉，只跑一次（用旗標記住跑過了），
+// 不會每次載入都重新掃全部語言的資料。
+const SAME_AS_SOURCE_CLEANUP_LS = "flashcard_same_as_source_cleanup_v1_done";
+if(!localStorage.getItem(SAME_AS_SOURCE_CLEANUP_LS)){
+  LANG_ORDER.forEach(lang => {
+    if(lang === "id" || lang === "ms") return;
+    const dbKey = lsKeyForLang(CUSTOM_DB_LS, lang);
+    let db;
+    try{ db = JSON.parse(localStorage.getItem(dbKey)) || {}; }catch(e){ return; }
+    let changed = false;
+    Object.keys(db).forEach(text => {
+      if(db[text] && db[text].sameAsSource){
+        delete db[text].sameAsSource;
+        changed = true;
+      }
+    });
+    if(changed) localStorage.setItem(dbKey, JSON.stringify(db));
+  });
+  // 目前這個語言的記憶體副本也要跟著清，不然要重新整理過一次才會消失。
+  if(currentLang !== "id" && currentLang !== "ms"){
+    Object.keys(customDB).forEach(text => {
+      if(customDB[text] && customDB[text].sameAsSource) delete customDB[text].sameAsSource;
+    });
+  }
+  localStorage.setItem(SAME_AS_SOURCE_CLEANUP_LS, "1");
+}
+
 // 印尼文以外的語言先給空題庫，翻譯/發音/例句都是靠 AI 生成、存進 customDB
 // （跟印尼文的 customDB 已經是同一套機制了，只是沒有內建題庫資料）。
 const EMPTY_DB = {};
