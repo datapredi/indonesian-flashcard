@@ -5037,7 +5037,15 @@ document.getElementById("listenSpeedSelect").addEventListener("change", (e) => {
 document.getElementById("btnBackFromListen").onclick = () => {
   listenRunning = false;
   if(listenTimeoutId) clearTimeout(listenTimeoutId);
-  document.getElementById("listenAudio").pause();
+  const audioEl = document.getElementById("listenAudio");
+  audioEl.pause();
+  // 跑步聽力模式調過的速度（下拉選單／按住 2 倍速）只該在跑步模式內生效，
+  // 離開時要把速度重設回 1 倍，不然單字表、Flash Card 之後用同一個
+  // <audio> 元素播放 GPT 語音時，會沿用離開前選的那個速度（回報的問題）。
+  listenBaseRate = 1;
+  listenFastMode = false;
+  audioEl.playbackRate = 1;
+  document.getElementById("listenSpeedSelect").value = "1";
   showScreen("select");
 };
 
