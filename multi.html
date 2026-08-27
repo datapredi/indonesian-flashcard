@@ -1760,6 +1760,58 @@ let antonymsCache = {};
 try{ antonymsCache = JSON.parse(localStorage.getItem(lsKey(ANTONYMS_CACHE_LS))) || {}; }catch(e){ antonymsCache = {}; }
 function saveAntonymsCache(){ localStorage.setItem(lsKey(ANTONYMS_CACHE_LS), JSON.stringify(antonymsCache)); }
 
+// 埃及口語專用：把「同一個字因為對話對象或主詞的性別／單複數而換的形式」收在
+// 同一張卡片裡看，不用把 ezayak／ezayik／ezayku 拆成三個單字。快取結構：
+// { baseNote: 變化規則說明, forms: [{ label, romanized, nativeScript, zh }] }。
+const INFLECTIONS_CACHE_LS = "flashcard_inflections_cache_v1";
+let inflectionsCache = {};
+try{ inflectionsCache = JSON.parse(localStorage.getItem(lsKey(INFLECTIONS_CACHE_LS))) || {}; }catch(e){ inflectionsCache = {}; }
+function saveInflectionsCache(){ localStorage.setItem(lsKey(INFLECTIONS_CACHE_LS), JSON.stringify(inflectionsCache)); }
+
+async function getEgyptianInflections(text, zh, nativeScript, force){
+  if(!force && inflectionsCache[text]) return inflectionsCache[text];
+  const schema = {
+    type: "object",
+    properties: {
+      baseNote: { type: "string" },
+      forms: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            label: { type: "string" },
+            romanized: { type: "string" },
+            nativeScript: { type: "string" },
+            zh: { type: "string" }
+          },
+          required: ["label", "romanized", "nativeScript", "zh"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["baseNote", "forms"],
+    additionalProperties: false
+  };
+  const prompt = `你是埃及阿拉伯語老師。下面是學生在背的一個埃及開羅口語單字/片語：
+羅馬拼音：${text}${nativeScript ? `\n阿拉伯文：${nativeScript}` : ""}${zh ? `\n中文意思：${zh}` : ""}
+
+請判斷這個字/片語會不會因為「對話對象的性別/單複數」或「主詞的性別/單複數」而換形式，如果會，列出所有常用的變化形。
+
+- forms：每一個變化形一筆
+  - label：用繁體中文標這是對誰/主詞是誰，例如「對男生」「對女生」「對一群人」「主詞是女生」「主詞是複數」，簡短即可
+  - romanized：這個變化形的羅馬拼音（拼法規則照上面埃及口語規則，跟學生原本背的那個形式一致）
+  - nativeScript：對應的埃及口語阿拉伯文
+  - zh：這個變化形的中文意思（通常跟原本一樣，可補一句對象說明）
+- baseNote：用一句繁體中文說明變化規則（例如「字尾 -ak 對男生、-ik 對女生、-ku 對多人」）；如果這個字根本不會變（固定客套話、名詞、感嘆詞、數字等），baseNote 說明「這個字沒有性別/單複數變化」，forms 回傳空陣列
+
+學生原本背的那個形式也要放進 forms（照它原本的樣子，不要漏），順序照「對男生→對女生→對多人」之類的自然順序。${genderNoteForLang("arz")}`;
+  const parsed = await callClaude(prompt, schema, 2048);
+  const result = { baseNote: parsed.baseNote || "", forms: parsed.forms || [] };
+  inflectionsCache[text] = result;
+  saveInflectionsCache();
+  return result;
+}
+
 async function getAntonyms(text, zh, nativeScript){
   if(antonymsCache[text]) return antonymsCache[text];
   const hasScript = L().hasScript;
@@ -2354,12 +2406,13 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel, antonymsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
     el.insertBefore(crossLangPanel, el.firstChild);
     el.insertBefore(minimalPairsPanel, crossLangPanel);
     el.insertBefore(nativeTonePanel, minimalPairsPanel);
     el.insertBefore(tonePanel, nativeTonePanel);
-    el.insertBefore(antonymsPanel, tonePanel);
+    el.insertBefore(inflectionsPanel, tonePanel);
+    el.insertBefore(antonymsPanel, inflectionsPanel);
     el.insertBefore(usagePanel, antonymsPanel);
     el.insertBefore(row, usagePanel);
   }
@@ -2911,6 +2964,75 @@ function renderAntonymsPanel(panel, antonyms){
     item.appendChild(zhLine);
     panel.appendChild(item);
   });
+}
+
+function renderInflectionsPanel(panel, result, onRegenerate){
+  panel.innerHTML = "";
+  const forms = (result && result.forms) || [];
+  if(result && result.baseNote){
+    const note = document.createElement("div");
+    note.className = "usage-zh";
+    note.style.marginBottom = "8px";
+    note.textContent = result.baseNote;
+    panel.appendChild(note);
+  }
+  if(forms.length === 0){
+    if(!result || !result.baseNote) panel.textContent = "這個字沒有性別/單複數變化。";
+  } else {
+    forms.forEach(f => {
+      const item = document.createElement("div");
+      item.className = "usage-example";
+
+      const idLine = document.createElement("div");
+      idLine.className = "usage-id";
+      const label = document.createElement("span");
+      label.textContent = `${f.label ? f.label + "：" : ""}${f.romanized}`;
+      idLine.appendChild(label);
+
+      const speakBtn = document.createElement("button");
+      speakBtn.type = "button";
+      speakBtn.className = "speak-btn";
+      speakBtn.textContent = "🔊";
+      speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(f.nativeScript || f.romanized, speakBtn); });
+      idLine.appendChild(speakBtn);
+
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "speak-btn";
+      const inList = isNativeScriptInList(f.nativeScript);
+      addBtn.textContent = inList ? "已加入" : "➕ 加入單字表";
+      if(inList) addBtn.disabled = true;
+      addBtn.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        let t = (f.romanized || "").trim();
+        if(!t) return;
+        if(allWords.some(w => w.text.toLowerCase() === t.toLowerCase())){
+          let suffix = 2;
+          while(allWords.some(w => w.text.toLowerCase() === `${t} (${suffix})`.toLowerCase())) suffix++;
+          t = `${t} (${suffix})`;
+        }
+        if(addWordToList(t)){ addBtn.textContent = "已加入"; addBtn.disabled = true; }
+      });
+      idLine.appendChild(addBtn);
+
+      const zhLine = document.createElement("div");
+      zhLine.className = "usage-zh";
+      zhLine.textContent = f.zh || "";
+
+      item.appendChild(idLine);
+      item.appendChild(zhLine);
+      panel.appendChild(item);
+    });
+  }
+  if(onRegenerate){
+    const regenBtn = document.createElement("button");
+    regenBtn.type = "button";
+    regenBtn.className = "speak-btn";
+    regenBtn.textContent = "🔄 重新生成";
+    regenBtn.title = "重新問一次 AI（會蓋掉目前存的版本）";
+    regenBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); onRegenerate(); });
+    panel.appendChild(regenBtn);
+  }
 }
 
 function renderExistingMatchesSection(container, matches){
@@ -3629,6 +3751,38 @@ function createWordItem(w){
   });
   row.appendChild(antonymsBtn);
 
+  // 埃及口語專用：同一個字的人稱/性別/單複數變化形（ezayak／ezayik／ezayku…）
+  // 收在同一張卡片裡，不用拆成多個單字。其他語言不顯示這顆按鈕。
+  const inflectionsPanel = document.createElement("div");
+  inflectionsPanel.className = "usage-panel hidden";
+  if(currentLang === "arz"){
+    const inflectionsBtn = document.createElement("button");
+    inflectionsBtn.type = "button";
+    inflectionsBtn.className = "usage-btn";
+    inflectionsBtn.textContent = "🔀";
+    inflectionsBtn.title = "AI 列出人稱/性別/單複數變化形（對男生/女生/多人…）";
+    inflectionsBtn.setAttribute("aria-label", `AI 列出 ${w.text} 的變化形`);
+    async function loadInflectionsPanel(force){
+      if(!force && inflectionsPanel.dataset.loaded === "1") return;
+      if(!getApiKey()){ inflectionsPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+      inflectionsPanel.textContent = "生成中...";
+      try{
+        const result = await getEgyptianInflections(w.text, data ? data.zh : "", data ? data.nativeScript : "", force);
+        renderInflectionsPanel(inflectionsPanel, result, () => loadInflectionsPanel(true));
+        inflectionsPanel.dataset.loaded = "1";
+      }catch(err){
+        inflectionsPanel.textContent = "生成失敗：" + err.message;
+      }
+    }
+    inflectionsBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!inflectionsPanel.classList.contains("hidden")){ inflectionsPanel.classList.add("hidden"); return; }
+      inflectionsPanel.classList.remove("hidden");
+      await loadInflectionsPanel(false);
+    });
+    row.appendChild(inflectionsBtn);
+  }
+
   // 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。兩種語言
   // 用同一套按鈕/面板/快取機制，只是呼叫的 AI 函式跟顯示文字不同。
   const toneLangActive = isToneLangActive();
@@ -3904,7 +4058,7 @@ function createWordItem(w){
   });
   row.appendChild(crossLangBtn);
 
-  return { row, usagePanel, antonymsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
+  return { row, usagePanel, antonymsPanel, inflectionsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
 }
 
 function updatePendingSyncBar(){
@@ -3938,10 +4092,11 @@ function renderList(){
     el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel, antonymsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
     el.appendChild(antonymsPanel);
+    el.appendChild(inflectionsPanel);
     el.appendChild(tonePanel);
     el.appendChild(nativeTonePanel);
     el.appendChild(minimalPairsPanel);
