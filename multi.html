@@ -102,6 +102,11 @@
   .card-area .card-native{font-size:1.15rem; color:var(--accent2); margin-top:6px;}
   .card-area .card-native:empty{display:none;}
   .front-pron.is-native{font-size:1.15rem; color:var(--text); margin-top:6px;}
+  /* 埃及阿拉伯文客套話的固定對答：只有少數詞（打招呼、道謝、道賀…）會有，
+     一般字沒有這行，所以列表上自然只有那幾個字會浮出來 */
+  .native-ar{font-family:"Geeza Pro","Damascus","Al Bayan",-apple-system,sans-serif;}
+  .item .reply-line{font-size:0.82rem; color:var(--accent2); margin-top:2px;}
+  .item .reply-line .speak-btn{padding:1px 6px; font-size:0.78rem; margin-left:4px;}
   .listen-btn{margin-top:14px; padding:9px 16px; border-radius:999px; font-weight:600;}
   .listen-btn.speaking{opacity:0.6;}
   .progress{text-align:center; color:var(--muted); font-size:0.85rem; margin:10px 0;}
@@ -221,8 +226,10 @@
       <button id="btnGenerateAllTones" class="hidden">🎵 全部生成聲調標記</button>
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
       <button id="btnBackfillRegisterCefr">🏷️ 補齊口語/難易度標籤</button>
+      <button id="btnBackfillReplies" class="hidden">💬 補上常見回覆（埃及）</button>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
+    <div class="note hidden" id="repliesNote">埃及阿拉伯文專用：掃過勾選的字，判斷哪些是有固定口語對答的客套話（打招呼、道謝、道賀…），有的話把「對方通常會怎麼回」顯示在那個字下面。一般字彙不會有這行。</div>
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
     <div class="toolbar">
       <input type="text" id="wordSearch" placeholder="搜尋印尼文或中文...">
@@ -523,6 +530,8 @@ function updateLangButtons(){
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", !toneLangActiveTop);
   document.getElementById("btnGenerateAllTones").textContent = "🎵 全部生成聲調標記";
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
+  document.getElementById("btnBackfillReplies").classList.toggle("hidden", currentLang !== "arz");
+  document.getElementById("repliesNote").classList.toggle("hidden", currentLang !== "arz");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -1420,6 +1429,52 @@ ${registerCefrPromptLines(L().label)}
 請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
 
 單字/片語清單：
+${list}`;
+  const parsed = await callClaude(prompt, schema, 2048);
+  return parsed.entries;
+}
+
+// 埃及阿拉伯文專用：判斷這個詞是不是「有固定口語對答的客套話」（打招呼、道謝、
+// 道賀、祝福、السلام عليكم 之類），是的話給出對方通常會怎麼回。絕大多數一般
+// 字彙（名詞/動詞/形容詞）沒有這種對答，hasReply 回 false 就好，不要硬湊。
+async function generateEgyptianRepliesForKnownWords(items){
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            hasReply: { type: "boolean" },
+            romanized: { type: "string" },
+            nativeScript: { type: "string" },
+            zh: { type: "string" },
+            note: { type: "string" }
+          },
+          required: ["hasReply", "romanized", "nativeScript", "zh", "note"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  const list = items.map((it, i) => `${i + 1}. ${(it.nativeScript && it.nativeScript + "（") || ""}羅馬拼音 ${it.text}${it.nativeScript ? "）" : ""}${it.zh ? `，中文意思：${it.zh}` : ""}`).join("\n");
+  const prompt = `你是埃及阿拉伯語老師。下面每一項是學生在背的埃及阿拉伯文（開羅口語）單字/片語，意思已經確定，不用重新翻譯。
+
+針對每一項，判斷它是不是「一種有固定、慣用口語對答的說法」——例如打招呼（صباح الخير → صباح النور）、問候（إزيك → الحمد لله）、道謝（شكراً → العفو）、道賀（مبروك → الله يبارك فيك）、祝福、السلام عليكم、打噴嚏、剪髮/洗澡後的 نعيماً 等等。
+
+- 如果「是」：hasReply=true，並給出埃及人最自然的回覆：
+  - romanized：回覆的埃及口語羅馬拼音
+  - nativeScript：回覆的阿拉伯文書寫（埃及口語，不要標準語）
+  - zh：回覆的繁體中文意思
+  - note：一句話說明這個對答的使用情境（繁體中文）
+- 如果「不是」（絕大多數一般字彙都不是）：hasReply=false，其餘欄位一律填空字串 ""，不要硬掰一個回覆。
+
+請依輸入順序輸出，數量一致，不要合併或省略。
+
+清單：
 ${list}`;
   const parsed = await callClaude(prompt, schema, 2048);
   return parsed.entries;
@@ -3075,6 +3130,15 @@ document.getElementById("btnGenerateAll").onclick = async () => {
       }
     }
 
+    // 埃及阿拉伯文：順便掃一遍「常見回覆」（客套話才會有），只處理還沒查過的。
+    // 非致命，失敗不擋後面的例句/發音。
+    if(currentLang === "arz"){
+      const needReply = list.filter(w => { const d = lookup(w.text); return d && d.zh && !("reply" in d); });
+      if(needReply.length){
+        try{ await backfillEgyptianReplies(needReply, btn, "查常見回覆中"); }catch(e){ /* 忽略，繼續 */ }
+      }
+    }
+
     // 第二階段：逐字生成例句 + 發音（單字本身的發音、中文意思的發音）。已經生成過、
     // 存在快取裡的會自動跳過，不會重複花錢；單一個字失敗不中斷整個流程，繼續下一個。
     let done = 0;
@@ -3090,6 +3154,11 @@ document.getElementById("btnGenerateAll").onclick = async () => {
       }catch(e){ failCount++; }
       try{
         if(data && data.zh) await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
+      }catch(e){ failCount++; }
+      try{
+        if(currentLang === "arz" && data && data.reply && data.reply.nativeScript){
+          await getTTSAudioBlob(data.reply.nativeScript, L().ttsInstructions);
+        }
       }catch(e){ failCount++; }
       done++;
     }
@@ -3201,6 +3270,58 @@ document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
   }
 };
 
+// 埃及阿拉伯文「常見回覆」補資料：判斷每個字要不要有對方回覆，有的話存成
+// data.reply（{romanized, nativeScript, zh, note}），沒有的話存 reply=null，
+// 這樣下次就不會再問一次。btnBackfillReplies 跟「全部生成」共用這個。
+async function backfillEgyptianReplies(list, btn, labelPrefix){
+  const batches = chunkArr(list, 20);
+  let done = 0;
+  let failCount = 0;
+  for(const batch of batches){
+    if(btn) btn.textContent = `${labelPrefix}... (${done}/${list.length})`;
+    try{
+      const items = batch.map(w => {
+        const d = lookup(w.text) || {};
+        return { text: w.text, nativeScript: d.nativeScript, zh: d.zh };
+      });
+      const entries = await generateEgyptianRepliesForKnownWords(items);
+      batch.forEach((w, i) => {
+        const e = entries[i];
+        if(!e) return;
+        const reply = e.hasReply
+          ? { romanized: e.romanized, nativeScript: e.nativeScript, zh: e.zh, note: e.note }
+          : null;
+        customDB[w.text] = Object.assign({}, lookup(w.text), { reply });
+      });
+      saveCustomDB();
+    }catch(err){ failCount += batch.length; }
+    done += batch.length;
+    renderList();
+  }
+  return { done, failCount };
+}
+
+document.getElementById("btnBackfillReplies").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  const list = allWords.filter(w => selected.has(w.id)).filter(w => {
+    const data = lookup(w.text);
+    return data && data.zh && !("reply" in data);
+  });
+  if(list.length === 0){ alert("勾選的字裡面，沒有「已經有意思、但還沒查過常見回覆」的字（可以先按上面的「全選」再試一次）。"); return; }
+  const btn = document.getElementById("btnBackfillReplies");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  await acquireWakeLock();
+  try{
+    const { done, failCount } = await backfillEgyptianReplies(list, btn, "查常見回覆中");
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    alert(`完成，掃過 ${done} 個字，有回覆的會顯示在字下面。${failCount > 0 ? `有 ${failCount} 個失敗（可能是網路不穩），可以再按一次，已經處理過的不會重跑。` : ""}`);
+  } finally {
+    releaseWakeLock();
+  }
+};
+
 function getVisibleWords(){
   // 比對清單模式優先權最高：只看你釘選過的那幾個字，忽略搜尋框跟難度篩選，
   // 這樣不管搜尋框現在打什麼，畫面都只會顯示你真正想比對的那幾個。
@@ -3265,8 +3386,22 @@ function createWordItem(w){
       <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
       <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data) + sameAsSourceTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+      ${currentLang === "arz" && data && data.reply ? `<div class="reply-line" title="${(data.reply.note || "").replace(/"/g, "&quot;")}">↩︎ 對方回：<bdi dir="rtl" class="native-ar">${data.reply.nativeScript || ""}</bdi> ${data.reply.romanized || ""}${data.reply.zh ? " · " + data.reply.zh : ""}</div>` : ""}
     </div>
   `;
+  if(currentLang === "arz" && data && data.reply){
+    const replyLine = row.querySelector(".reply-line");
+    const replySpeakBtn = document.createElement("button");
+    replySpeakBtn.type = "button";
+    replySpeakBtn.className = "speak-btn";
+    replySpeakBtn.textContent = "🔊";
+    replySpeakBtn.title = "播放對方的回覆";
+    replySpeakBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      speak(data.reply.nativeScript || data.reply.romanized, replySpeakBtn);
+    });
+    replyLine.appendChild(replySpeakBtn);
+  }
   row.querySelector("input").addEventListener("change", (e) => {
     const id = Number(e.target.dataset.id);
     if(e.target.checked) selected.add(id); else selected.delete(id);
@@ -4530,6 +4665,10 @@ function renderCard(){
   const pronText = (data && data.pron && data.pron !== w.text) ? ` [${data.pron}]` : "";
   // 日文漢字假名原文（其他 hasScript 語言的原生文字刻意不顯示，見 CSS 註解）
   const nativeText = (currentLang === "ja" && data && data.nativeScript) ? data.nativeScript : "";
+  // 埃及阿拉伯文客套話的固定回覆（只有少數字有），跟著背面一起翻開
+  const replyText = (currentLang === "arz" && data && data.reply)
+    ? `↩︎ 對方回：${data.reply.romanized || data.reply.nativeScript || ""}${data.reply.zh ? " · " + data.reply.zh : ""}`
+    : "";
   const cardNative = document.getElementById("cardNative");
   if(cardDirection === "id-zh"){
     document.getElementById("cardFront").textContent = w.text;
@@ -4537,14 +4676,14 @@ function renderCard(){
     document.getElementById("cardPron").textContent = nativeText || pronText.trim();
     document.getElementById("cardPron").classList.toggle("is-native", !!nativeText);
     document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
-    cardNative.textContent = "";
+    cardNative.textContent = replyText;
   } else {
     document.getElementById("cardFront").textContent = data ? data.zh : "尚無翻譯資料";
     document.getElementById("cardPron").textContent = "";
     document.getElementById("cardPron").classList.remove("is-native");
     document.getElementById("cardBack").textContent = w.text + pronText;
     // 中文回想日文時，漢字原文是答案的一部分，跟著背面一起翻開才顯示
-    cardNative.textContent = nativeText;
+    cardNative.textContent = [nativeText, replyText].filter(Boolean).join("　");
   }
   document.getElementById("cardBack").classList.add("hidden");
   cardNative.classList.add("hidden");
