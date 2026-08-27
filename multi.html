@@ -95,6 +95,13 @@
   .front-pron{font-size:0.95rem; color:var(--muted); margin-top:4px;}
   .item .pron{color:var(--muted); font-weight:400; font-size:0.85rem;}
   .card-area .back{font-size:1.05rem; color:var(--accent2); margin-top:12px;}
+  /* 日文漢字假名原文：中文母語者看得懂漢字，值得直接顯示（其他 hasScript 語言
+     的原生文字則刻意不給，那些是使用者主動選擇不學的） */
+  .native-jp{font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","YuGothic",-apple-system,"PingFang TC",sans-serif;}
+  .item .native-text{font-size:1rem; margin-top:1px;}
+  .card-area .card-native{font-size:1.15rem; color:var(--accent2); margin-top:6px;}
+  .card-area .card-native:empty{display:none;}
+  .front-pron.is-native{font-size:1.15rem; color:var(--text); margin-top:6px;}
   .listen-btn{margin-top:14px; padding:9px 16px; border-radius:999px; font-weight:600;}
   .listen-btn.speaking{opacity:0.6;}
   .progress{text-align:center; color:var(--muted); font-size:0.85rem; margin:10px 0;}
@@ -131,6 +138,7 @@
     <button class="lang-btn" data-lang="ja">🇯🇵 日文</button>
     <button class="lang-btn" data-lang="ko">🇰🇷 韓文</button>
     <button class="lang-btn" data-lang="yue">🇭🇰 粵語</button>
+    <button class="lang-btn" data-lang="arz">🇪🇬 埃及阿拉伯文</button>
     <button class="lang-btn" data-lang="en">🇺🇸 英文</button>
   </div>
   <div class="toolbar hidden" id="thaiAlphabetBar">
@@ -279,6 +287,7 @@
       <div class="front-pron" id="cardPron"></div>
       <button type="button" class="listen-btn" id="cardSpeak">🔊 播放發音</button>
       <div class="back hidden" id="cardBack"></div>
+      <div class="card-native native-jp hidden" id="cardNative"></div>
     </div>
     <div class="nav hidden" id="cardAssessRow">
       <button id="btnCardWrong">✗ 還要練習</button>
@@ -367,7 +376,7 @@
 // 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
 // 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
 const LANG_LS = "flashcard_lang_v1";
-const LANG_ORDER = ["id", "ms", "th", "vi", "ja", "ko", "yue", "en"];
+const LANG_ORDER = ["id", "ms", "th", "vi", "ja", "ko", "yue", "arz", "en"];
 let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
 function lsKey(base){ return lsKeyForLang(base, currentLang); }
 function lsKeyForLang(base, lang){ return lang === "id" ? base : `${base}_${lang}`; }
@@ -423,6 +432,12 @@ const LANG_INFO = {
     ttsInstructions: "Speak in authentic Cantonese (Hong Kong / Guangzhou dialect), not Mandarin, with natural Cantonese pronunciation, intonation, and tones, as a native Cantonese speaker would.",
     hasScript: true
   },
+  arz: {
+    label: "埃及阿拉伯文（羅馬拼音）", flag: "🇪🇬", teacher: "埃及阿拉伯語老師",
+    speechLang: "ar-EG",
+    ttsInstructions: "Speak in authentic Egyptian Arabic (Cairene colloquial, اللهجة المصرية العامية) with natural Egyptian pronunciation and intonation, as a native Cairo speaker would -- e.g. pronounce ج as a hard 'g'. This is spoken Egyptian Masri, not Modern Standard Arabic.",
+    hasScript: true // 顯示的是羅馬拼音，真正要發音必須用 AI 額外生成的阿拉伯文原生文字（nativeScript）
+  },
   en: {
     label: "英文", flag: "🇺🇸", teacher: "英語老師",
     speechLang: "en-US",
@@ -450,6 +465,12 @@ function genderNoteForLang(lang){
     // 日文的性別標記沒有泰文/越南文那麼強制（不影響文法正確性），但口語第一人稱
     // 代名詞、語尾語氣還是有陽性/陰性傾向，使用者是男性。
     return "\n\n使用者（說話者）是男性，如果句子自然會用到第一人稱代名詞，優先用「僕」或中性的「私」，避免使用明顯偏女性化的用詞或語尾（例如「わ」結尾、「かしら」等）。";
+  }
+  if(lang === "arz"){
+    // 埃及阿拉伯文一律用埃及開羅口語（Masri），不要用標準阿拉伯語（فصحى）。
+    // 阿拉伯語性別標記很強：第一人稱的形容詞/分詞（例如「我想要」عايز／عايزة、
+    // 「我累了」تعبان／تعبانة）跟第二人稱都分陰陽，使用者是男性。
+    return "\n\n一律用埃及開羅口語（اللهجة المصرية العامية，Masri），不要用標準阿拉伯語（فصحى）的字彙或句式——羅馬拼音跟原生文字書寫都要是埃及口語（例如「想要」用 ʕāyiz／عايز 不用 areed／أريد，「不是／沒有」用 miš／مش，「怎麼」用 izzāy／ازاي，「現在」用 dilwaʔti／دلوقتي）。使用者（說話者）是男性：需要區分性別的第一人稱形容詞/分詞用陽性（「我想要」用「عايز」不用「عايزة」、「我累了」用「تعبان」不用「تعبانة」）；句子如果有講到對話對象、又沒有特別指定性別，第二人稱預設也用陽性（用「إنت」不用「إنتي」，動詞與形容詞跟著用陽性）。";
   }
   // 韓文的說話者性別不會像泰文/越南文那樣改變代名詞或語氣詞的選擇，不需要額外設定。
   return "";
@@ -3242,6 +3263,7 @@ function createWordItem(w){
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
       <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
+      ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
       <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data) + sameAsSourceTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
     </div>
   `;
@@ -3816,7 +3838,7 @@ document.getElementById("btnDedupByMeaning").onclick = () => {
   // 拼音沒有唯一標準寫法，同一個字可能被拼成不同字串（例如 "sawadee" 跟
   // "sawatdee"），但如果背後對應的 nativeScript 完全相同，才是真的重複。
   if(!L().hasScript){
-    alert(`${L().label}沒有另外的原生文字欄位可以比對，這個工具只適用於有原生文字的語言（泰文、越南文、日文、韓文）。`);
+    alert(`${L().label}沒有另外的原生文字欄位可以比對，這個工具只適用於有原生文字的語言（泰文、越南文、日文、韓文、埃及阿拉伯文）。`);
     return;
   }
   // 整句話（不只是單字）常常會有結尾標點符號不一致的情況（同一句有沒有問號、
@@ -4050,6 +4072,7 @@ function scriptsForLang(){
   if(currentLang === "ja") scripts.push("Hiragana", "Katakana", "Han");
   if(currentLang === "ko") scripts.push("Hangul");
   if(currentLang === "yue") scripts.push("Han");
+  if(currentLang === "arz") scripts.push("Arabic");
   return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
 function nonWordCharRe(){
@@ -4091,7 +4114,7 @@ function extractIndonesianLine(raw){
 // （日文/粵語/英文都一樣，中文字跟中文意思註解本來就沒辦法只靠文字腳本
 // 分辨，算是既有的已知限制）。
 function scriptsForConvertImport(){
-  const scripts = ["Latin", "Thai", "Hangul", "Hiragana", "Katakana"];
+  const scripts = ["Latin", "Thai", "Hangul", "Hiragana", "Katakana", "Arabic"];
   if(currentLang === "ja" || currentLang === "yue" || currentLang === "en") scripts.push("Han");
   return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
@@ -4505,20 +4528,31 @@ function renderCard(){
   const data = lookup(w.text);
   document.getElementById("cardProgress").textContent = `第 ${cardIndex+1} / ${cardSession.length} 張`;
   const pronText = (data && data.pron && data.pron !== w.text) ? ` [${data.pron}]` : "";
+  // 日文漢字假名原文（其他 hasScript 語言的原生文字刻意不顯示，見 CSS 註解）
+  const nativeText = (currentLang === "ja" && data && data.nativeScript) ? data.nativeScript : "";
+  const cardNative = document.getElementById("cardNative");
   if(cardDirection === "id-zh"){
     document.getElementById("cardFront").textContent = w.text;
-    document.getElementById("cardPron").textContent = pronText.trim();
+    // 認羅馬拼音回想意思時，漢字原文一起顯示在正面當輔助（不是答案，不算洩題）
+    document.getElementById("cardPron").textContent = nativeText || pronText.trim();
+    document.getElementById("cardPron").classList.toggle("is-native", !!nativeText);
     document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
+    cardNative.textContent = "";
   } else {
     document.getElementById("cardFront").textContent = data ? data.zh : "尚無翻譯資料";
     document.getElementById("cardPron").textContent = "";
+    document.getElementById("cardPron").classList.remove("is-native");
     document.getElementById("cardBack").textContent = w.text + pronText;
+    // 中文回想日文時，漢字原文是答案的一部分，跟著背面一起翻開才顯示
+    cardNative.textContent = nativeText;
   }
   document.getElementById("cardBack").classList.add("hidden");
+  cardNative.classList.add("hidden");
   document.getElementById("cardAssessRow").classList.add("hidden");
 }
 document.getElementById("cardArea").onclick = () => {
   document.getElementById("cardBack").classList.toggle("hidden");
+  document.getElementById("cardNative").classList.toggle("hidden");
   document.getElementById("cardAssessRow").classList.toggle("hidden");
 };
 document.getElementById("cardSpeak").addEventListener("click", (e) => {
