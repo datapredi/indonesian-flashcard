@@ -1795,14 +1795,17 @@ async function getEgyptianInflections(text, zh, nativeScript, force){
   const prompt = `你是埃及阿拉伯語老師。下面是學生在背的一個埃及開羅口語單字/片語：
 羅馬拼音：${text}${nativeScript ? `\n阿拉伯文：${nativeScript}` : ""}${zh ? `\n中文意思：${zh}` : ""}
 
-請判斷這個字/片語會不會因為「對話對象的性別/單複數」或「主詞的性別/單複數」而換形式，如果會，列出所有常用的變化形。
+請判斷這個字/片語會不會因為人稱、性別或單複數而換形式，如果會，列出所有常用的變化形。要涵蓋的情況包括（不限於）：
+- 對話對象的性別/單複數（問候、提問句的第二人稱：ezayak／ezayik／ezayku）
+- 主詞的性別/單複數（形容詞、分詞的一致：kwayyes／kwayyesa／kwayyeseen；動詞的人稱變化）
+- 名詞、介係詞後面接的所有格／受詞代名詞後綴：-y／-i（我的／我）、-ak（你的，對男生）、-ik（你的，對女生）、-ku 或 -kom（你們的）、-o／-u（他的）、-ha（她的）、-na（我們的）、-hom（他們的）。例如 kitaab→kitaaby、kitaabak、kitaabik、kitaabku…；如果學生背的就是某一個帶後綴的形式（例如 kitaabak），一樣把整組後綴變化列出來
 
 - forms：每一個變化形一筆
-  - label：用繁體中文標這是對誰/主詞是誰，例如「對男生」「對女生」「對一群人」「主詞是女生」「主詞是複數」，簡短即可
+  - label：用繁體中文標這是哪一個人稱/對象，例如「我的」「你的（對男生）」「你的（對女生）」「你們的」「他的」「她的」「我們的」「他們的」，或「對男生」「主詞是女生」「主詞是複數」等，簡短即可
   - romanized：這個變化形的羅馬拼音（拼法規則照上面埃及口語規則，跟學生原本背的那個形式一致）
   - nativeScript：對應的埃及口語阿拉伯文
-  - zh：這個變化形的中文意思（通常跟原本一樣，可補一句對象說明）
-- baseNote：用一句繁體中文說明變化規則（例如「字尾 -ak 對男生、-ik 對女生、-ku 對多人」）；如果這個字根本不會變（固定客套話、名詞、感嘆詞、數字等），baseNote 說明「這個字沒有性別/單複數變化」，forms 回傳空陣列
+  - zh：這個變化形的中文意思（通常跟原本一樣，可補一句人稱/對象說明）
+- baseNote：用一句繁體中文說明變化規則（例如「所有格後綴：-y 我的、-ak 你的(m)、-ik 你的(f)、-ku 你們的、-o 他的、-ha 她的、-na 我們的、-hom 他們的」）；如果這個字根本不會變（固定客套話、感嘆詞、數字、不接後綴的字等），baseNote 說明「這個字沒有人稱/性別/單複數變化」，forms 回傳空陣列
 
 學生原本背的那個形式也要放進 forms（照它原本的樣子，不要漏），順序照「對男生→對女生→對多人」之類的自然順序。${genderNoteForLang("arz")}`;
   const parsed = await callClaude(prompt, schema, 2048);
@@ -2977,7 +2980,7 @@ function renderInflectionsPanel(panel, result, onRegenerate){
     panel.appendChild(note);
   }
   if(forms.length === 0){
-    if(!result || !result.baseNote) panel.textContent = "這個字沒有性別/單複數變化。";
+    if(!result || !result.baseNote) panel.textContent = "這個字沒有人稱/性別/單複數變化。";
   } else {
     forms.forEach(f => {
       const item = document.createElement("div");
@@ -3760,7 +3763,7 @@ function createWordItem(w){
     inflectionsBtn.type = "button";
     inflectionsBtn.className = "usage-btn";
     inflectionsBtn.textContent = "🔀";
-    inflectionsBtn.title = "AI 列出人稱/性別/單複數變化形（對男生/女生/多人…）";
+    inflectionsBtn.title = "AI 列出人稱/性別/單複數變化形（我的/你的、對男生/女生/多人…）";
     inflectionsBtn.setAttribute("aria-label", `AI 列出 ${w.text} 的變化形`);
     async function loadInflectionsPanel(force){
       if(!force && inflectionsPanel.dataset.loaded === "1") return;
