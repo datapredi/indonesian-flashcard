@@ -1782,9 +1782,10 @@ async function getEgyptianInflections(text, zh, nativeScript, force){
             label: { type: "string" },
             romanized: { type: "string" },
             nativeScript: { type: "string" },
+            ttsScript: { type: "string" },
             zh: { type: "string" }
           },
-          required: ["label", "romanized", "nativeScript", "zh"],
+          required: ["label", "romanized", "nativeScript", "ttsScript", "zh"],
           additionalProperties: false
         }
       }
@@ -1809,12 +1810,13 @@ async function getEgyptianInflections(text, zh, nativeScript, force){
 - forms：每一個變化形一筆
   - label：用繁體中文標這是哪一種變化，例如「我的」「你的（對男生）」「你的（對女生）」「你們的」「他的」「她的」「我們的」「他們的」，或「對男生」「陰性」「複數」「雙數（兩個）」「比較級」「最高級」「否定」等，簡短即可
   - romanized：這個變化形的羅馬拼音（拼法規則照上面埃及口語規則，跟學生原本背的那個形式一致）
-  - nativeScript：對應的埃及口語阿拉伯文。**重要：如果有兩個以上的變化形在不標音的情況下寫法一模一樣、只差短母音（最常見的是第二人稱所有格／受詞後綴——對男生 -ak 是 fatha、對女生 -ik 是 kasra，例如「你的書」對男生 كِتَابَك、對女生 كِتَابِك 的骨架都是 كتابك），這幾個形式的 nativeScript 一定要補上必要的短母音符號（تشكيل：َ ِ ُ ْ），讓語音朗讀唸得出差別，不要只丟沒標音的骨架**；寫法本來就不一樣的變化形照一般不標音寫法即可
+  - nativeScript：對應的埃及口語阿拉伯文，一般不標音的寫法（給學生看的）
+  - ttsScript：同一個變化形，但**標上完整短母音（تشكيل：ـَ ـِ ـُ ـّ ـْ）的阿拉伯文，專門給語音引擎用**。每一個變化形都要給，尤其字尾後綴的母音一定要標出來，讓引擎唸得出差別——例如「你的書」對男生 كِتَابَكْ、對女生 كِتَابِكْ（這兩個不標音時骨架都是 كتابك，不標音引擎只會唸成對男生的）。整個字每個音節都標滿，不要只標字尾
   - zh：這個變化形的中文意思（可補一句人稱/對象/語氣說明）
 - baseNote：用一句繁體中文說明主要的變化規則（例如「所有格後綴：-y 我的、-ak 你的(m)、-ik 你的(f)、-ku 你們的、-o 他的、-ha 她的、-na 我們的、-hom 他們的」）；如果這個字根本不會變（固定客套話、感嘆詞、數字、專有名詞等），baseNote 說明「這個字沒有這類變化」，forms 回傳空陣列
 
 學生原本背的那個形式也要放進 forms（照它原本的樣子，不要漏）。多種變化同時適用時，照這個順序分組列：性別→單複數/雙數/複數→所有格後綴→比較級/最高級→否定；不用把不同類別交叉相乘（例如不用列「他的書的複數」），每一類把它自己的整組列出來就好。${genderNoteForLang("arz")}`;
-  const parsed = await callClaude(prompt, schema, 3072);
+  const parsed = await callClaude(prompt, schema, 4096);
   const result = { baseNote: parsed.baseNote || "", forms: parsed.forms || [] };
   inflectionsCache[text] = result;
   saveInflectionsCache();
@@ -3002,7 +3004,7 @@ function renderInflectionsPanel(panel, result, onRegenerate){
       speakBtn.type = "button";
       speakBtn.className = "speak-btn";
       speakBtn.textContent = "🔊";
-      speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(f.nativeScript || f.romanized, speakBtn); });
+      speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(f.ttsScript || f.nativeScript || f.romanized, speakBtn); });
       idLine.appendChild(speakBtn);
 
       const addBtn = document.createElement("button");
