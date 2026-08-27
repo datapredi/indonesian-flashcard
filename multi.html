@@ -3401,6 +3401,37 @@ function createWordItem(w){
       speak(data.reply.nativeScript || data.reply.romanized, replySpeakBtn);
     });
     replyLine.appendChild(replySpeakBtn);
+
+    // 覺得這個回覆本身也值得背，直接把它加進單字表——跟例句的「➕ 整句加入」
+    // 一樣，先帶 nativeScript/zh（回覆資料裡現成的），quizEn 等留給「AI 自動
+    // 生成缺少的翻譯」補（needsGeneration 會抓到這種半成品）。
+    const replyText = (data.reply.romanized || "").trim();
+    const replyAddBtn = document.createElement("button");
+    replyAddBtn.type = "button";
+    replyAddBtn.className = "speak-btn";
+    const replyAlreadyIn = replyText && isWordInList(replyText);
+    replyAddBtn.textContent = replyAlreadyIn ? "✓" : "➕";
+    replyAddBtn.title = replyAlreadyIn ? "回覆已在單字表" : "把這個回覆也加進單字表";
+    if(replyAlreadyIn || !replyText) replyAddBtn.disabled = true;
+    replyAddBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      let t = replyText;
+      if(allWords.some(w => w.text.toLowerCase() === t.toLowerCase())){
+        let suffix = 2;
+        while(allWords.some(w => w.text.toLowerCase() === `${t} (${suffix})`.toLowerCase())) suffix++;
+        t = `${t} (${suffix})`;
+      }
+      if(addWordToList(t)){
+        if(data.reply.nativeScript || data.reply.zh){
+          customDB[t] = { nativeScript: data.reply.nativeScript, zh: data.reply.zh };
+          saveCustomDB();
+        }
+        replyAddBtn.textContent = "✓";
+        replyAddBtn.title = "回覆已在單字表";
+        replyAddBtn.disabled = true;
+      }
+    });
+    replyLine.appendChild(replyAddBtn);
   }
   row.querySelector("input").addEventListener("change", (e) => {
     const id = Number(e.target.dataset.id);
