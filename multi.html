@@ -550,9 +550,25 @@ updateLangButtons();
 
 // 給沒有真正原生文字可用時的 fallback：拿羅馬拼音直接唸還是比完全不唸好一點，
 // 只是在 hasScript 語言下標明「可能不準」，不假裝這樣唸出來一定正確。
+// 埃及口語：把 Franco/Arabizi 羅馬拼音裡的數字換回字母，變成 TTS 唸得出來的形式。
+// 為什麼不直接唸阿拉伯文原生文字：不標音的阿拉伯文短母音全丟了，كتابك / إزيك 這種
+// 字尾 -ak（fatha）跟 -ik（kasra）長得一模一樣，OpenAI TTS 一律唸成 -ak，minimal
+// pair 永遠分不出來。羅馬拼音本來就是照「實際怎麼唸」拼的，配上埃及語音指示，
+// TTS 反而唸得準。ح/ع/hamza 沒有對應的英文字母，換成近似音或直接省略即可。
+function arzRomanToSpeakable(s){
+  return String(s || "")
+    .replace(/7/g, "h")     // ح
+    .replace(/5/g, "kh")    // خ
+    .replace(/9/g, "s")     // ص
+    .replace(/6/g, "t")     // ط
+    .replace(/[2348]/g, "") // ع(3)、hamza/ق(2)、غ(8)、ء(4)：省略，短母音會接起來
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 function getSpeechText(w){
   if(!L().hasScript) return w.text;
   const data = lookup(w.text);
+  if(currentLang === "arz") return arzRomanToSpeakable(w.text) || (data && data.nativeScript) || w.text;
   return (data && data.nativeScript) || w.text;
 }
 
@@ -2952,7 +2968,7 @@ function renderAntonymsPanel(panel, antonyms){
     speakBtn.type = "button";
     speakBtn.className = "speak-btn";
     speakBtn.textContent = "🔊";
-    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak((hasScript && a.nativeScript) || a.romanized, speakBtn); });
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(currentLang === "arz" ? (arzRomanToSpeakable(a.romanized) || a.nativeScript) : ((hasScript && a.nativeScript) || a.romanized), speakBtn); });
     idLine.appendChild(speakBtn);
 
     const addBtn = document.createElement("button");
@@ -3016,7 +3032,7 @@ function renderInflectionsPanel(panel, result, onRegenerate){
       speakBtn.type = "button";
       speakBtn.className = "speak-btn";
       speakBtn.textContent = "🔊";
-      speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(f.ttsScript || f.nativeScript || f.romanized, speakBtn); });
+      speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(arzRomanToSpeakable(f.romanized) || f.ttsScript || f.nativeScript, speakBtn); });
       idLine.appendChild(speakBtn);
 
       const addBtn = document.createElement("button");
@@ -3301,8 +3317,8 @@ document.getElementById("btnGenerateAll").onclick = async () => {
         if(data && data.zh) await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
       }catch(e){ failCount++; }
       try{
-        if(currentLang === "arz" && data && data.reply && data.reply.nativeScript){
-          await getTTSAudioBlob(data.reply.nativeScript, L().ttsInstructions);
+        if(currentLang === "arz" && data && data.reply && (data.reply.romanized || data.reply.nativeScript)){
+          await getTTSAudioBlob(arzRomanToSpeakable(data.reply.romanized) || data.reply.nativeScript, L().ttsInstructions);
         }
       }catch(e){ failCount++; }
       done++;
@@ -3543,7 +3559,7 @@ function createWordItem(w){
     replySpeakBtn.title = "播放對方的回覆";
     replySpeakBtn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
-      speak(data.reply.nativeScript || data.reply.romanized, replySpeakBtn);
+      speak(arzRomanToSpeakable(data.reply.romanized) || data.reply.nativeScript, replySpeakBtn);
     });
     replyLine.appendChild(replySpeakBtn);
 
@@ -3693,7 +3709,10 @@ function createWordItem(w){
     : "在 Forvo 查真人發音（開新分頁）";
   forvoBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    const query = getSpeechText(w); // hasScript 語言用背後的原生文字查，Forvo 是照各語言原生文字收錄的
+    // hasScript 語言用背後的原生文字查，Forvo 是照各語言原生文字收錄的。埃及口語
+    // 的 getSpeechText 現在回傳的是給 TTS 用的羅馬拼音，Forvo 要的是阿拉伯文，
+    // 所以這裡直接取 nativeScript。
+    const query = (L().hasScript && data && data.nativeScript) || w.text;
     // Forvo 沒有「埃及口語」這個獨立語言（埃及只是 Arabic 底下的口音標籤），URL 沒辦法
     // 直接篩到埃及；能做到的是把搜尋鎖在 Arabic（/ar/），少一層「先選語言」的步驟，
     // 剩下埃及口音還是得看國旗自己挑。其他語言維持原本的全站搜尋。
