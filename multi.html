@@ -348,6 +348,10 @@
     <audio id="listenAudio"></audio>
     <div class="actions" style="margin-top:16px; justify-content:center;">
       <button id="btnListenPause">⏸️ 暫停</button>
+      <select id="listenOrder" style="flex:0 0 auto;" title="播放順序（下一個字生效）">
+        <option value="wordFirst" selected>外語→中文</option>
+        <option value="zhFirst">中文→外語</option>
+      </select>
       <select id="listenSpeedSelect" style="flex:0 0 auto;">
         <option value="1" selected>1x</option>
         <option value="1.5">1.5x</option>
@@ -383,6 +387,9 @@
 // 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
 // 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
 const LANG_LS = "flashcard_lang_v1";
+// 跑步聽力模式的播放順序偏好（全語言通用，不加語言後綴）：
+// "wordFirst" = 外語x3 → 停頓 → 中文x1（預設）；"zhFirst" = 中文x1 → 停頓 → 外語x3。
+const LISTEN_ORDER_LS = "flashcard_listen_order_v1";
 const LANG_ORDER = ["id", "ms", "th", "vi", "ja", "ko", "yue", "arz", "en"];
 let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
 function lsKey(base){ return lsKeyForLang(base, currentLang); }
@@ -491,6 +498,11 @@ function setLang(l){
 document.querySelectorAll(".lang-btn").forEach(btn => {
   btn.addEventListener("click", () => setLang(btn.dataset.lang));
 });
+if(localStorage.getItem(LISTEN_ORDER_LS) === "zhFirst") document.getElementById("listenOrder").value = "zhFirst";
+document.getElementById("listenOrder").addEventListener("change", (e) => {
+  localStorage.setItem(LISTEN_ORDER_LS, e.target.value);
+});
+
 document.getElementById("viDialect").value = viDialect;
 document.getElementById("viDialect").addEventListener("change", (e) => {
   viDialect = e.target.value;
@@ -5294,44 +5306,51 @@ async function runListenLoop(){
         catch(err){ /* 拿不到聲調標記就先顯示原本的羅馬拼音，不要卡住跑步模式 */ }
       }
     }
-    document.getElementById("listenWord").textContent = displayWord;
-    document.getElementById("listenZh").textContent = "";
+    // 播放順序：預設「外語→中文」照舊；選「中文→外語」時先只給中文、把外語
+    // 藏起來（顯示「？」），停頓讓你回想，再唸外語並把字顯示出來。每個字現查
+    // 一次，跑步途中改下拉選單，下一個字就生效。
+    const zhFirst = document.getElementById("listenOrder").value === "zhFirst";
+    document.getElementById("listenWord").textContent = zhFirst ? "？" : displayWord;
+    document.getElementById("listenZh").textContent = zhFirst ? data.zh : "";
 
-    // 播放這個字（重複3次＋思考停頓＋中文意思）獨立包成一個函式，中途要提早
-    // 結束（因為按了「已經會了」、暫停、或整個模式被停掉）用 return 就好，
+    // 播放這個字（外語x3＋思考停頓＋中文x1，或反過來）獨立包成一個函式，中途要
+    // 提早結束（因為按了「已經會了」、暫停、或整個模式被停掉）用 return 就好，
     // 不會影響外層 while 迴圈的 break（那個是專門用來真的整個停掉跑步模式的）。
     async function playCurrentWord(){
+      const interrupted = () => !listenRunning || listenSkipRequested || listenPaused;
+      let idBlob = null, zhBlob = null;
       if(voiceSource === "gpt"){
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（生成語音中...）`;
-        const idBlob = await withTimeout(getTTSAudioBlob(getSpeechText(w), L().ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
-        const zhBlob = await withTimeout(getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+        idBlob = await withTimeout(getTTSAudioBlob(getSpeechText(w), L().ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+        zhBlob = await withTimeout(getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
-
-        for(let i = 0; i < 3 && listenRunning && !listenSkipRequested && !listenPaused; i++){
-          await playAudioBlob(idBlob);
-          if(!listenRunning || listenSkipRequested || listenPaused) return;
+      }
+      async function playWordPart(){
+        document.getElementById("listenWord").textContent = displayWord;
+        for(let i = 0; i < 3 && !interrupted(); i++){
+          if(voiceSource === "gpt") await playAudioBlob(idBlob);
+          else await speakAsync(getSpeechText(w), L().speechLang);
+          if(interrupted()) return;
           await waitMs(400);
         }
-        if(!listenRunning || listenSkipRequested || listenPaused) return;
-
-        await waitMsOrSkip(thinkMs);
-        if(!listenRunning || listenSkipRequested || listenPaused) return;
-
+      }
+      async function playZhPart(){
         document.getElementById("listenZh").textContent = data.zh;
-        await playAudioBlob(zhBlob);
+        if(voiceSource === "gpt") await playAudioBlob(zhBlob);
+        else await speakAsync(data.zh, "zh-TW");
+      }
+      if(zhFirst){
+        await playZhPart();
+        if(interrupted()) return;
+        await waitMsOrSkip(thinkMs);
+        if(interrupted()) return;
+        await playWordPart();
       } else {
-        for(let i = 0; i < 3 && listenRunning && !listenSkipRequested && !listenPaused; i++){
-          await speakAsync(getSpeechText(w), L().speechLang);
-          if(!listenRunning || listenSkipRequested || listenPaused) return;
-          await waitMs(400);
-        }
-        if(!listenRunning || listenSkipRequested || listenPaused) return;
-
+        await playWordPart();
+        if(interrupted()) return;
         await waitMsOrSkip(thinkMs);
-        if(!listenRunning || listenSkipRequested || listenPaused) return;
-
-        document.getElementById("listenZh").textContent = data.zh;
-        await speakAsync(data.zh, "zh-TW");
+        if(interrupted()) return;
+        await playZhPart();
       }
     }
     try{
