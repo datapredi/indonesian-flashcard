@@ -227,6 +227,7 @@
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
       <button id="btnBackfillRegisterCefr">🏷️ 補齊口語/難易度標籤</button>
       <button id="btnBackfillReplies" class="hidden">💬 補上常見回覆（埃及）</button>
+      <button id="btnTagZhGender" class="hidden">🚻 幫舊字的中文補性別註記（埃及・暫時）</button>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
     <div class="note hidden" id="repliesNote">埃及阿拉伯文專用：掃過勾選的字，判斷哪些是有固定口語對答的客套話（打招呼、道謝、道賀…），有的話把「對方通常會怎麼回」顯示在那個字下面。一般字彙不會有這行。</div>
@@ -543,6 +544,7 @@ function updateLangButtons(){
   document.getElementById("btnGenerateAllTones").textContent = "🎵 全部生成聲調標記";
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
   document.getElementById("btnBackfillReplies").classList.toggle("hidden", currentLang !== "arz");
+  document.getElementById("btnTagZhGender").classList.toggle("hidden", currentLang !== "arz");
   document.getElementById("repliesNote").classList.toggle("hidden", currentLang !== "arz");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
@@ -3505,6 +3507,92 @@ document.getElementById("btnBackfillReplies").onclick = async () => {
     btn.textContent = originalLabel;
     alert(`完成，掃過 ${done} 個字，有回覆的會顯示在字下面。${failCount > 0 ? `有 ${failCount} 個失敗（可能是網路不穩），可以再按一次，已經處理過的不會重跑。` : ""}`);
   } finally {
+    releaseWakeLock();
+  }
+};
+
+// ===== 暫時性工具：幫舊的埃及單字，在中文意思結尾補上（對男生）/（對女生）等性別註記 =====
+// （新生成的字 prompt 已經會自己加；這顆按鈕只是回頭補舊資料。用完可以叫我拿掉。）
+async function tagEgyptianZhGender(list, btn){
+  const CHUNK = 25;
+  const originalLabel = btn.textContent;
+  let done = 0, changed = 0, failCount = 0;
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            i: { type: "integer" },
+            zh: { type: "string" },
+            changed: { type: "boolean" }
+          },
+          required: ["i", "zh", "changed"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  for(let start = 0; start < list.length; start += CHUNK){
+    const chunk = list.slice(start, start + CHUNK);
+    btn.textContent = `補性別註記中... (${done}/${list.length})`;
+    const lines = chunk.map((w, k) => {
+      const d = lookup(w.text) || {};
+      return `${k + 1}. i=${k + 1}｜羅馬拼音=${w.text}｜阿拉伯文=${d.nativeScript || "（無）"}｜目前中文=${d.zh || ""}`;
+    }).join("\n");
+    const prompt = `你是埃及阿拉伯語老師。下面每一項是學生在背的埃及開羅口語單字/片語，已經有中文意思。**不要重新翻譯、不要改寫、不要換更好的說法。**
+
+唯一任務：判斷這個埃及口語詞/片語本身有沒有「性別或單複數標記」——第二人稱陽性/陰性（enta/enty、字尾 -ak/-ik）、第三人稱他/她（huwwa/heyya、字尾 -o/-ha）、陽性/陰性或複數的形容詞/分詞（kwayyes/kwayyesa/kwayyeseen）等。
+- 有：把「目前中文」原封不動照抄，只在**結尾**加一個括號註記：（對男生）/（對女生）/（他）/（她）/（男）/（女）/（複數）等最貼切的一個。changed=true。
+- 沒有（第一人稱、名詞、數字、固定客套話、男女通用的字…）：zh 原封不動照抄，changed=false。
+- 「目前中文」如果已經有這類括號註記了：照抄、changed=false。
+
+每一項輸出 { i（照抄輸入的 i）, zh, changed }，數量、順序跟輸入一致。
+
+清單：
+${lines}`;
+    try{
+      const parsed = await callClaude(prompt, schema, 4096);
+      (parsed.entries || []).forEach(e => {
+        const w = chunk[e.i - 1];
+        if(!w || !e.zh || !e.changed) return;
+        const prev = lookup(w.text) || {};
+        if(prev.zh === e.zh) return;
+        // 舊的中文語音快取失效，讓它下次用新的（帶註記）重新生成
+        try{ deleteCachedAudio(ttsCacheKey(zhForSpeech(prev.zh || ""), TTS_INSTRUCTIONS_ZH)); }catch(_){}
+        customDB[w.text] = Object.assign({}, prev, { zh: e.zh });
+        changed++;
+      });
+      saveCustomDB();
+    }catch(err){
+      failCount += chunk.length;
+    }
+    done += chunk.length;
+  }
+  btn.textContent = originalLabel;
+  return { done, changed, failCount };
+}
+document.getElementById("btnTagZhGender").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  const list = allWords.filter(w => selected.has(w.id)).filter(w => {
+    const d = lookup(w.text);
+    return d && d.zh;
+  });
+  if(list.length === 0){ alert("勾選的字裡面沒有「已經有中文意思」的字（可以先按「全選」再試一次）。"); return; }
+  if(!confirm(`會掃過勾選的 ${list.length} 個埃及字，有性別標記的在中文結尾補上（對男生）/（對女生）等註記，其他字不動。要開始嗎？`)) return;
+  const btn = document.getElementById("btnTagZhGender");
+  btn.disabled = true;
+  await acquireWakeLock();
+  try{
+    const { done, changed, failCount } = await tagEgyptianZhGender(list, btn);
+    renderList();
+    alert(`完成，掃過 ${done} 個字，補了 ${changed} 個註記。${failCount > 0 ? `有 ${failCount} 個失敗（網路不穩之類），可以再按一次，已改過的不會重複。` : ""}`);
+  } finally {
+    btn.disabled = false;
     releaseWakeLock();
   }
 };
