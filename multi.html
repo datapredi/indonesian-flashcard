@@ -739,6 +739,23 @@ const TTS_STORE_NAME = "audio";
 const TTS_MODEL = "gpt-4o-mini-tts";
 const TTS_INSTRUCTIONS_ZH = "Speak in natural Traditional Chinese (Taiwanese Mandarin) pronunciation and intonation, as a native speaker would.";
 
+// 中文意思拿去 TTS 之前先過一遍：
+// 1) TTS 常常把（）裡的字唸得很小聲或整個跳過，改用逗號斷句，讓「(男)/(女)/(複數)」
+//    這類性別、單複數註記唸得出來。
+// 2) 「他/她/牠/它/祂」在國語裡同音（tā），聽力複習會分不出來——當它是「孤立代名詞」
+//    （整串就是它，或後面只接 的/們，前面沒有黏著別的字）時補一句旁註；「其他、吉他、
+//    他們的…」這種複合詞不動，免得唸壞。
+function zhForSpeech(s){
+  s = String(s || "");
+  s = s.replace(/[（(]\s*([^（）()]{1,14}?)\s*[)）]/g, "，$1，");
+  s = s.replace(/\bm\b/gi, "男性").replace(/\bf\b/gi, "女性").replace(/\bpl\b/gi, "複數");
+  const map = { "他": "男性", "她": "女性", "牠": "動物", "它": "物", "祂": "神" };
+  s = s.replace(/(^|[\s，、。：「『（(和跟與或])([他她牠它祂])(的|們)?(?=$|[\s，、。：」』）)，])/g,
+    (mm, pre, p, suf) => `${pre}${p}${suf || ""}，${map[p]}，`);
+  s = s.replace(/，{2,}/g, "，").replace(/^，+|，+$/g, "");
+  return s;
+}
+
 function openTTSDB(){
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(TTS_DB_NAME, 1);
@@ -2668,7 +2685,7 @@ document.getElementById("btnRegenerateAudioById").addEventListener("click", asyn
   btn.textContent = "清除快取、重新生成中...";
   try{
     await deleteCachedAudio(ttsCacheKey(speechText, L().ttsInstructions));
-    if(data && data.zh) await deleteCachedAudio(ttsCacheKey(data.zh, TTS_INSTRUCTIONS_ZH));
+    if(data && data.zh) await deleteCachedAudio(ttsCacheKey(zhForSpeech(data.zh), TTS_INSTRUCTIONS_ZH));
     await speak(speechText, null);
     alert(`已清除編號 ${id}（${w.text}）的發音快取並重新生成，剛剛應該有播放新版本。如果還是不對，可能是這個文字本身 AI 就是會念錯，可以考慮用「錄音取代」功能。`);
   }catch(err){
@@ -3314,7 +3331,7 @@ document.getElementById("btnGenerateAll").onclick = async () => {
         await getTTSAudioBlob(getSpeechText(w), L().ttsInstructions);
       }catch(e){ failCount++; }
       try{
-        if(data && data.zh) await getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH);
+        if(data && data.zh) await getTTSAudioBlob(zhForSpeech(data.zh), TTS_INSTRUCTIONS_ZH);
       }catch(e){ failCount++; }
       try{
         if(currentLang === "arz" && data && data.reply && (data.reply.romanized || data.reply.nativeScript)){
@@ -5341,7 +5358,7 @@ async function runListenLoop(){
       if(voiceSource === "gpt"){
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（生成語音中...）`;
         idBlob = await withTimeout(getTTSAudioBlob(getSpeechText(w), L().ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
-        zhBlob = await withTimeout(getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+        zhBlob = await withTimeout(getTTSAudioBlob(zhForSpeech(data.zh), TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
       }
       // GPT 音檔播放的保險：偶爾 <audio>.play() 會被瀏覽器悄悄擋掉（手勢過期之類），
@@ -5370,7 +5387,7 @@ async function runListenLoop(){
       async function playZhPart(){
         document.getElementById("listenZh").textContent = data.zh;
         if(voiceSource === "gpt") await playBlobEnsured(zhBlob);
-        else await speakAsync(data.zh, "zh-TW");
+        else await speakAsync(zhForSpeech(data.zh), "zh-TW");
       }
       if(zhFirst){
         await playZhPart();
