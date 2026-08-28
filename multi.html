@@ -5344,10 +5344,24 @@ async function runListenLoop(){
         zhBlob = await withTimeout(getTTSAudioBlob(data.zh, TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
       }
+      // GPT 音檔播放的保險：偶爾 <audio>.play() 會被瀏覽器悄悄擋掉（手勢過期之類），
+      // play() 直接 reject 或幾乎沒播就 resolve。這種情況短暫等一下重試，不要讓那一
+      // 段（尤其「中文→外語」模式下唯一的一次中文）整個沒聲音、也不要讓整個模式停掉。
+      async function playBlobEnsured(blob){
+        for(let attempt = 0; attempt < 3; attempt++){
+          if(interrupted()) return;
+          try{
+            const t0 = Date.now();
+            await playAudioBlob(blob);
+            if(interrupted() || Date.now() - t0 >= 200) return; // 有真的播出來就結束
+          }catch(e){ /* play() 被擋掉／中途出錯，等一下重試 */ }
+          await waitMs(200);
+        }
+      }
       async function playWordPart(){
         document.getElementById("listenWord").textContent = displayWord;
         for(let i = 0; i < 3 && !interrupted(); i++){
-          if(voiceSource === "gpt") await playAudioBlob(idBlob);
+          if(voiceSource === "gpt") await playBlobEnsured(idBlob);
           else await speakAsync(getSpeechText(w), L().speechLang);
           if(interrupted()) return;
           await waitMs(400);
@@ -5355,7 +5369,7 @@ async function runListenLoop(){
       }
       async function playZhPart(){
         document.getElementById("listenZh").textContent = data.zh;
-        if(voiceSource === "gpt") await playAudioBlob(zhBlob);
+        if(voiceSource === "gpt") await playBlobEnsured(zhBlob);
         else await speakAsync(data.zh, "zh-TW");
       }
       if(zhFirst){
