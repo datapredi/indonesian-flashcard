@@ -1851,19 +1851,19 @@ async function getEgyptianInflections(text, zh, nativeScript, force){
 - 陰性形（國籍、職業、形容詞）：masri→masreyya、doktor→doktora、mudarris→mudarrisa
 - 雙數 -een：yom→yomeen、marra→marreteen
 - 形容詞的比較級／最高級：kwayyes→a7san、kbiir→akbar、soghayyar→asghar
-- 這個字本身的否定形：動詞用 ma…sh 包夾（ruht→ma-rot-tesh）、非動詞用 mesh（ʕayez→mesh ʕayez、kwayyes→mesh kwayyes）
-不要在這裡做完整的動詞人稱變位表（那是另一個功能）；動詞只需要列上面講到的「否定形」這一種。
+- 這個字本身的否定形：動詞用 ma…sh 包夾（ruht→ma-rot-tesh、bafham→ma-bafhamsh）、非動詞用 mesh（ʕayez→mesh ʕayez、kwayyes→mesh kwayyes）
+- 如果這個字是「動詞」：不管學生打進來的是哪一個人稱（ana bafham、enty betifhami、huwwa biyifham、fihimt… 全都算），都要列出「同一個時態/體」的完整人稱變化，八個主詞一個都不能少：ana（我）、enta（你，男）、enty（你，女）、huwwa（他）、heyya（她）、e7na（我們）、entu（你們）、humma（他們）。時態跟著學生輸入的形式判斷、而且只列那一個時態：帶 bi- 的是現在/習慣（ana bafham、enta betifham、enty betifhami、huwwa biyifham、heyya betifham、e7na benfham、entu betifhamu、humma biyifhamu），過去式就列過去（ana fihimt、enta fihimt、enty fihimti、huwwa fihim、heyya fihmet、e7na fihimna、entu fihimtu、humma fihmu），命令式就列命令式（enta efham、enty efhami、entu efhamu）。不要把現在/過去/未來/命令式通通列出來。動詞的否定形只要列「跟學生輸入那個人稱一致」的那一個就好。
 
 - forms：每一個變化形一筆
-  - label：用繁體中文標這是哪一種變化，例如「我的」「你的（對男生）」「你的（對女生）」「你們的」「他的」「她的」「我們的」「他們的」，或「對男生」「陰性」「複數」「雙數（兩個）」「比較級」「最高級」「否定」等，簡短即可
+  - label：用繁體中文標這是哪一種變化，例如「我的」「你的（對男生）」「你的（對女生）」「你們的」「他的」「她的」「我們的」「他們的」，動詞人稱用「我」「你（男）」「你（女）」「他」「她」「我們」「你們」「他們」，或「對男生」「陰性」「複數」「雙數（兩個）」「比較級」「最高級」「否定」等，簡短即可
   - romanized：這個變化形的羅馬拼音（拼法規則照上面埃及口語規則，跟學生原本背的那個形式一致）
   - nativeScript：對應的埃及口語阿拉伯文，一般不標音的寫法（給學生看的）
   - ttsScript：同一個變化形，但**標上完整短母音（تشكيل：ـَ ـِ ـُ ـّ ـْ）的阿拉伯文，專門給語音引擎用**。每一個變化形都要給，尤其字尾後綴的母音一定要標出來，讓引擎唸得出差別——例如「你的書」對男生 كِتَابَكْ、對女生 كِتَابِكْ（這兩個不標音時骨架都是 كتابك，不標音引擎只會唸成對男生的）。整個字每個音節都標滿，不要只標字尾
   - zh：這個變化形的中文意思，**結尾一定要用括號註明這是哪一個對象/主詞**（例如「你是哪裡人（對女生）」「你的書（對男生）」「累了（主詞女性）」「好（複數）」），因為中文「你/他/她」聽起來一樣，光聽中文分不出性別，這個括號註記是給語音朗讀唸出來用的，不能省
 - baseNote：用一句繁體中文說明主要的變化規則（例如「所有格後綴：-y 我的、-ak 你的(m)、-ik 你的(f)、-ku 你們的、-o 他的、-ha 她的、-na 我們的、-hom 他們的」）；如果這個字根本不會變（固定客套話、感嘆詞、數字、專有名詞等），baseNote 說明「這個字沒有這類變化」，forms 回傳空陣列
 
-學生原本背的那個形式也要放進 forms（照它原本的樣子，不要漏）。多種變化同時適用時，照這個順序分組列：性別→單複數/雙數/複數→所有格後綴→比較級/最高級→否定；不用把不同類別交叉相乘（例如不用列「他的書的複數」），每一類把它自己的整組列出來就好。${genderNoteForLang("arz")}`;
-  const parsed = await callClaude(prompt, schema, 4096);
+學生原本背的那個形式也要放進 forms（照它原本的樣子，不要漏）。多種變化同時適用時，照這個順序分組列：動詞人稱（ana→enta→enty→huwwa→heyya→e7na→entu→humma）→性別→單複數/雙數/複數→所有格後綴→比較級/最高級→否定；不用把不同類別交叉相乘（例如不用列「他懂的過去式」「他的書的複數」），每一類把它自己的整組列出來就好。${genderNoteForLang("arz")}`;
+  const parsed = await callClaude(prompt, schema, 6144);
   const result = { baseNote: parsed.baseNote || "", forms: parsed.forms || [] };
   inflectionsCache[text] = result;
   saveInflectionsCache();
@@ -3916,7 +3916,7 @@ function createWordItem(w){
     inflectionsBtn.type = "button";
     inflectionsBtn.className = "usage-btn";
     inflectionsBtn.textContent = "🔀";
-    inflectionsBtn.title = "AI 列出變化形：所有格(我的/你的…)、陰性、複數/雙數、比較級、否定…";
+    inflectionsBtn.title = "AI 列出變化形：動詞人稱變位、所有格(我的/你的…)、陰性、複數/雙數、比較級、否定…";
     inflectionsBtn.setAttribute("aria-label", `AI 列出 ${w.text} 的變化形`);
     async function loadInflectionsPanel(force){
       if(!force && inflectionsPanel.dataset.loaded === "1") return;
