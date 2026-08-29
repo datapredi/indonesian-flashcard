@@ -482,7 +482,7 @@ function genderNoteForLang(lang){
   if(lang === "ja"){
     // 日文的性別標記沒有泰文/越南文那麼強制（不影響文法正確性），但口語第一人稱
     // 代名詞、語尾語氣還是有陽性/陰性傾向，使用者是男性。
-    return "\n\n使用者（說話者）是男性。日文口語一定會省略講得出來的主詞：第一人稱主詞「僕は／私は」只有在需要跟別人對比、或特別強調「我」的時候才加，其他情況一律不要加（「我不懂日文」就翻成「日本語がわかりません」，不要翻成「僕は日本語がわかりません」；「我很累」就「疲れた／疲れました」不要「僕は疲れた」）。真的自然會用到第一人稱代名詞時（例如受詞、對比），用「僕」或中性的「私」，避免明顯偏女性化的用詞或語尾（例如「わ」結尾、「かしら」等）。整體要貼近日本人實際會話的講法，不要教科書式地把每個成分補齊。";
+    return "\n\n使用者（說話者）是男性。日文口語一定會省略講得出來的主詞：第一人稱主詞「僕は／私は」只有在需要跟別人對比、或特別強調「我」的時候才加，其他情況一律不要加（「我不懂日文」就翻成「日本語がわかりません」，不要翻成「僕は日本語がわかりません」；「我很累」就「疲れた／疲れました」不要「僕は疲れた」）。真的自然會用到第一人稱代名詞時（例如受詞、對比），用「僕」或中性的「私」，避免明顯偏女性化的用詞或語尾（例如「わ」結尾、「かしら」等）。整體要貼近日本人實際會話的講法，不要教科書式地把每個成分補齊。\n另外，nativeScript（日文原生文字）要照日本人平常的書寫慣例，該用漢字的地方就用漢字（「沒問題」用「大丈夫」不是「だいじょうぶ」、「日本語」不是「にほんご」、「疲れた」不是「つかれた」、「時間」不是「じかん」），本來就用假名寫的詞才用假名。只要 nativeScript 裡有漢字，就在整個詞／句的後面用全形括號附上完整的假名讀音，例如「大丈夫（だいじょうぶ）」「日本語がわかりません（にほんごがわかりません）」「疲れた（つかれた）」；整句沒有漢字的就不用加括號。括號裡放假名讀音，不是羅馬拼音。";
   }
   if(lang === "arz"){
     // 埃及阿拉伯文一律用埃及開羅口語（Masri），不要用標準阿拉伯語（فصحى）。
@@ -570,10 +570,17 @@ function arzRomanToSpeakable(s){
     .replace(/\s{2,}/g, " ")
     .trim();
 }
+// 日文 nativeScript 會帶「漢字（かな讀音）」的括號讀音給學生看，唸的時候要把
+// 那層括號拿掉，只留漢字本體（TTS 讀漢字沒問題，讀「大丈夫（だいじょうぶ）」
+// 反而會整個唸兩次）。
+function stripJaFurigana(s){
+  return String(s || "").replace(/（[ぁ-んァ-ヶ・ー\s]*）/g, "").replace(/\([ぁ-んァ-ヶ・ー\s]*\)/g, "").trim();
+}
 function getSpeechText(w){
   if(!L().hasScript) return w.text;
   const data = lookup(w.text);
   if(currentLang === "arz") return arzRomanToSpeakable(w.text) || (data && data.nativeScript) || w.text;
+  if(currentLang === "ja") return stripJaFurigana((data && data.nativeScript) || "") || (data && data.nativeScript) || w.text;
   return (data && data.nativeScript) || w.text;
 }
 
@@ -597,6 +604,9 @@ let speakGeneration = 0;
 // 空檔，使用者的點擊如果剛好落在空檔裡，那時候沒有東西在播、abortCurrentPlayback
 // 抓不到，只能靠這個回傳值讓 speakRepeat 自己在空檔前後也檢查一次。
 async function speak(text, btn, langOverride, recordingOverrideKey){
+  // 日文文字若帶「漢字（かな）」的讀音註記，唸之前先拿掉那層假名括號，不然會
+  // 連讀音一起唸、整個唸兩次。
+  if((langOverride || currentLang) === "ja") text = stripJaFurigana(text);
   // 每次開始一個新的播放請求，先明確中斷「上一個還沒播完的」，不要只靠等一下
   // 改 <audio>.src 順便把它打斷——那個是瀏覽器自己的行為，靠不靠得住、多快
   // 生效不一定，這就是「有時候按下一個字馬上播、有時候沒反應」的原因。這裡
