@@ -66,6 +66,8 @@
   .usage-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
   .usage-panel{padding:10px 14px 14px; border-bottom:1px solid var(--border); background:var(--bg); font-size:0.88rem;}
   .usage-panel.hidden{display:none;}
+  .note-ta{width:100%; box-sizing:border-box; min-height:70px; resize:vertical; font:inherit; font-size:0.9rem; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--card, var(--bg)); color:inherit;}
+  .note-saved{color:var(--muted); font-size:0.75rem; margin-top:4px;}
   .usage-example{margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--border);}
   .usage-example:last-child{margin-bottom:0; padding-bottom:0; border-bottom:none;}
   .usage-id{font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
@@ -993,6 +995,19 @@ function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMaster
 const PRON_FLAG_LS = "flashcard_pron_flag_v1";
 let pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
 function savePronFlag(){ saveMasteredSet(lsKey(PRON_FLAG_LS), pronFlagIds); }
+
+// 每個單字自己的自由筆記（使用者手打）。跟 customDB 一樣用 w.text 當 key，換
+// 語言各存一份，也會一起進備份。
+const WORD_NOTES_LS = "flashcard_word_notes_v1";
+let wordNotes = {};
+try{ wordNotes = JSON.parse(localStorage.getItem(lsKey(WORD_NOTES_LS))) || {}; }catch(e){ wordNotes = {}; }
+function saveWordNotes(){ localStorage.setItem(lsKey(WORD_NOTES_LS), JSON.stringify(wordNotes)); }
+function getWordNote(text){ return wordNotes[text] || ""; }
+function setWordNote(text, val){
+  const v = (val || "").trim();
+  if(v) wordNotes[text] = v; else delete wordNotes[text];
+  saveWordNotes();
+}
 
 // 預設還是播 AI 發音，只有使用者自己確認過「這個字 AI 唸錯了」、明確標記
 // 要用自己錄的音取代，才會改播錄音——不能因為剛好有錄音檔就自動偷換掉，
@@ -2482,12 +2497,13 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel, antonymsPanel, inflectionsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
     el.insertBefore(crossLangPanel, el.firstChild);
     el.insertBefore(minimalPairsPanel, crossLangPanel);
     el.insertBefore(nativeTonePanel, minimalPairsPanel);
     el.insertBefore(tonePanel, nativeTonePanel);
-    el.insertBefore(inflectionsPanel, tonePanel);
+    el.insertBefore(notesPanel, tonePanel);
+    el.insertBefore(inflectionsPanel, notesPanel);
     el.insertBefore(antonymsPanel, inflectionsPanel);
     el.insertBefore(usagePanel, antonymsPanel);
     el.insertBefore(row, usagePanel);
@@ -3958,6 +3974,49 @@ function createWordItem(w){
     row.appendChild(inflectionsBtn);
   }
 
+  // 每個單字的自由筆記：📝 打開一個 textarea，內容邊打邊存（離開輸入框時也再存
+  // 一次）。有寫東西的字，按鈕會highlight。
+  const notesPanel = document.createElement("div");
+  notesPanel.className = "usage-panel hidden";
+  const notesBtn = document.createElement("button");
+  notesBtn.type = "button";
+  notesBtn.className = "usage-btn";
+  notesBtn.textContent = "📝";
+  function refreshNotesBtn(){
+    const has = !!getWordNote(w.text);
+    notesBtn.title = has ? "編輯筆記（已有筆記）" : "加筆記";
+    notesBtn.classList.toggle("primary", has);
+  }
+  refreshNotesBtn();
+  const notesTa = document.createElement("textarea");
+  notesTa.className = "note-ta";
+  notesTa.placeholder = `幫「${w.text}」寫點筆記…（自動儲存）`;
+  const notesSaved = document.createElement("div");
+  notesSaved.className = "note-saved";
+  let notesSaveTimer = null;
+  function commitNote(){
+    setWordNote(w.text, notesTa.value);
+    refreshNotesBtn();
+    notesSaved.textContent = getWordNote(w.text) ? "已儲存 ✓" : "";
+  }
+  notesTa.addEventListener("input", () => {
+    notesSaved.textContent = "儲存中…";
+    clearTimeout(notesSaveTimer);
+    notesSaveTimer = setTimeout(commitNote, 500);
+  });
+  notesTa.addEventListener("blur", () => { clearTimeout(notesSaveTimer); commitNote(); });
+  notesPanel.appendChild(notesTa);
+  notesPanel.appendChild(notesSaved);
+  notesBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!notesPanel.classList.contains("hidden")){ notesPanel.classList.add("hidden"); return; }
+    notesTa.value = getWordNote(w.text);
+    notesSaved.textContent = "";
+    notesPanel.classList.remove("hidden");
+    notesTa.focus();
+  });
+  row.appendChild(notesBtn);
+
   // 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。兩種語言
   // 用同一套按鈕/面板/快取機制，只是呼叫的 AI 函式跟顯示文字不同。
   const toneLangActive = isToneLangActive();
@@ -4233,7 +4292,7 @@ function createWordItem(w){
   });
   row.appendChild(crossLangBtn);
 
-  return { row, usagePanel, antonymsPanel, inflectionsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
+  return { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
 }
 
 function updatePendingSyncBar(){
@@ -4267,11 +4326,12 @@ function renderList(){
     el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel, antonymsPanel, inflectionsPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
     el.appendChild(antonymsPanel);
     el.appendChild(inflectionsPanel);
+    el.appendChild(notesPanel);
     el.appendChild(tonePanel);
     el.appendChild(nativeTonePanel);
     el.appendChild(minimalPairsPanel);
@@ -4704,7 +4764,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
-  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS];
 
