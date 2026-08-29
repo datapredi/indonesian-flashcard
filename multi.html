@@ -238,6 +238,7 @@
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
+      <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <button id="btnSortCefr">📊 難易度排序 A1→C2</button>
@@ -1064,6 +1065,23 @@ let compareSet = loadMasteredSet(lsKey(COMPARE_SET_LS));
 function saveCompareSet(){ saveMasteredSet(lsKey(COMPARE_SET_LS), compareSet); }
 let showCompareOnly = false;
 let showPronFlagOnly = false;
+let showNumbersOnly = false;
+
+// 「只顯示數字」篩選用：靠中英文意思判斷這個字是不是數字/數量詞（1、2…、100、
+// 千、萬、第一、half…）。沒有另存標籤，純靠意思比對，所以是概略的（可能會漏、
+// 也可能誤收像「秒 second」這種），但複習數字時夠用。
+const ZH_NUM_RE = /^[0-9０-９零〇一二三四五六七八九十兩俩廿卅卌百千万萬億兆京垓又半\s]+$/;
+function isNumberWord(w){
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  const zh = String(d.zh || "").replace(/[（(][^（）()]*[)）]/g, "").replace(/[、,，./／~～\-—－]/g, "").trim();
+  const en = String(d.en || "").trim().toLowerCase();
+  if(/^\d[\d,]*(\.\d+)?$/.test(en)) return true;
+  if(/^\d+\s*(st|nd|rd|th)$/.test(en)) return true;
+  if(/^(a\s+)?(zero|nought|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|trillion|dozen|score|half|quarter|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|twentieth|thirtieth|hundredth|thousandth)([\s\-]+(and|a|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|hundred|thousand|million|billion))*$/.test(en)) return true;
+  if(zh && ZH_NUM_RE.test(zh)) return true;
+  if(/^第\s*[0-9０-９零〇一二三四五六七八九十百千万萬兩]+$/.test(zh)) return true;
+  return false;
+}
 // 每次「匯入並自動生成資料」成功後自動記住這批處理到的字，畫面預設只顯示
 // 這些，不用再自己捲到清單最下面找。只存在這次瀏覽階段，不用存 localStorage。
 let newlyImportedIds = new Set();
@@ -3611,6 +3629,7 @@ function getVisibleWords(){
   const list = allWords.filter(w => {
     if(showSelectedOnly && !selected.has(w.id)) return false;
     if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
+    if(showNumbersOnly && !isNumberWord(w)) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -4266,6 +4285,7 @@ function updateCount(){
   if(cardMasteredIds.size) parts.push(`卡片已會 ${cardMasteredIds.size}`);
   if(quizMasteredIds.size) parts.push(`測驗已會 ${quizMasteredIds.size}`);
   document.getElementById("selCount").textContent = parts.join("・");
+  if(typeof updateNumbersToggleLabel === "function") updateNumbersToggleLabel();
 }
 function deleteWord(id){
   const target = allWords.find(w => w.id === id);
@@ -4514,6 +4534,18 @@ document.getElementById("btnTogglePronFlagOnly").addEventListener("click", () =>
   renderList();
 });
 updatePronFlagToggleLabel();
+function updateNumbersToggleLabel(){
+  const btn = document.getElementById("btnToggleNumbersOnly");
+  const n = allWords.filter(isNumberWord).length;
+  btn.textContent = showNumbersOnly ? `顯示全部單字 (數字 ${n} 個)` : `🔢 只顯示數字 (${n})`;
+  btn.classList.toggle("primary", showNumbersOnly);
+}
+document.getElementById("btnToggleNumbersOnly").addEventListener("click", () => {
+  showNumbersOnly = !showNumbersOnly;
+  updateNumbersToggleLabel();
+  renderList();
+});
+updateNumbersToggleLabel();
 function updateNewlyImportedToggleLabel(){
   const btn = document.getElementById("btnToggleNewlyImportedOnly");
   btn.textContent = showNewlyImportedOnly ? `顯示全部單字 (剛匯入 ${newlyImportedIds.size} 個)` : `🆕 只顯示剛匯入的單字 (${newlyImportedIds.size})`;
