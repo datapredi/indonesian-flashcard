@@ -4457,6 +4457,19 @@ function deleteWord(id){
   quizMasteredIds.delete(id);
   saveCardMastered();
   saveQuizMastered();
+  // 把這個字的 AI 生成資料也一起清掉（你自己打的 📝 筆記保留），這樣之後重新
+  // 輸入同一個字會重新生成，不會撈到刪掉前的舊翻譯／舊變化形。
+  if(target){
+    const t = target.text;
+    if(customDB[t]){ delete customDB[t]; saveCustomDB(); }
+    if(usageCache[t]){ delete usageCache[t]; saveUsageCache(); }
+    if(antonymsCache[t]){ delete antonymsCache[t]; saveAntonymsCache(); }
+    if(inflectionsCache[t]){ delete inflectionsCache[t]; saveInflectionsCache(); }
+    if(toneMarksCache[t]){ delete toneMarksCache[t]; saveToneMarksCache(); }
+    if(viToneMarksCache[t]){ delete viToneMarksCache[t]; saveViToneMarksCache(); }
+    if(nativeToneMarksCache[t]){ delete nativeToneMarksCache[t]; saveNativeToneMarksCache(); }
+    if(viNativeToneMarksCache[t]){ delete viNativeToneMarksCache[t]; saveViNativeToneMarksCache(); }
+  }
   renderList();
 }
 
