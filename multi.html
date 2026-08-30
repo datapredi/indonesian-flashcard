@@ -5075,11 +5075,18 @@ async function processConvertImportText(rawText){
           // 同一份來源字，不管轉成哪個語言，中英文意思都要一致，跨語言查詢
           // （🌐）才配得到。第一次看到這個來源字就記住這次生成的中英文意思，
           // 之後（不管轉成哪個語言）都強制沿用同一組，不讓每次各自生成飄移。
-          // 例外：勾了「強制重新轉換」代表使用者知道舊結果有問題、要的就是新的，
-          // 這時候用新生成的意思覆蓋掉舊的鎖定值，不然重轉幾次都還是舊翻譯。
-          if(sourceMeaningCache[sourceKey] && !forceReconvert){
-            entry.zh = sourceMeaningCache[sourceKey].zh;
-            entry.en = sourceMeaningCache[sourceKey].en;
+          // 例外一：勾了「強制重新轉換」代表使用者知道舊結果有問題、要的就是新的。
+          // 例外二：新生成的中文帶了性別／單複數括號註記（對男生／對女生／男／女／
+          // 複數…），但記住的舊版沒有——這是修正（例如埃及 esmik→「…（對女生）」），
+          // 採用新的並更新記錄，不然不勾強制就永遠拿不到帶性別的版本。
+          const cachedMeaning = sourceMeaningCache[sourceKey];
+          const genderTagRe = /（[^（）]*(對男|對女|男生|女生|[男女]性|複數|單數|主詞)[^（）]*）/;
+          const newZhHasTag = genderTagRe.test(entry.zh || "");
+          const cachedZhHasTag = cachedMeaning ? genderTagRe.test(cachedMeaning.zh || "") : false;
+          const isCorrection = newZhHasTag && !cachedZhHasTag;
+          if(cachedMeaning && !forceReconvert && !isCorrection){
+            entry.zh = cachedMeaning.zh;
+            entry.en = cachedMeaning.en;
           } else {
             sourceMeaningCache[sourceKey] = { zh: entry.zh, en: entry.en };
             saveSourceMeaningCache();
