@@ -4469,6 +4469,14 @@ function deleteWord(id){
     if(viToneMarksCache[t]){ delete viToneMarksCache[t]; saveViToneMarksCache(); }
     if(nativeToneMarksCache[t]){ delete nativeToneMarksCache[t]; saveNativeToneMarksCache(); }
     if(viNativeToneMarksCache[t]){ delete viNativeToneMarksCache[t]; saveViNativeToneMarksCache(); }
+    // 「匯入並自動生成／轉換貼上」那條路會把來源字第一次生出來的中英文意思鎖進
+    // sourceMeaningCache，之後同一個來源字不管重轉幾次都強制沿用那組舊意思
+    // （convertWordsToTargetLang 生了新的也會被蓋回去）。刪掉這個字時要一起解鎖，
+    // 不然刪掉再重貼還是拿到刪之前的舊翻譯。convertedMap 是「已轉換過就跳過」的
+    // 記錄，也一起清掉，讓重貼會真的重新處理。
+    const tl = t.toLowerCase();
+    if(sourceMeaningCache[tl]){ delete sourceMeaningCache[tl]; saveSourceMeaningCache(); }
+    if(convertedMap[tl]){ delete convertedMap[tl]; saveConvertedMap(); }
   }
   renderList();
 }
@@ -5067,7 +5075,9 @@ async function processConvertImportText(rawText){
           // 同一份來源字，不管轉成哪個語言，中英文意思都要一致，跨語言查詢
           // （🌐）才配得到。第一次看到這個來源字就記住這次生成的中英文意思，
           // 之後（不管轉成哪個語言）都強制沿用同一組，不讓每次各自生成飄移。
-          if(sourceMeaningCache[sourceKey]){
+          // 例外：勾了「強制重新轉換」代表使用者知道舊結果有問題、要的就是新的，
+          // 這時候用新生成的意思覆蓋掉舊的鎖定值，不然重轉幾次都還是舊翻譯。
+          if(sourceMeaningCache[sourceKey] && !forceReconvert){
             entry.zh = sourceMeaningCache[sourceKey].zh;
             entry.en = sourceMeaningCache[sourceKey].en;
           } else {
