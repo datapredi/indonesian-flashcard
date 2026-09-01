@@ -199,12 +199,12 @@
       </label>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
         <input type="checkbox" id="useProvidedZh">
-        用我提供的中文意思（每行「原文 = 中文」）
+        貼上的內容含中文（直接貼中文翻成目前語言；也支援每行「原文 = 中文」）
       </label>
       <button id="btnExportWordListTxt">📋 複製目前語言單字（給貼到 Obsidian 或轉到其他語言用）</button>
     </div>
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
-      <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。若勾了「用我提供的中文意思」，每行寫「原文 = 中文」" rows="4" style="flex:1 1 260px;"></textarea>
+      <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
       <button id="btnImportConvertPaste">📥 轉換貼上的文字</button>
     </div>
     <div class="note hidden" id="convertNote"></div>
@@ -1654,7 +1654,7 @@ async function convertWordsToTargetLang(words, hints){
     ? `\n\n注意：清單裡標了【學生指定中文意思：「…」】的項目，zh 欄位一定要原封不動照學生寫的那串輸出（連（對女生）這種括號註記都要保留），不要改寫、不要自己重新翻譯、不要調整用詞；其他欄位（en、quizEn、correct、distractors）還是照這個指定的意思去做。沒有標的項目照原本規則自己判斷意思。`
     : "";
   const scriptLine = hasScript ? `\n- nativeScript：對應的正確${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
-  const prompt = `以下是一份單字/片語清單，來源語言不限（可能是印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
+  const prompt = `以下是一份單字/片語清單，來源語言不限（可能是中文、印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼；如果某一項本身就是中文，代表學生要把這個中文意思翻成${L().label}）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
 - source：原封不動複製清單裡這一項的原文（一字不差），用來對應是哪一個原始項目
 - romanized：對應的${L().label}，用羅馬拼音（英文字母）寫。**先判斷這一項原本是什麼語言，這個判斷結果決定下面走哪一條規則，兩條規則不能混用：**
   - **情況A／這一項原本就已經是${L().label}（學生自己打的，不是別的語言）**：不用翻譯、不用換句話說、不用「挑一個更常見/更完整/更清楚的說法」，直接把學生打的原文原封不動當作 romanized 輸出，包括代名詞、俚語、非正式縮寫或簡稱（例如「ish」這種口語用法，即使聽起來不是一個「完整」的字，也不要展開/改寫成別的字或片語，例如不能因為「ish」的意思接近「kind of」就換成「kind of」——那是翻譯，不是保留原文）。粗俗、直接、不客氣的用字（髒話、粗話等）也一樣原封不動保留，不要因為比較委婉、禮貌而偷換成別的字。學生很多時候是從電影/影集/歌曲裡聽到某個道地說法特地要背下來，即使是少見、特殊語境的版本也一律照原文保留。唯一可以修正的情況：原文本身文法錯誤、拼字明顯打錯、或意思根本不通，這時候才能修正，而且只能修到「文法/拼字正確」為止，不能進一步換成別的慣用語或別的說法。代名詞也一樣要保留原文本來的用字（例如原文用「tôi」就照樣保留「tôi」，不要因為下面的說話者身分設定換掉——那個設定只用在你自己新造句子的地方，即 correct、distractors，不適用在 romanized/nativeScript 這裡）。
@@ -4819,7 +4819,11 @@ function extractIndonesianLine(raw){
 // 分辨，算是既有的已知限制）。
 function scriptsForConvertImport(){
   const scripts = ["Latin", "Thai", "Hangul", "Hiragana", "Katakana", "Arabic"];
-  if(currentLang === "ja" || currentLang === "yue" || currentLang === "en") scripts.push("Han");
+  // 一般情況下濾掉漢字（見上面的註解）；但勾了「貼上的內容含中文」就是明確要把
+  // 中文當來源翻成目前語言，這時候要放行漢字，不然整行中文會被判成「不是單字」。
+  let chineseMode = false;
+  try{ chineseMode = document.getElementById("useProvidedZh").checked; }catch(e){}
+  if(currentLang === "ja" || currentLang === "yue" || currentLang === "en" || chineseMode) scripts.push("Han");
   return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
 function nonWordCharReConvert(){
@@ -5015,6 +5019,9 @@ async function processConvertImportText(rawText){
       if(seen.has(key)) return;
       seen.add(key);
       indoWords.push(cleaned);
+      // 勾了「含中文」而且這一整行本身就是中文：把它當作學生指定的中文意思，
+      // 之後直接照這串當 zh，不讓 AI 用「字典基本形式」把它改寫掉。
+      if(useProvidedZh && /\p{Script=Han}/u.test(cleaned)) providedZhBySource[key] = cleaned;
     });
     if(indoWords.length === 0){
       showConvertResult("沒有解析到任何單字，請確認檔案內容。");
