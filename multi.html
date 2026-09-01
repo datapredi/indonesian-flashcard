@@ -246,6 +246,7 @@
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
+      <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <button id="btnSortCefr">📊 難易度排序 A1→C2</button>
@@ -1011,6 +1012,14 @@ function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMaster
 const PRON_FLAG_LS = "flashcard_pron_flag_v1";
 let pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
 function savePronFlag(){ saveMasteredSet(lsKey(PRON_FLAG_LS), pronFlagIds); }
+
+// 「太難、現在完全不想看到，但也不想刪掉」的字：藏起來——不在單字表顯示，也
+// 不進 Flash Card／測驗／跑步模式（藏的時候順便取消勾選）。用「🙈 顯示隱藏的」
+// 隨時叫回來檢視／取消隱藏。存起來、也進備份。
+const HIDDEN_LS = "flashcard_hidden_v1";
+let hiddenIds = loadMasteredSet(lsKey(HIDDEN_LS));
+function saveHidden(){ saveMasteredSet(lsKey(HIDDEN_LS), hiddenIds); }
+let showHiddenOnly = false;
 
 // 每個單字自己的自由筆記（使用者手打）。跟 customDB 一樣用 w.text 當 key，換
 // 語言各存一份，也會一起進備份。
@@ -3738,17 +3747,22 @@ document.getElementById("btnJaKanjiBackfill").onclick = async () => {
 };
 
 function getVisibleWords(){
+  // 「顯示隱藏的」檢視模式：只列被藏起來的字，方便一次檢視／取消隱藏。
+  if(showHiddenOnly){
+    return allWords.filter(w => hiddenIds.has(w.id));
+  }
   // 比對清單模式優先權最高：只看你釘選過的那幾個字，忽略搜尋框跟難度篩選，
   // 這樣不管搜尋框現在打什麼，畫面都只會顯示你真正想比對的那幾個。
   if(showCompareOnly){
-    return allWords.filter(w => compareSet.has(w.id));
+    return allWords.filter(w => compareSet.has(w.id) && !hiddenIds.has(w.id));
   }
   if(showNewlyImportedOnly){
-    return allWords.filter(w => newlyImportedIds.has(w.id));
+    return allWords.filter(w => newlyImportedIds.has(w.id) && !hiddenIds.has(w.id));
   }
   const query = document.getElementById("wordSearch").value.trim().toLowerCase();
   const diffFilter = document.getElementById("difficultyFilter").value;
   const list = allWords.filter(w => {
+    if(hiddenIds.has(w.id)) return false;
     if(showSelectedOnly && !selected.has(w.id)) return false;
     if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
     if(showNumbersOnly && !isNumberWord(w)) return false;
@@ -3981,6 +3995,27 @@ function createWordItem(w){
     window.open(url, `forvo_${Date.now()}`, "noopener");
   });
   row.appendChild(forvoBtn);
+
+  const hideBtn = document.createElement("button");
+  hideBtn.type = "button";
+  hideBtn.className = "delete-btn";
+  const isHidden = hiddenIds.has(w.id);
+  hideBtn.textContent = isHidden ? "👁 取消隱藏" : "🙈";
+  hideBtn.title = isHidden ? "取消隱藏，讓這個字重新出現" : "隱藏這個字（不刪除，之後可從「🙈 顯示隱藏的」找回）";
+  hideBtn.setAttribute("aria-label", isHidden ? `取消隱藏 ${w.text}` : `隱藏 ${w.text}`);
+  hideBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(hiddenIds.has(w.id)){
+      hiddenIds.delete(w.id);
+    } else {
+      hiddenIds.add(w.id);
+      selected.delete(w.id);   // 藏起來就不該還留在 Flash Card／測驗／跑步的選取範圍裡
+      saveSelected();
+    }
+    saveHidden();
+    renderList();
+  });
+  row.appendChild(hideBtn);
 
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
@@ -4454,6 +4489,7 @@ function updateCount(){
   if(quizMasteredIds.size) parts.push(`測驗已會 ${quizMasteredIds.size}`);
   document.getElementById("selCount").textContent = parts.join("・");
   if(typeof updateNumbersToggleLabel === "function") updateNumbersToggleLabel();
+  if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
 }
 function deleteWord(id){
   const target = allWords.find(w => w.id === id);
@@ -4466,6 +4502,7 @@ function deleteWord(id){
   quizMasteredIds.delete(id);
   saveCardMastered();
   saveQuizMastered();
+  if(hiddenIds.delete(id)) saveHidden();
   // 把這個字的 AI 生成資料也一起清掉（你自己打的 📝 筆記保留），這樣之後重新
   // 輸入同一個字會重新生成，不會撈到刪掉前的舊翻譯／舊變化形。
   if(target){
@@ -4658,6 +4695,7 @@ document.getElementById("btnRenumber").onclick = () => {
   cardMasteredIds = remapIdSet(cardMasteredIds);
   quizMasteredIds = remapIdSet(quizMasteredIds);
   pronFlagIds = remapIdSet(pronFlagIds);
+  hiddenIds = remapIdSet(hiddenIds);
   useRecordingIds = remapIdSet(useRecordingIds);
   compareSet = remapIdSet(compareSet);
   // 剛匯入清單只是這次瀏覽階段暫時用的標記，編號全部變了之後對應不上，
@@ -4669,6 +4707,7 @@ document.getElementById("btnRenumber").onclick = () => {
   saveCardMastered();
   saveQuizMastered();
   savePronFlag();
+  saveHidden();
   saveUseRecordingIds();
   saveCompareSet();
   updateCompareToggleLabel();
@@ -4735,6 +4774,18 @@ document.getElementById("btnToggleNumbersOnly").addEventListener("click", () => 
   renderList();
 });
 updateNumbersToggleLabel();
+function updateHiddenToggleLabel(){
+  const btn = document.getElementById("btnToggleHiddenOnly");
+  btn.textContent = showHiddenOnly ? `回到正常清單 (隱藏 ${hiddenIds.size} 個)` : `🙈 顯示隱藏的 (${hiddenIds.size})`;
+  btn.classList.toggle("primary", showHiddenOnly);
+  btn.classList.toggle("hidden", hiddenIds.size === 0 && !showHiddenOnly);
+}
+document.getElementById("btnToggleHiddenOnly").addEventListener("click", () => {
+  showHiddenOnly = !showHiddenOnly;
+  updateHiddenToggleLabel();
+  renderList();
+});
+updateHiddenToggleLabel();
 function updateNewlyImportedToggleLabel(){
   const btn = document.getElementById("btnToggleNewlyImportedOnly");
   btn.textContent = showNewlyImportedOnly ? `顯示全部單字 (剛匯入 ${newlyImportedIds.size} 個)` : `🆕 只顯示剛匯入的單字 (${newlyImportedIds.size})`;
@@ -4897,7 +4948,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
-  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS];
 
