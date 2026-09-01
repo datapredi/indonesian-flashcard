@@ -197,10 +197,14 @@
         <input type="checkbox" id="forceReconvert">
         強制重新轉換（忽略已轉換記錄）
       </label>
+      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
+        <input type="checkbox" id="useProvidedZh">
+        用我提供的中文意思（每行「原文 = 中文」）
+      </label>
       <button id="btnExportWordListTxt">📋 複製目前語言單字（給貼到 Obsidian 或轉到其他語言用）</button>
     </div>
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
-      <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入" rows="4" style="flex:1 1 260px;"></textarea>
+      <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。若勾了「用我提供的中文意思」，每行寫「原文 = 中文」" rows="4" style="flex:1 1 260px;"></textarea>
       <button id="btnImportConvertPaste">📥 轉換貼上的文字</button>
     </div>
     <div class="note hidden" id="convertNote"></div>
@@ -1613,7 +1617,7 @@ ${list}`;
 // 選的語言」。不特別寫死印尼文，是因為以後可能還會加其他語言，來源語言越通用
 // 越好維護——直接讓 AI 判斷來源語言、轉成目標語言就好，不用先繞經中文當中介，
 // 準確度不會比較好，只是多一次沒必要的轉換。
-async function convertWordsToTargetLang(words){
+async function convertWordsToTargetLang(words, hints){
   const hasScript = L().hasScript;
   const schema = {
     type: "object",
@@ -1645,7 +1649,10 @@ async function convertWordsToTargetLang(words){
     required: ["entries"],
     additionalProperties: false
   };
-  const list = words.map((w, i) => `${i + 1}. ${w}`).join("\n");
+  const list = words.map((w, i) => `${i + 1}. ${w}${hints && hints[w] ? `　【學生指定中文意思：「${hints[w]}」】` : ""}`).join("\n");
+  const hintLine = hints && Object.keys(hints).length
+    ? `\n\n注意：清單裡標了【學生指定中文意思：「…」】的項目，zh 欄位一定要原封不動照學生寫的那串輸出（連（對女生）這種括號註記都要保留），不要改寫、不要自己重新翻譯、不要調整用詞；其他欄位（en、quizEn、correct、distractors）還是照這個指定的意思去做。沒有標的項目照原本規則自己判斷意思。`
+    : "";
   const scriptLine = hasScript ? `\n- nativeScript：對應的正確${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
   const prompt = `以下是一份單字/片語清單，來源語言不限（可能是印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
 - source：原封不動複製清單裡這一項的原文（一字不差），用來對應是哪一個原始項目
@@ -1658,7 +1665,7 @@ ${registerCefrPromptLines(L().label)}- zh：繁體中文意思，用字典基本
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語，一樣要選最普遍常用的說法）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
 
-清單裡每一項都要對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。以下的說話者身分設定只適用在你自己新造句子的地方（correct、distractors），如果來源本身已經是${L().label}、用字已經合理，不要為了套用這個設定而更動學生原文的代名詞或用字。${genderNoteForLang()}
+清單裡每一項都要對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。以下的說話者身分設定只適用在你自己新造句子的地方（correct、distractors），如果來源本身已經是${L().label}、用字已經合理，不要為了套用這個設定而更動學生原文的代名詞或用字。${genderNoteForLang()}${hintLine}
 
 單字清單（來源語言不限）：
 ${list}`;
@@ -4972,10 +4979,36 @@ function showConvertResult(msg){
 // 碰撞處理規則，不用維護兩份幾乎一樣的邏輯。
 async function processConvertImportText(rawText){
   {
+    // 勾了「用我提供的中文意思」時，每行照「原文 <分隔> 中文」拆開，把使用者自己
+    // 寫的中文收進 providedZhBySource，轉換完直接拿它當 zh，不讓 AI 自己翻。
+    // 分隔符接受 =、tab、：/:、|、—/–、//；「中文」那半一定要含中文字才算數。
+    const useProvidedZh = document.getElementById("useProvidedZh").checked;
+    const providedZhBySource = {};
+    function splitProvidedZh(raw){
+      const s = raw.replace(/\r/g, "").replace(/\*\*/g, "").replace(/^\s*\d+[\.\)]\s*/, "").replace(/^[\s\-\*]+/, "").trim();
+      const m = s.match(/^(.+?)\s*(?:=+>?|-+>|::?|：|→|\t|\||—|–|\/\/)\s*(.+)$/);
+      if(!m) return null;
+      const zhPart = m[2].trim().replace(/^[>\-–—=:：\s]+/, "").replace(/[\s;；。]+$/, "");
+      if(!/\p{Script=Han}/u.test(zhPart)) return null;
+      const srcClean = extractConvertSourceLine(m[1]);
+      if(!srcClean) return null;
+      return { src: srcClean, zh: zhPart };
+    }
+
     const lines = rawText.split(/\r?\n/);
     const indoWords = [];
     const seen = new Set();
     lines.forEach(line => {
+      if(useProvidedZh){
+        const pair = splitProvidedZh(line);
+        if(pair){
+          const k = pair.src.toLowerCase();
+          if(!seen.has(k)){ seen.add(k); indoWords.push(pair.src); }
+          providedZhBySource[k] = pair.zh;   // 後一行的同名原文覆蓋前一行
+          return;
+        }
+        // 拆不出「原文 = 中文」的行，退回照一般方式當純原文處理
+      }
       const cleaned = extractConvertSourceLine(line);
       if(cleaned === null) return;
       const key = cleaned.toLowerCase();
@@ -5050,7 +5083,10 @@ async function processConvertImportText(rawText){
       // 跟原本「AI 自動生成翻譯」那個功能的做法一致。
       for(const batch of batches){
         btn.textContent = `轉換中... (${done}/${wordsToConvert.length})`;
-        const entries = await convertWordsToTargetLang(batch);
+        const batchHints = useProvidedZh
+          ? Object.fromEntries(batch.map(w => [w, providedZhBySource[w.toLowerCase()]]).filter(([, v]) => v))
+          : null;
+        const entries = await convertWordsToTargetLang(batch, batchHints);
         let nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
         // 只有真的有比對到來源字、而且產出有效羅馬拼音的，才記錄為「已轉換」。
         // AI 有時候會少回傳幾筆或漏掉某一項，如果整批照樣全部標記已轉換，
@@ -5062,6 +5098,8 @@ async function processConvertImportText(rawText){
           const sourceKey = (entry.source || "").trim().toLowerCase();
           if(!text || !sourceKey || !batchWordSet.has(sourceKey)) return;
           matchedThisBatch.add(sourceKey);
+          // 勾了「用我提供的中文意思」：直接用使用者寫的中文蓋掉 AI 生成的 zh。
+          if(useProvidedZh && providedZhBySource[sourceKey]) entry.zh = providedZhBySource[sourceKey];
           // 印尼文/馬來文這種近親語言常常同一個字兩邊拼法完全一樣，標記起來讓
           // 使用者一眼看出「這個不用特別背，兩種語言長得一樣」。純粹字面比對
           // （不分大小寫），跟意思是否真的相同無關。這個功能沒有記錄來源是哪個
@@ -5084,7 +5122,8 @@ async function processConvertImportText(rawText){
           const newZhHasTag = genderTagRe.test(entry.zh || "");
           const cachedZhHasTag = cachedMeaning ? genderTagRe.test(cachedMeaning.zh || "") : false;
           const isCorrection = newZhHasTag && !cachedZhHasTag;
-          if(cachedMeaning && !forceReconvert && !isCorrection){
+          const hasProvidedZh = useProvidedZh && !!providedZhBySource[sourceKey];
+          if(cachedMeaning && !forceReconvert && !isCorrection && !hasProvidedZh){
             entry.zh = cachedMeaning.zh;
             entry.en = cachedMeaning.en;
           } else {
