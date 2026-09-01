@@ -5100,10 +5100,17 @@ async function processConvertImportText(rawText){
         // 沒轉到的字就會被誤判成「以後都跳過」、永遠補不回來（就是這次回報的問題）。
         const batchWordSet = new Set(batch.map(w => w.toLowerCase()));
         const matchedThisBatch = new Set();
-        entries.forEach(entry => {
+        entries.forEach((entry, idx) => {
           const text = (entry.romanized || "").trim();
-          const sourceKey = (entry.source || "").trim().toLowerCase();
+          let sourceKey = (entry.source || "").trim().toLowerCase();
+          // AI 回傳的 source 對不上原字（中文繁簡被轉、多加了註解、翻成別的語言
+          // 之類）時，在「數量一致」的前提下照順序退回用對應位置的原字——prompt
+          // 有要求輸出數量/順序跟輸入一致，這個對應是安全的。
+          if(!batchWordSet.has(sourceKey) && batch.length === entries.length && batch[idx]){
+            sourceKey = batch[idx].toLowerCase();
+          }
           if(!text || !sourceKey || !batchWordSet.has(sourceKey)) return;
+          if(matchedThisBatch.has(sourceKey)) return; // 同一個原字別被兩筆 entry 都對到
           matchedThisBatch.add(sourceKey);
           // 勾了「用我提供的中文意思」：直接用使用者寫的中文蓋掉 AI 生成的 zh。
           if(useProvidedZh && providedZhBySource[sourceKey]) entry.zh = providedZhBySource[sourceKey];
