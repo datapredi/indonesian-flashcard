@@ -3758,7 +3758,9 @@ function getVisibleWords(){
     }
     if(!query) return true;
     const data = lookup(w.text);
-    const haystack = `${w.text} ${data ? data.zh : ""} ${data ? data.en : ""}`.toLowerCase();
+    // 也比對 📝 筆記跟 AI 補的搜尋關鍵字（近義詞），這樣「待會見」的字用「再見」
+    // 也搜得到——只要在筆記或關鍵字裡有出現。
+    const haystack = `${w.text} ${data ? data.zh : ""} ${data ? data.en : ""} ${data && data.searchKeywords ? data.searchKeywords : ""} ${getWordNote(w.text)}`.toLowerCase();
     return haystack.includes(query);
   });
   if(sortCefr){
