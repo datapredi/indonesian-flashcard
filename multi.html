@@ -79,6 +79,9 @@
   .item.jump-highlight{animation:jumpFlash 1.6s ease-out;}
   @keyframes jumpFlash{ 0%{background:rgba(255,196,0,0.55);} 100%{background:transparent;} }
   .jump-back-btn{position:fixed; right:16px; bottom:16px; z-index:50; border-radius:999px; padding:10px 16px; box-shadow:0 2px 10px rgba(0,0,0,0.25);}
+  .autoplay-float{position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:60; display:flex; gap:8px; align-items:center; background:var(--card); border:1px solid var(--border); border-radius:999px; padding:6px 8px 6px 16px; box-shadow:0 3px 16px rgba(0,0,0,0.3);}
+  .autoplay-float .ap-status{font-size:0.8rem; color:var(--muted); white-space:nowrap;}
+  .autoplay-float button{flex:0 0 auto; border-radius:999px; padding:8px 14px; font-size:1rem;}
   .usage-zh{color:var(--muted); margin-top:2px;}
   .usage-note{color:var(--muted); font-size:0.8rem; margin-top:4px; font-style:italic;}
   .diff-chip{
@@ -391,6 +394,12 @@
 </div>
 
 <button id="btnJumpBack" class="jump-back-btn secondary hidden">⬅ 回到句子</button>
+
+<div id="autoplayFloat" class="autoplay-float hidden">
+  <span class="ap-status" id="autoplayFloatStatus"></span>
+  <button type="button" id="autoplayFloatToggle" title="暫停／繼續">⏸️</button>
+  <button type="button" id="autoplayFloatClose" title="結束依序播放">✕</button>
+</div>
 
 <script>
 // ================= 語言切換 =================
@@ -1022,6 +1031,11 @@ const HIDDEN_LS = "flashcard_hidden_v1";
 let hiddenIds = loadMasteredSet(lsKey(HIDDEN_LS));
 function saveHidden(){ saveMasteredSet(lsKey(HIDDEN_LS), hiddenIds); }
 let showHiddenOnly = false;
+
+// 首頁「依序播放發音」的狀態（實作在檔案下方）。放這裡宣告，確保 renderList 執行時一定看得到。
+let listAutoplayRunning = false;   // 迴圈正在跑
+let listAutoplayPaused = false;    // 使用者暫停了（浮動控制器留著、可從同一個字繼續）
+let listAutoplayIndex = 0;
 
 // 每個單字自己的自由筆記（使用者手打）。跟 customDB 一樣用 w.text 當 key，換
 // 語言各存一份，也會一起進備份。
@@ -4485,13 +4499,15 @@ function renderList(){
   });
   updateCount();
   updatePendingSyncBar();
-  // 依序播放進行中、清單又重繪的話（例如勾選、篩選變動），把目前這個字的高亮補回去。
-  if(typeof listAutoplayRunning !== "undefined" && listAutoplayRunning){
+  // 依序播放進行中（或暫停中）、清單又重繪的話（勾選、篩選變動…），把目前這個字
+  // 的高亮補回去。
+  if((listAutoplayRunning || listAutoplayPaused)){
     const cur = visibleWords[listAutoplayIndex];
     if(cur){
       const rowEl = el.querySelector(`.item[data-word-id="${cur.id}"]`);
       if(rowEl) rowEl.classList.add("autoplay-current");
     }
+    if(typeof renderAutoplayControls === "function") renderAutoplayControls();
   }
 }
 function updateCount(){
@@ -4798,38 +4814,67 @@ document.getElementById("btnToggleHiddenOnly").addEventListener("click", () => {
 });
 updateHiddenToggleLabel();
 
-// ===== 首頁「依序播放發音」：留在單字表畫面，一個一個把每個字的 🔊 播 3 次 =====
-let listAutoplayRunning = false;
-let listAutoplayIndex = 0;
-function updateListAutoplayBtn(){
-  const btn = document.getElementById("btnListAutoplay");
-  if(!btn) return;
-  btn.textContent = listAutoplayRunning ? "⏸️ 暫停依序播放" : "▶️ 依序播放發音（每字 3 次）";
-  btn.classList.toggle("primary", listAutoplayRunning);
+// ===== 首頁「依序播放發音」：留在單字表畫面，一個一個把每個字的 🔊 播 3 次。
+// 有一顆浮動控制器固定在畫面下方，清單自動捲動時它不會跟著跑掉，隨時能暫停/繼續。
+// （狀態變數宣告在檔案上方，跟其他清單狀態放一起，避免 renderList 早於這裡執行時撞 TDZ。）
+function clearAutoplayHighlight(){
+  document.querySelectorAll("#wordList .item.autoplay-current").forEach(el => el.classList.remove("autoplay-current"));
 }
+function renderAutoplayControls(){
+  const active = listAutoplayRunning || listAutoplayPaused;
+  const toolBtn = document.getElementById("btnListAutoplay");
+  if(toolBtn){
+    toolBtn.textContent = listAutoplayRunning ? "⏸️ 暫停依序播放"
+      : listAutoplayPaused ? "▶️ 繼續依序播放"
+      : "▶️ 依序播放發音（每字 3 次）";
+    toolBtn.classList.toggle("primary", active);
+  }
+  const float = document.getElementById("autoplayFloat");
+  if(float){
+    float.classList.toggle("hidden", !active);
+    const total = getVisibleWords().length;
+    document.getElementById("autoplayFloatStatus").textContent =
+      `${Math.min(listAutoplayIndex + 1, total)} / ${total}${listAutoplayPaused ? "（已暫停）" : ""}`;
+    document.getElementById("autoplayFloatToggle").textContent = listAutoplayRunning ? "⏸️" : "▶️";
+  }
+}
+// 完整停止（離開畫面、按 ✕）：重設進度、收起浮動控制器。
 function stopListAutoplay(){
-  if(!listAutoplayRunning) return;
+  if(!listAutoplayRunning && !listAutoplayPaused) return;
   listAutoplayRunning = false;
+  listAutoplayPaused = false;
+  listAutoplayIndex = 0;
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
-  document.querySelectorAll("#wordList .item.autoplay-current").forEach(el => el.classList.remove("autoplay-current"));
-  updateListAutoplayBtn();
+  clearAutoplayHighlight();
+  renderAutoplayControls();
+}
+// 暫停：停在目前這個字，浮動控制器跟 highlight 都留著，之後從同一個字繼續。
+function pauseListAutoplay(){
+  if(!listAutoplayRunning) return;
+  listAutoplayRunning = false;
+  listAutoplayPaused = true;
+  abortCurrentPlayback();
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  renderAutoplayControls();
 }
 async function runListAutoplay(){
   const words = getVisibleWords();
-  if(words.length === 0){ listAutoplayRunning = false; updateListAutoplayBtn(); return; }
+  if(words.length === 0){ stopListAutoplay(); return; }
   if(listAutoplayIndex >= words.length) listAutoplayIndex = 0;
   listAutoplayRunning = true;
-  updateListAutoplayBtn();
+  listAutoplayPaused = false;
+  renderAutoplayControls();
   for(; listAutoplayIndex < words.length && listAutoplayRunning; listAutoplayIndex++){
     const w = words[listAutoplayIndex];
     const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
     const btn = rowEl ? rowEl.querySelector(".row-speak") : null;
     if(rowEl){
-      document.querySelectorAll("#wordList .item.autoplay-current").forEach(el => el.classList.remove("autoplay-current"));
+      clearAutoplayHighlight();
       rowEl.classList.add("autoplay-current");
       rowEl.scrollIntoView({ block: "center", behavior: "smooth" });
     }
+    renderAutoplayControls();
     const text = getSpeechText(w);
     const recKey = useRecordingIds.has(w.id) ? recKeyFor(w.text) : null;
     for(let r = 0; r < 3 && listAutoplayRunning; r++){
@@ -4840,16 +4885,20 @@ async function runListAutoplay(){
     if(!listAutoplayRunning) break;
     await delayMs(550);
   }
-  document.querySelectorAll("#wordList .item.autoplay-current").forEach(el => el.classList.remove("autoplay-current"));
-  if(listAutoplayIndex >= words.length){ listAutoplayIndex = 0; }   // 播完一輪，下次從頭
+  if(listAutoplayPaused) return;   // 被暫停：保留 index / highlight / 浮動控制器
+  clearAutoplayHighlight();        // 正常播完一輪
+  listAutoplayIndex = 0;
   listAutoplayRunning = false;
-  updateListAutoplayBtn();
+  renderAutoplayControls();
 }
-document.getElementById("btnListAutoplay").addEventListener("click", () => {
-  if(listAutoplayRunning){ stopListAutoplay(); }
-  else { runListAutoplay(); }
-});
-updateListAutoplayBtn();
+function toggleListAutoplay(){
+  if(listAutoplayRunning) pauseListAutoplay();
+  else runListAutoplay();          // 從頭，或從暫停處繼續（listAutoplayIndex 已保留）
+}
+document.getElementById("btnListAutoplay").addEventListener("click", toggleListAutoplay);
+document.getElementById("autoplayFloatToggle").addEventListener("click", toggleListAutoplay);
+document.getElementById("autoplayFloatClose").addEventListener("click", stopListAutoplay);
+renderAutoplayControls();
 function updateNewlyImportedToggleLabel(){
   const btn = document.getElementById("btnToggleNewlyImportedOnly");
   btn.textContent = showNewlyImportedOnly ? `顯示全部單字 (剛匯入 ${newlyImportedIds.size} 個)` : `🆕 只顯示剛匯入的單字 (${newlyImportedIds.size})`;
