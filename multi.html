@@ -2275,36 +2275,38 @@ document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
 // ================= 埃及阿拉伯字母表（純靜態參考資料，不是 AI 生成） =================
 // 顯示阿拉伯字母 + 這個 app 用的 Franco/Arabizi 拼法 + 開羅口語實際發音。發音是唸
 // 字母本身，跟它在真正單字裡的唸法會有點不一樣，僅供參考。
-// [阿拉伯字母, 字母名, 這個 app 的 Franco 拼法, 開羅口語發音]
+// [阿拉伯字母, 字母名(羅馬), 這個 app 的 Franco 拼法, 開羅口語發音, 字母名(阿拉伯文，給🔊唸)]
+// 「字母名」是固定的（跟老師教的一樣，例如 ث 叫 thaa）；「Franco 拼法」「發音」是
+// 這個字母出現在埃及口語單字裡時實際怎麼拼、怎麼唸，兩者常常不一樣。
 const ARABIC_LETTERS = [
-  ["ا", "alif", "a / aa", "長 a；或當 hamza 的座"],
-  ["ب", "baa", "b", "b"],
-  ["ت", "taa", "t", "t"],
-  ["ث", "saa", "s", "開羅口語多半唸 s（少數字唸 t）"],
-  ["ج", "geem", "g", "硬 g（像英文 go）——開羅口語特色，不是 j"],
-  ["ح", "Haa", "7", "喉嚨用力擠出的 h（ħ）"],
-  ["خ", "khaa", "kh", "kh（像德文 Bach、台語「客」的起音）"],
-  ["د", "daal", "d", "d"],
-  ["ذ", "zaal", "z", "開羅口語多半唸 z（少數字唸 d）"],
-  ["ر", "raa", "r", "彈舌 r"],
-  ["ز", "zeen", "z", "z"],
-  ["س", "seen", "s", "s"],
-  ["ش", "sheen", "sh", "sh"],
-  ["ص", "Saad", "s", "重音 s（發音時舌根抬高）；拼法一樣寫 s"],
-  ["ض", "Daad", "d", "重音 d；拼法一樣寫 d"],
-  ["ط", "Taa", "t", "重音 t；拼法一樣寫 t"],
-  ["ظ", "Zaa", "z", "重音 z；拼法一樣寫 z"],
-  ["ع", "3een", "3", "咽壁擠出來的濁喉音（ʕ）——就是那個「怪聲」"],
-  ["غ", "gheen", "gh", "像法文小舌 r（ɣ）"],
-  ["ف", "faa", "f", "f"],
-  ["ق", "qaaf", "2（或 '）", "開羅口語多半是喉塞音（ʔ）；標準語才唸 q"],
-  ["ك", "kaaf", "k", "k"],
-  ["ل", "laam", "l", "l"],
-  ["م", "meem", "m", "m"],
-  ["ن", "noon", "n", "n"],
-  ["ه", "haa", "h", "輕輕的 h（像英文 house 的 h）"],
-  ["و", "waaw", "w / oo", "子音 w；或長 u／長 o"],
-  ["ي", "yaa", "y / ee", "子音 y；或長 i／長 e"]
+  ["ا", "alif", "a / aa", "長 a；或當 hamza 的座", "ألف"],
+  ["ب", "baa", "b", "b", "باء"],
+  ["ت", "taa", "t", "t", "تاء"],
+  ["ث", "thaa", "s（有些字 t）", "字母名唸 thaa（英文 think 的 th）；但出現在埃及口語單字裡多半唸 s，少數唸 t——這個 app 拼 s", "ثاء"],
+  ["ج", "geem", "g", "埃及唸硬 g（像英文 go），不是 j；標準語才唸 jeem", "جيم"],
+  ["ح", "Haa", "7", "喉嚨用力擠出的 h（ħ）", "حاء"],
+  ["خ", "khaa", "kh", "kh（像德文 Bach、台語「客」的起音）", "خاء"],
+  ["د", "daal", "d", "d", "دال"],
+  ["ذ", "dhaal", "z（有些字 d）", "字母名唸 dhaal（英文 this 的 th）；出現在埃及口語單字裡多半唸 z，少數唸 d——這個 app 拼 z", "ذال"],
+  ["ر", "raa", "r", "彈舌 r", "راء"],
+  ["ز", "zeen", "z", "z", "زاي"],
+  ["س", "seen", "s", "s", "سين"],
+  ["ش", "sheen", "sh", "sh", "شين"],
+  ["ص", "Saad", "s", "字母名是重音 s；出現在單字裡拼法一樣寫 s", "صاد"],
+  ["ض", "Daad", "d", "字母名是重音 d；出現在單字裡拼法一樣寫 d", "ضاد"],
+  ["ط", "Taa", "t", "字母名是重音 t；出現在單字裡拼法一樣寫 t", "طاء"],
+  ["ظ", "Zaa (DHaa)", "z", "字母名標準語是重音的 th（ðˤ）；埃及口語唸 z（少數 d），拼法寫 z", "ظاء"],
+  ["ع", "3een", "3", "咽壁擠出來的濁喉音（ʕ）——就是那個「怪聲」", "عين"],
+  ["غ", "gheen", "gh", "像法文小舌 r（ɣ）", "غين"],
+  ["ف", "faa", "f", "f", "فاء"],
+  ["ق", "qaaf", "2（或 '）", "字母名唸 qaaf；出現在埃及口語單字裡多半是喉塞音（ʔ），標準語才唸 q", "قاف"],
+  ["ك", "kaaf", "k", "k", "كاف"],
+  ["ل", "laam", "l", "l", "لام"],
+  ["م", "meem", "m", "m", "ميم"],
+  ["ن", "noon", "n", "n", "نون"],
+  ["ه", "haa", "h", "輕輕的 h（像英文 house 的 h）", "هاء"],
+  ["و", "waaw", "w / oo", "子音 w；或長 u／長 o", "واو"],
+  ["ي", "yaa", "y / ee", "子音 y；或長 i／長 e", "ياء"]
 ];
 const ARABIC_EXTRAS = [
   ["ء", "hamza", "2 / '", "喉塞音（像台語「一」前面那個頓）"],
@@ -2322,11 +2324,11 @@ function renderArabicAlphabetPanel(){
   function grid(list, letterFont){
     const g = document.createElement("div");
     g.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px;";
-    list.forEach(([letter, name, franco, sound]) => {
+    list.forEach(([letter, name, franco, sound, arName]) => {
       const item = document.createElement("div");
       item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:150px; flex:1 1 150px; text-align:center;";
       const top = document.createElement("div");
-      top.appendChild(makeSpeakableLabel(letter, letterFont, "arz"));
+      top.appendChild(makeSpeakableLabel(letter, letterFont, "arz", arName || null));
       item.appendChild(top);
       const info = document.createElement("div");
       info.className = "usage-note";
