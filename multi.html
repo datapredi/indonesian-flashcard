@@ -160,6 +160,10 @@
     <button id="btnToggleViAlphabet">📖 越南文母音／子音對照表</button>
   </div>
   <div class="list hidden" id="viAlphabetPanel" style="padding:14px;"></div>
+  <div class="toolbar hidden" id="arabicAlphabetBar">
+    <button id="btnToggleArabicAlphabet">📖 埃及阿拉伯字母表（含 Franco 拼法）</button>
+  </div>
+  <div class="list hidden" id="arabicAlphabetPanel" style="padding:14px;"></div>
   <div class="toolbar hidden" id="viDialectBar">
     <label for="viDialect" style="align-self:center;">越南語口音</label>
     <select id="viDialect">
@@ -558,6 +562,8 @@ function updateLangButtons(){
   if(currentLang !== "th") document.getElementById("thaiAlphabetPanel").classList.add("hidden");
   document.getElementById("viAlphabetBar").classList.toggle("hidden", currentLang !== "vi");
   if(currentLang !== "vi") document.getElementById("viAlphabetPanel").classList.add("hidden");
+  document.getElementById("arabicAlphabetBar").classList.toggle("hidden", currentLang !== "arz");
+  if(currentLang !== "arz") document.getElementById("arabicAlphabetPanel").classList.add("hidden");
   const toneLangActiveTop = isToneLangActive();
   document.getElementById("btnGenerateAllTones").classList.toggle("hidden", !toneLangActiveTop);
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", !toneLangActiveTop);
@@ -2262,6 +2268,109 @@ document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
     return;
   }
   if(panel.innerHTML === "") renderViAlphabetPanel();
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// ================= 埃及阿拉伯字母表（純靜態參考資料，不是 AI 生成） =================
+// 顯示阿拉伯字母 + 這個 app 用的 Franco/Arabizi 拼法 + 開羅口語實際發音。發音是唸
+// 字母本身，跟它在真正單字裡的唸法會有點不一樣，僅供參考。
+// [阿拉伯字母, 字母名, 這個 app 的 Franco 拼法, 開羅口語發音]
+const ARABIC_LETTERS = [
+  ["ا", "alif", "a / aa", "長 a；或當 hamza 的座"],
+  ["ب", "baa", "b", "b"],
+  ["ت", "taa", "t", "t"],
+  ["ث", "saa", "s", "開羅口語多半唸 s（少數字唸 t）"],
+  ["ج", "geem", "g", "硬 g（像英文 go）——開羅口語特色，不是 j"],
+  ["ح", "Haa", "7", "喉嚨用力擠出的 h（ħ）"],
+  ["خ", "khaa", "kh", "kh（像德文 Bach、台語「客」的起音）"],
+  ["د", "daal", "d", "d"],
+  ["ذ", "zaal", "z", "開羅口語多半唸 z（少數字唸 d）"],
+  ["ر", "raa", "r", "彈舌 r"],
+  ["ز", "zeen", "z", "z"],
+  ["س", "seen", "s", "s"],
+  ["ش", "sheen", "sh", "sh"],
+  ["ص", "Saad", "s", "重音 s（發音時舌根抬高）；拼法一樣寫 s"],
+  ["ض", "Daad", "d", "重音 d；拼法一樣寫 d"],
+  ["ط", "Taa", "t", "重音 t；拼法一樣寫 t"],
+  ["ظ", "Zaa", "z", "重音 z；拼法一樣寫 z"],
+  ["ع", "3een", "3", "咽壁擠出來的濁喉音（ʕ）——就是那個「怪聲」"],
+  ["غ", "gheen", "gh", "像法文小舌 r（ɣ）"],
+  ["ف", "faa", "f", "f"],
+  ["ق", "qaaf", "2（或 '）", "開羅口語多半是喉塞音（ʔ）；標準語才唸 q"],
+  ["ك", "kaaf", "k", "k"],
+  ["ل", "laam", "l", "l"],
+  ["م", "meem", "m", "m"],
+  ["ن", "noon", "n", "n"],
+  ["ه", "haa", "h", "輕輕的 h（像英文 house 的 h）"],
+  ["و", "waaw", "w / oo", "子音 w；或長 u／長 o"],
+  ["ي", "yaa", "y / ee", "子音 y；或長 i／長 e"]
+];
+const ARABIC_EXTRAS = [
+  ["ء", "hamza", "2 / '", "喉塞音（像台語「一」前面那個頓）"],
+  ["ة", "taa marbuta", "-a", "陰性字尾，唸 -a"],
+  ["ـَ", "fatha", "a", "短母音 a"],
+  ["ـِ", "kasra", "e / i", "短母音 e／i"],
+  ["ـُ", "damma", "o", "標準語是 u，開羅口語聽起來是 o（shokran 不是 shukran）"],
+  ["ـّ", "shadda", "疊字母", "這個子音唸兩次（kwayyes、huwwa）"],
+  ["ـْ", "sukuun", "（無母音）", "這個子音後面不接母音"]
+];
+function renderArabicAlphabetPanel(){
+  const panel = document.getElementById("arabicAlphabetPanel");
+  panel.innerHTML = "";
+
+  function grid(list, letterFont){
+    const g = document.createElement("div");
+    g.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px;";
+    list.forEach(([letter, name, franco, sound]) => {
+      const item = document.createElement("div");
+      item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:150px; flex:1 1 150px; text-align:center;";
+      const top = document.createElement("div");
+      top.appendChild(makeSpeakableLabel(letter, letterFont, "arz"));
+      item.appendChild(top);
+      const info = document.createElement("div");
+      info.className = "usage-note";
+      info.innerHTML = `${name} · <b>${franco}</b><br>${sound}`;
+      item.appendChild(info);
+      g.appendChild(item);
+    });
+    panel.appendChild(g);
+  }
+
+  const h1 = document.createElement("div");
+  h1.style.fontWeight = "600";
+  h1.textContent = "字母（28 個，由右往左寫；粗體是這個 app 用的 Franco/Arabizi 拼法）";
+  panel.appendChild(h1);
+  grid(ARABIC_LETTERS, "1.7rem");
+
+  const h2 = document.createElement("div");
+  h2.style.fontWeight = "600";
+  h2.textContent = "短母音符號與其他";
+  panel.appendChild(h2);
+  grid(ARABIC_EXTRAS, "1.5rem");
+
+  const h3 = document.createElement("div");
+  h3.style.fontWeight = "600";
+  h3.textContent = "手機打字的數字代號（Franco / Arabizi）";
+  panel.appendChild(h3);
+  const nums = document.createElement("div");
+  nums.className = "usage-note";
+  nums.style.margin = "8px 0 16px";
+  nums.innerHTML = "<b>7</b> = ح　<b>3</b> = ع　<b>2</b> = ء 跟開羅口語的 ق（喉塞音）<br>ش→sh、خ→kh、غ→gh、ج→g；重音字母 ص／ض／ط／ظ 一律寫成一般的 s／d／t／z";
+  panel.appendChild(nums);
+
+  const note = document.createElement("div");
+  note.className = "usage-note";
+  note.textContent = "這張表是固定不變的語言學事實（字母、名稱、開羅口語發音），寫死的比每次問 AI 可靠。發音鍵唸的是「字母本身」，跟它在真正單字裡的唸法會有點不一樣，僅供參考。開羅口語跟標準阿拉伯語差滿多：ج 唸 g、ق 多半是喉塞音、ث→s、ذ→z、重音字母拼法都簡化。";
+  panel.appendChild(note);
+}
+document.getElementById("btnToggleArabicAlphabet").addEventListener("click", () => {
+  const panel = document.getElementById("arabicAlphabetPanel");
+  if(!panel.classList.contains("hidden")){
+    panel.classList.add("hidden");
+    return;
+  }
+  if(panel.innerHTML === "") renderArabicAlphabetPanel();
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
