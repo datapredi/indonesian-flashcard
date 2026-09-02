@@ -2151,30 +2151,31 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
 // example：一個含這個母音的常見字，只放在說明文字裡當參考（「例：ba」）。
 // 🔊 按鈕唸的是字母/拼法本身（使用者要求直接唸 alphabet，不要唸範例字）；
 // 注意 TTS 唸孤立的 ă/â/ơ/ư 這種帶變音符號的字母有時候會唸不準或亂猜。
+// sound 裡的注音是「最接近的國語音」概略對照，方便台灣學生抓感覺，不是精準等值。
 const VI_VOWELS = [
-  { letter: "a", sound: "a（短）", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
-  { letter: "ă", sound: "a（更短）", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
-  { letter: "â", sound: "ơ（短）", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
-  { letter: "e", sound: "ae", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
-  { letter: "ê", sound: "e", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
-  { letter: "o", sound: "o（開）", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
-  { letter: "ô", sound: "o（閉，像喔）", example: "tô", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
-  { letter: "ơ", sound: "er（不捲舌）", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
-  { letter: "u", sound: "u", example: "thu", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
-  { letter: "ư", sound: "跟 u 嘴型一樣但不圓唇", example: "thư", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } },
-  { letter: "i", sound: "i（跟 y 同音，用哪個看字源）；最好發，擺最後", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } }
+  { letter: "a", sound: "像ㄚ（短）", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
+  { letter: "ă", sound: "像ㄚ（更短、更急）", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
+  { letter: "â", sound: "像ㄜ（短）", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
+  { letter: "e", sound: "像ㄝ（嘴張比較大）", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
+  { letter: "ê", sound: "像ㄟ的前半、不往上滑", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
+  { letter: "o", sound: "像ㄛ（開口）", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
+  { letter: "ô", sound: "像ㄛ（收口，像「喔」）", example: "tô", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
+  { letter: "ơ", sound: "像ㄜ（拉長、不捲舌）", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
+  { letter: "u", sound: "像ㄨ", example: "thu", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
+  { letter: "ư", sound: "跟ㄨ嘴型一樣但不圓唇、嘴角往兩邊（注音沒有對應）", example: "thư", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } },
+  { letter: "i", sound: "像ㄧ（跟 y 同音，用哪個看字源）；最好發，擺最後", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } }
 ];
 const VI_DIPHTHONGS = [
-  { form: "ia / iê / yê", sound: "ia", example: "chia" },
-  { form: "ua / uô", sound: "ua", example: "mua" },
-  { form: "ưa / ươ", sound: "uea", example: "chưa" }
+  { form: "ia / iê / yê", sound: "像ㄧㄝ滑過去", example: "chia" },
+  { form: "ua / uô", sound: "像ㄨㄛ滑過去", example: "mua" },
+  { form: "ưa / ươ", sound: "像ㄜ滑到ㄚ（前段是 ư 的不圓唇音）", example: "chưa" }
 ];
 const VI_CONSONANTS = [
-  ["b","b"], ["c / k / q","k"], ["ch","tʃ（接近 j）"], ["d","南部念像 y"], ["đ","d"],
-  ["g / gh","g"], ["gi","南部念像 y"], ["h","h"], ["kh","kh（喉音）"], ["l","l"],
-  ["m","m"], ["n","n"], ["ng / ngh","ng"], ["nh","ny（像中文的ㄋㄧ連著念）"], ["p","p"],
-  ["ph","f"], ["r","南部念像捲舌 r，接近國語ㄖ"], ["s","南部念捲舌 s，跟 x 有分"], ["t","t"],
-  ["th","th（送氣）"], ["tr","南部念捲舌，接近 ch"], ["v","北部像 v，南部常念像 y"], ["x","s（不捲舌）"]
+  ["b","b（像ㄅ，不送氣）"], ["c / k / q","k（像ㄍ，不送氣）"], ["ch","接近ㄐ"], ["d","南部念像 y（ㄧ- 起音）"], ["đ","d（像ㄉ）"],
+  ["g / gh","像ㄍ但更軟、帶點摩擦"], ["gi","南部念像 y（ㄧ- 起音）"], ["h","像ㄏ"], ["kh","喉音，像用力磨的ㄏ"], ["l","像ㄌ"],
+  ["m","像ㄇ"], ["n","像ㄋ"], ["ng / ngh","像英文 sing 的尾音（注音沒有這個開頭音）"], ["nh","像ㄋㄧ連著念"], ["p","p（像ㄅ，不送氣）"],
+  ["ph","f（像ㄈ）"], ["r","南部念捲舌，接近ㄖ"], ["s","南部念捲舌，接近ㄕ（跟 x 有分）"], ["t","t（像ㄉ，不送氣）"],
+  ["th","送氣，像ㄊ"], ["tr","南部念捲舌，接近ㄓ／ch"], ["v","北部像 v；南部常念像 y（ㄧ- 起音）"], ["x","不捲舌的 s，像ㄙ"]
 ];
 // 母音的 5 個聲調變化（M/F/R/L/S）小標籤列，每個都能點下去聽發音——直接
 // 把重音符號寫法跟聲調字母放在一起看，比只看字母抽象的說明更直覺。
