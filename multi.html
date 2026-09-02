@@ -4229,10 +4229,11 @@ function createWordItem(w){
 
   const nativeTonePanel = document.createElement("div");
   nativeTonePanel.className = "usage-panel hidden";
+  nativeTonePanel.dataset.nativeTonePanelFor = w.id;   // 給「依序播放」找得到
 
   const nativeToneBtn = document.createElement("button");
   nativeToneBtn.type = "button";
-  nativeToneBtn.className = "usage-btn";
+  nativeToneBtn.className = "usage-btn row-native-tone-btn";
   nativeToneBtn.textContent = currentLang === "vi" ? "Ư" : "ก";
   nativeToneBtn.title = `AI 在原生文字上標註聲調（${toneLetterLabel}）`;
   nativeToneBtn.setAttribute("aria-label", `AI 在 ${w.text} 的原生文字上標註聲調`);
@@ -4877,13 +4878,16 @@ async function runListAutoplay(){
       clearAutoplayHighlight();
       rowEl.classList.add("autoplay-current");
       rowEl.scrollIntoView({ block: "center", behavior: "smooth" });
-      // 聲調語言（泰文／越南文南部口音）：播到這個字時自動展開它的 🎵 聲調標記，
-      // 換到下一個字再把上一個收起來。
+      // 聲調語言：播到這個字時自動展開它的聲調標記，換到下一個字再收起上一個。
+      // 越南文顯示「原生文字上的聲調」（帶聲調符號的越南字，比羅馬拼音＋MFRLS 直覺）；
+      // 泰文用羅馬拼音＋HLMRF 那個面板。
       if(isToneLangActive()){
         if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
         autoplayOpenedTonePanel = null;
-        const tPanel = document.querySelector(`#wordList .usage-panel[data-tone-panel-for="${w.id}"]`);
-        const tBtn = rowEl.querySelector(".row-tone-btn");
+        const useNative = currentLang === "vi";
+        const sel = useNative ? `[data-native-tone-panel-for="${w.id}"]` : `[data-tone-panel-for="${w.id}"]`;
+        const tPanel = document.querySelector(`#wordList .usage-panel${sel}`);
+        const tBtn = rowEl.querySelector(useNative ? ".row-native-tone-btn" : ".row-tone-btn");
         if(tPanel && tBtn && tPanel.classList.contains("hidden")){
           tBtn.click();   // 展開並（用快取或現生成）載入聲調標記
           autoplayOpenedTonePanel = tPanel;
