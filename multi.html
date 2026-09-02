@@ -4347,6 +4347,32 @@ function createWordItem(w){
   });
   row.appendChild(notesBtn);
 
+  // 埃及阿拉伯文：一顆按鈕切換顯示/隱藏這個字的阿拉伯文原文（資料裡現成的 nativeScript，
+  // 不用問 AI）。預設收起來，想對照原文再點開。
+  if(currentLang === "arz" && data && data.nativeScript){
+    const arLine = document.createElement("div");
+    arLine.className = "native-text hidden";
+    const bdi = document.createElement("bdi");
+    bdi.dir = "rtl";
+    bdi.className = "native-ar";
+    bdi.style.fontSize = "1.2rem";
+    bdi.textContent = data.nativeScript;
+    arLine.appendChild(bdi);
+    row.querySelector("div").appendChild(arLine);
+    const arBtn = document.createElement("button");
+    arBtn.type = "button";
+    arBtn.className = "usage-btn";
+    arBtn.textContent = "أ";
+    arBtn.title = "顯示／隱藏埃及阿拉伯文原文";
+    arBtn.setAttribute("aria-label", `顯示 ${w.text} 的阿拉伯文原文`);
+    arBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      arLine.classList.toggle("hidden");
+      arBtn.classList.toggle("primary", !arLine.classList.contains("hidden"));
+    });
+    row.appendChild(arBtn);
+  }
+
   // 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。兩種語言
   // 用同一套按鈕/面板/快取機制，只是呼叫的 AI 函式跟顯示文字不同。
   const toneLangActive = isToneLangActive();
