@@ -52,6 +52,7 @@
   .item .meaning{color:var(--muted); font-size:0.82rem;}
   .item.no-data .id-text{color:var(--muted);}
   .item.no-data .meaning{color:var(--danger);}
+  .item.autoplay-current{box-shadow:inset 4px 0 0 var(--accent); background:color-mix(in srgb, var(--accent) 10%, transparent);}
   /* 文字區塊固定佔滿一整行，按鈕多的話會自動排到下一行，不會把單字擠成一個字母一行 */
   .item > div{flex:1 1 100%; min-width:0;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
@@ -245,6 +246,7 @@
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
+      <button id="btnListAutoplay">▶️ 依序播放發音（每字 3 次）</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
@@ -3812,6 +3814,7 @@ function createWordItem(w){
   // 還沒有中英文意思也一樣），data 會是真值，但其實還是不完整、還是需要按
   // 「AI 自動生成缺少的翻譯」才會有測驗需要的完整資料。
   row.className = "item" + (needsGeneration(w) ? " no-data" : "");
+  row.dataset.wordId = w.id;
   row.innerHTML = `
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
@@ -3892,7 +3895,7 @@ function createWordItem(w){
   }
   const speakBtn = document.createElement("button");
   speakBtn.type = "button";
-  speakBtn.className = "speak-btn";
+  speakBtn.className = "speak-btn row-speak";
   speakBtn.textContent = "🔊";
   speakBtn.setAttribute("aria-label", `連續播放 3 次 ${w.text} 發音`);
   speakBtn.title = "連續播放 3 次";
@@ -4482,6 +4485,14 @@ function renderList(){
   });
   updateCount();
   updatePendingSyncBar();
+  // 依序播放進行中、清單又重繪的話（例如勾選、篩選變動），把目前這個字的高亮補回去。
+  if(typeof listAutoplayRunning !== "undefined" && listAutoplayRunning){
+    const cur = visibleWords[listAutoplayIndex];
+    if(cur){
+      const rowEl = el.querySelector(`.item[data-word-id="${cur.id}"]`);
+      if(rowEl) rowEl.classList.add("autoplay-current");
+    }
+  }
 }
 function updateCount(){
   const parts = [`已選 ${selected.size} / ${allWords.length} 個單字`];
@@ -4786,6 +4797,59 @@ document.getElementById("btnToggleHiddenOnly").addEventListener("click", () => {
   renderList();
 });
 updateHiddenToggleLabel();
+
+// ===== 首頁「依序播放發音」：留在單字表畫面，一個一個把每個字的 🔊 播 3 次 =====
+let listAutoplayRunning = false;
+let listAutoplayIndex = 0;
+function updateListAutoplayBtn(){
+  const btn = document.getElementById("btnListAutoplay");
+  if(!btn) return;
+  btn.textContent = listAutoplayRunning ? "⏸️ 暫停依序播放" : "▶️ 依序播放發音（每字 3 次）";
+  btn.classList.toggle("primary", listAutoplayRunning);
+}
+function stopListAutoplay(){
+  if(!listAutoplayRunning) return;
+  listAutoplayRunning = false;
+  abortCurrentPlayback();
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  document.querySelectorAll("#wordList .item.autoplay-current").forEach(el => el.classList.remove("autoplay-current"));
+  updateListAutoplayBtn();
+}
+async function runListAutoplay(){
+  const words = getVisibleWords();
+  if(words.length === 0){ listAutoplayRunning = false; updateListAutoplayBtn(); return; }
+  if(listAutoplayIndex >= words.length) listAutoplayIndex = 0;
+  listAutoplayRunning = true;
+  updateListAutoplayBtn();
+  for(; listAutoplayIndex < words.length && listAutoplayRunning; listAutoplayIndex++){
+    const w = words[listAutoplayIndex];
+    const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
+    const btn = rowEl ? rowEl.querySelector(".row-speak") : null;
+    if(rowEl){
+      document.querySelectorAll("#wordList .item.autoplay-current").forEach(el => el.classList.remove("autoplay-current"));
+      rowEl.classList.add("autoplay-current");
+      rowEl.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    const text = getSpeechText(w);
+    const recKey = useRecordingIds.has(w.id) ? recKeyFor(w.text) : null;
+    for(let r = 0; r < 3 && listAutoplayRunning; r++){
+      try{ await speak(text, btn, null, recKey); }catch(e){ /* 播不出來就跳過這次，繼續 */ }
+      if(!listAutoplayRunning) break;
+      if(r < 2) await delayMs(350);
+    }
+    if(!listAutoplayRunning) break;
+    await delayMs(550);
+  }
+  document.querySelectorAll("#wordList .item.autoplay-current").forEach(el => el.classList.remove("autoplay-current"));
+  if(listAutoplayIndex >= words.length){ listAutoplayIndex = 0; }   // 播完一輪，下次從頭
+  listAutoplayRunning = false;
+  updateListAutoplayBtn();
+}
+document.getElementById("btnListAutoplay").addEventListener("click", () => {
+  if(listAutoplayRunning){ stopListAutoplay(); }
+  else { runListAutoplay(); }
+});
+updateListAutoplayBtn();
 function updateNewlyImportedToggleLabel(){
   const btn = document.getElementById("btnToggleNewlyImportedOnly");
   btn.textContent = showNewlyImportedOnly ? `顯示全部單字 (剛匯入 ${newlyImportedIds.size} 個)` : `🆕 只顯示剛匯入的單字 (${newlyImportedIds.size})`;
@@ -5952,6 +6016,7 @@ function shuffleArr(arr){
   return a;
 }
 function showScreen(name){
+  if(typeof stopListAutoplay === "function") stopListAutoplay(); // 離開/切換畫面就停掉首頁的依序播放，不要跟卡片/測驗/跑步的聲音打架
   ["select","cards","quiz","write","listen","result"].forEach(s => {
     document.getElementById("screen-" + s).classList.toggle("hidden", s !== name);
   });
