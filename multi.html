@@ -627,7 +627,7 @@ let speakGeneration = 0;
 // 重複——不能只看「播放中有沒有被打斷」，因為兩次重複中間還有 400ms 的
 // 空檔，使用者的點擊如果剛好落在空檔裡，那時候沒有東西在播、abortCurrentPlayback
 // 抓不到，只能靠這個回傳值讓 speakRepeat 自己在空檔前後也檢查一次。
-async function speak(text, btn, langOverride, recordingOverrideKey){
+async function speak(text, btn, langOverride, recordingOverrideKey, instructionsOverride){
   // 日文文字若帶「漢字（かな）」的讀音註記，唸之前先拿掉那層假名括號，不然會
   // 連讀音一起唸、整個唸兩次。
   if((langOverride || currentLang) === "ja") text = stripJaFurigana(text);
@@ -673,7 +673,7 @@ async function speak(text, btn, langOverride, recordingOverrideKey){
     audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
     if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
     try{
-      const blob = await withTimeout(getTTSAudioBlob(text, info.ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+      const blob = await withTimeout(getTTSAudioBlob(text, instructionsOverride || info.ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
       if(myGeneration === speakGeneration) await playAudioBlob(blob);
     }catch(e){
       if(myGeneration === speakGeneration) alert("GPT 語音播放失敗：" + e.message);
@@ -2034,7 +2034,7 @@ const THAI_CONSONANT_CLASSES = [
 // 例如孤立的單一母音字母 TTS 常常唸不準，改唸一個包著這個母音的常見單字
 // 準確度好很多，但畫面上還是要顯示字母本身，不是顯示那個範例單字。
 // 沒特別給 speakText 就照舊唸 text 本身。
-function makeSpeakableLabel(text, fontSize, lang, speakText){
+function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions){
   const wrap = document.createElement("span");
   wrap.style.cssText = "display:inline-flex; align-items:center; gap:2px;";
   const label = document.createElement("span");
@@ -2045,7 +2045,7 @@ function makeSpeakableLabel(text, fontSize, lang, speakText){
   btn.className = "speak-btn";
   btn.textContent = "🔊";
   btn.style.cssText = "padding:2px 5px; font-size:0.8rem;";
-  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang); });
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang, null, speakInstructions); });
   wrap.appendChild(label);
   wrap.appendChild(btn);
   return wrap;
@@ -2193,6 +2193,11 @@ function renderToneRow(tones){
   });
   return row;
 }
+// 給 TTS 的明確指示：這是「單獨一個越南文字母/拼法」，用越南語發音、只發那個音。
+// 一般 TTS 對孤立的變音符號字母（ă/â/ơ/ư）常常亂猜，把語言跟情境講死能改善不少。
+// 只在「發音來源」選 GPT 語音時生效（電腦內建語音吃不進指示）。
+const VI_LETTER_TTS = "You are pronouncing a single isolated Vietnamese vowel letter for a language learner. Use standard Vietnamese pronunciation. Produce only that one vowel sound, clearly, calmly and briefly. Do not spell it out, do not read it as English or any other language, do not add any other words.";
+const VI_CLUSTER_TTS = "You are pronouncing a single isolated Vietnamese vowel cluster for a language learner. Use standard Vietnamese pronunciation. Produce only that vowel-cluster sound, clearly and briefly. Do not read it as English or any other language, do not add any other words.";
 function renderViAlphabetPanel(){
   const panel = document.getElementById("viAlphabetPanel");
   panel.innerHTML = "";
@@ -2207,7 +2212,7 @@ function renderViAlphabetPanel(){
   VI_VOWELS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:170px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi"));
+    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi", null, VI_LETTER_TTS));
     const sound = document.createElement("div");
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
@@ -2227,7 +2232,7 @@ function renderViAlphabetPanel(){
   VI_DIPHTHONGS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi"));
+    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi", null, VI_CLUSTER_TTS));
     const sound = document.createElement("div");
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
@@ -2246,7 +2251,7 @@ function renderViAlphabetPanel(){
   VI_CONSONANTS.forEach(([letter, sound]) => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(letter, "1.1rem", "vi"));
+    item.appendChild(makeSpeakableLabel(letter, "1.1rem", "vi", letter.split("/")[0].trim(), VI_CLUSTER_TTS));
     const info = document.createElement("div");
     info.className = "usage-note";
     info.textContent = sound;
@@ -2257,7 +2262,7 @@ function renderViAlphabetPanel(){
 
   const note = document.createElement("div");
   note.className = "usage-note";
-  note.textContent = "越南文不像泰文有「子音 class 決定聲調」這種規則，這張表主要是幫你認拼法對應的大概發音，尤其是南部（胡志情市）口音特有、容易搞混的幾組（d/gi/v、r、s/x、tr）。發音是唸單一個字母/拼法本身，跟它在真正單字裡的唸法可能會有點不一樣，僅供參考。";
+  note.textContent = "越南文不像泰文有「子音 class 決定聲調」這種規則，這張表主要是幫你認拼法對應的大概發音，尤其是南部（胡志明市）口音特有、容易搞混的幾組（d/gi/v、r、s/x、tr）。🔊 唸的是單獨的字母/拼法本身，會附上「這是單獨的越南文字母、只發那個音」的指示——但這只在上面「發音來源」選『GPT 語音』時生效；用電腦內建語音的話，孤立的 ă/â/ơ/ư 這種字母還是可能唸不準（引擎限制），要準的話用 GPT 語音，或旁邊之後可加的 Forvo 真人發音。";
   panel.appendChild(note);
 }
 document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
