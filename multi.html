@@ -1902,6 +1902,64 @@ let inflectionsCache = {};
 try{ inflectionsCache = JSON.parse(localStorage.getItem(lsKey(INFLECTIONS_CACHE_LS))) || {}; }catch(e){ inflectionsCache = {}; }
 function saveInflectionsCache(){ localStorage.setItem(lsKey(INFLECTIONS_CACHE_LS), JSON.stringify(inflectionsCache)); }
 
+// 埃及阿拉伯文「字母拆解」：阿拉伯文通常不寫短母音，也有 ال 同化、疊音之類，所以
+// 字母跟羅馬拼音對不起來。這個把字按「由右到左的讀音順序」一格一格拆開，每格對到
+// 羅馬拼音的哪一段（含沒寫出來的短母音），另外給一份「標上完整短母音／還原同化前」
+// 的樣子。快取 key＝阿拉伯文原文。
+const AR_BREAKDOWN_CACHE_LS = "flashcard_ar_breakdown_cache_v1";
+let arBreakdownCache = {};
+try{ arBreakdownCache = JSON.parse(localStorage.getItem(lsKey(AR_BREAKDOWN_CACHE_LS))) || {}; }catch(e){ arBreakdownCache = {}; }
+function saveArBreakdownCache(){ localStorage.setItem(lsKey(AR_BREAKDOWN_CACHE_LS), JSON.stringify(arBreakdownCache)); }
+async function getEgyptianLetterBreakdown(nativeScript, romanized, force){
+  const key = nativeScript;
+  if(!force && arBreakdownCache[key]) return arBreakdownCache[key];
+  const schema = {
+    type: "object",
+    properties: {
+      fullyVoweled: { type: "string" },
+      preMergeRoman: { type: "string" },
+      mergeNote: { type: "string" },
+      segments: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            ar: { type: "string" },
+            pos: { type: "string", enum: ["字首", "字中", "字尾", "單獨"] },
+            roman: { type: "string" },
+            kind: { type: "string", enum: ["子音", "長母音", "短母音", "ال 冠詞", "陰性字尾", "疊音", "喉塞音", "其他"] },
+            silent: { type: "boolean" }
+          },
+          required: ["ar", "pos", "roman", "kind", "silent"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["fullyVoweled", "preMergeRoman", "mergeNote", "segments"],
+    additionalProperties: false
+  };
+  const prompt = `你是埃及阿拉伯語老師。下面是一個埃及開羅口語單字/片語：
+阿拉伯文：${nativeScript}
+羅馬拼音（這個 app 的 Franco 拼法，7=ح、3=ع、2/'=hamza、kh/gh/sh、damma→o）：${romanized}
+
+阿拉伯文平常不寫短母音，也有 ال 遇到「太陽字母」會同化、لا 一定連寫、疊音（shadda）等情形，字母因為在字首/字中/字尾位置不同長得也不一樣，所以阿拉伯字母跟羅馬拼音不會一對一。請輸出：
+
+1. fullyVoweled：這個字標上「完整短母音符號（تشكيل：ـَ ـِ ـُ ـّ ـْ）」的阿拉伯文——就是「短母音沒被省略時」的完整樣子。**寫成正常、字母該連就連、位置字形正確的阿拉伯文字串**（直接寫阿拉伯文就好，不要用 tatweel ـ 或空格把字母拆開）。
+
+2. preMergeRoman：「合併/同化/連寫之前」的樣子，用羅馬拼音一個音節一個音節寫出來——把 ال 同化還原（الشمس → el-shams，不是 esh-shams）、لا 拆回 l+a、疊音拆成兩個、把沒寫出來的短母音都補上。mergeNote：一句繁體中文說明這個字有沒有、在哪裡發生合併/同化/連寫（沒有就寫「沒有特別的合併」）。
+
+3. segments：把字按「阿拉伯文由右到左的讀音順序」拆成一格一格（陣列第一個＝最右邊、最先讀的），每格：
+   - ar：這一格的阿拉伯文（一個字母，或字母＋短母音符號，或「ال」「ة」）
+   - pos：這個字母在這個字裡的位置——字首／字中／字尾／單獨
+   - roman：這一格對應到羅馬拼音的哪一段，**包含沒寫出來但要唸的短母音**（例如 ص 這格對應 "sa"）。所有 roman 接起來要等於或很接近上面的羅馬拼音。
+   - kind：子音／長母音／短母音／ال 冠詞／陰性字尾／疊音／喉塞音／其他
+   - silent：這一格在羅馬拼音裡沒有對應的音就填 true（例如純粹當座的 alif），一般是 false`;
+  const parsed = await callClaude(prompt, schema, 2048);
+  arBreakdownCache[key] = parsed;
+  saveArBreakdownCache();
+  return parsed;
+}
+
 async function getEgyptianInflections(text, zh, nativeScript, force){
   if(!force && inflectionsCache[text]) return inflectionsCache[text];
   const schema = {
@@ -3272,6 +3330,59 @@ function renderAntonymsPanel(panel, antonyms){
   });
 }
 
+function renderArBreakdownPanel(panel, r, romanized, onRegenerate){
+  panel.innerHTML = "";
+  const kindColor = { "子音": "var(--fg, inherit)", "長母音": "var(--accent2)", "短母音": "var(--accent)", "ال 冠詞": "var(--muted)", "陰性字尾": "var(--accent)", "疊音": "var(--danger)", "喉塞音": "var(--muted)", "其他": "var(--muted)" };
+
+  const rn = document.createElement("div");
+  rn.className = "usage-note";
+  rn.textContent = `羅馬拼音：${romanized}`;
+  panel.appendChild(rn);
+
+  if(r.fullyVoweled){
+    const fv = document.createElement("div");
+    fv.style.cssText = "margin:6px 0;";
+    fv.innerHTML = `<span class="usage-note">標滿短母音：</span> <bdi dir="rtl" class="native-ar" style="font-size:1.35rem;">${r.fullyVoweled}</bdi>`;
+    panel.appendChild(fv);
+  }
+  if(r.preMergeRoman){
+    const pm = document.createElement("div");
+    pm.className = "usage-note";
+    pm.style.marginBottom = "4px";
+    pm.textContent = `合併/同化前：${r.preMergeRoman}${r.mergeNote ? "　（" + r.mergeNote + "）" : ""}`;
+    panel.appendChild(pm);
+  }
+
+  const grid = document.createElement("div");
+  // dir:rtl → 陣列第一格（最先讀的）排在最右邊，跟阿拉伯文讀法一致
+  grid.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; direction:rtl;";
+  (r.segments || []).forEach(seg => {
+    const cell = document.createElement("div");
+    cell.style.cssText = `border:1px solid var(--border); border-radius:8px; padding:5px 9px; min-width:52px; text-align:center; ${seg.silent ? "opacity:0.5;" : ""}`;
+    const ar = document.createElement("div");
+    ar.className = "native-ar";
+    ar.dir = "rtl";
+    ar.style.cssText = "font-size:1.5rem; line-height:1.3;";
+    ar.textContent = seg.ar;
+    const rom = document.createElement("div");
+    rom.style.cssText = `direction:ltr; font-weight:600; color:${kindColor[seg.kind] || "inherit"};`;
+    rom.textContent = seg.silent ? "（不發音）" : (seg.roman || "");
+    const k = document.createElement("div");
+    k.className = "usage-note";
+    k.style.fontSize = "0.68rem";
+    k.textContent = `${seg.pos || ""}·${seg.kind || ""}`;
+    cell.appendChild(ar); cell.appendChild(rom); cell.appendChild(k);
+    grid.appendChild(cell);
+  });
+  panel.appendChild(grid);
+
+  if(onRegenerate){
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "speak-btn"; b.textContent = "🔄 重新拆解";
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); onRegenerate(); });
+    panel.appendChild(b);
+  }
+}
 function renderInflectionsPanel(panel, result, onRegenerate){
   panel.innerHTML = "";
   const forms = (result && result.forms) || [];
@@ -4371,6 +4482,37 @@ function createWordItem(w){
       arBtn.classList.toggle("primary", !arLine.classList.contains("hidden"));
     });
     row.appendChild(arBtn);
+
+    // 「字母拆解」：AI 把阿拉伯文按由右到左讀音順序拆成一格一格，對到羅馬拼音的
+    // 哪一段（含沒寫出來的短母音），另外給「標滿短母音」跟「合併/同化前」的樣子。
+    const brkPanel = document.createElement("div");
+    brkPanel.className = "usage-panel hidden";
+    brkPanel.dataset.forId = w.id;
+    row.querySelector("div").appendChild(brkPanel);
+    const brkBtn = document.createElement("button");
+    brkBtn.type = "button";
+    brkBtn.className = "usage-btn";
+    brkBtn.textContent = "أ⇄a";
+    brkBtn.title = "AI 拆解：阿拉伯字母（由右到左）對應羅馬拼音、標出省略的短母音";
+    brkBtn.setAttribute("aria-label", `拆解 ${w.text} 的阿拉伯文字母`);
+    async function loadBrkPanel(force){
+      if(!force && brkPanel.dataset.loaded === "1") return;
+      if(!getApiKey()){ brkPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+      brkPanel.textContent = "拆解中...";
+      try{
+        const r = await getEgyptianLetterBreakdown(data.nativeScript, w.text, force);
+        renderArBreakdownPanel(brkPanel, r, w.text, () => loadBrkPanel(true));
+        brkPanel.dataset.loaded = "1";
+      }catch(err){ brkPanel.textContent = "拆解失敗：" + err.message; }
+    }
+    brkBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!brkPanel.classList.contains("hidden")){ brkPanel.classList.add("hidden"); brkBtn.classList.remove("primary"); return; }
+      brkPanel.classList.remove("hidden");
+      brkBtn.classList.add("primary");
+      await loadBrkPanel(false);
+    });
+    row.appendChild(brkBtn);
   }
 
   // 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。兩種語言
@@ -4735,6 +4877,8 @@ function deleteWord(id){
   // 輸入同一個字會重新生成，不會撈到刪掉前的舊翻譯／舊變化形。
   if(target){
     const t = target.text;
+    const ns = (customDB[t] || {}).nativeScript;
+    if(ns && arBreakdownCache[ns]){ delete arBreakdownCache[ns]; saveArBreakdownCache(); }
     if(customDB[t]){ delete customDB[t]; saveCustomDB(); }
     if(usageCache[t]){ delete usageCache[t]; saveUsageCache(); }
     if(antonymsCache[t]){ delete antonymsCache[t]; saveAntonymsCache(); }
@@ -5312,7 +5456,8 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
-  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
+  INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS];
 
