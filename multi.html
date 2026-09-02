@@ -627,7 +627,7 @@ let speakGeneration = 0;
 // 重複——不能只看「播放中有沒有被打斷」，因為兩次重複中間還有 400ms 的
 // 空檔，使用者的點擊如果剛好落在空檔裡，那時候沒有東西在播、abortCurrentPlayback
 // 抓不到，只能靠這個回傳值讓 speakRepeat 自己在空檔前後也檢查一次。
-async function speak(text, btn, langOverride, recordingOverrideKey, instructionsOverride){
+async function speak(text, btn, langOverride, recordingOverrideKey, instructionsOverride, forceSystemVoice){
   // 日文文字若帶「漢字（かな）」的讀音註記，唸之前先拿掉那層假名括號，不然會
   // 連讀音一起唸、整個唸兩次。
   if((langOverride || currentLang) === "ja") text = stripJaFurigana(text);
@@ -663,7 +663,9 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
   // 語言的設定去唸別種語言的文字。
   const info = langOverride ? LANG_INFO[langOverride] : L();
   const voiceSource = document.getElementById("voiceSource").value;
-  if(voiceSource === "gpt"){
+  // 字母表那種「單獨一個字母/音」的播放寫死用電腦內建語音——實測比 GPT 準，GPT
+  // 對孤立字母常常亂唸。forceSystemVoice=true 時不管「發音來源」選什麼都走內建語音。
+  if(voiceSource === "gpt" && !forceSystemVoice){
     const audioEl = document.getElementById("listenAudio");
     // speak() 在很多畫面（單字表、Flash Card...）都會被單獨點擊觸發，不像跑步
     // 模式一開始就先解鎖過 <audio> 元素。這裡在點擊當下、還沒 await 任何非同步
@@ -2045,7 +2047,8 @@ function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions){
   btn.className = "speak-btn";
   btn.textContent = "🔊";
   btn.style.cssText = "padding:2px 5px; font-size:0.8rem;";
-  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang, null, speakInstructions); });
+  // 字母表一律用電腦內建語音（單獨字母 GPT 唸不準，這是使用者實測後決定寫死的）。
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang, null, speakInstructions, true); });
   wrap.appendChild(label);
   wrap.appendChild(btn);
   return wrap;
@@ -2186,7 +2189,7 @@ function renderToneRow(tones){
     btn.className = "speak-btn";
     btn.textContent = "🔊";
     btn.style.cssText = "padding:1px 4px; font-size:0.7rem;";
-    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText, btn, "vi"); });
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText, btn, "vi", null, null, true); });
     badge.appendChild(label);
     badge.appendChild(btn);
     row.appendChild(badge);
@@ -2262,7 +2265,7 @@ function renderViAlphabetPanel(){
 
   const note = document.createElement("div");
   note.className = "usage-note";
-  note.textContent = "越南文不像泰文有「子音 class 決定聲調」這種規則，這張表主要是幫你認拼法對應的大概發音，尤其是南部（胡志明市）口音特有、容易搞混的幾組（d/gi/v、r、s/x、tr）。🔊 唸的是單獨的字母/拼法本身，會附上「這是單獨的越南文字母、只發那個音」的指示——但這只在上面「發音來源」選『GPT 語音』時生效；用電腦內建語音的話，孤立的 ă/â/ơ/ư 這種字母還是可能唸不準（引擎限制），要準的話用 GPT 語音，或旁邊之後可加的 Forvo 真人發音。";
+  note.textContent = "越南文不像泰文有「子音 class 決定聲調」這種規則，這張表主要是幫你認拼法對應的大概發音，尤其是南部（胡志明市）口音特有、容易搞混的幾組（d/gi/v、r、s/x、tr）。這張表的 🔊 一律用電腦內建語音（不管你上面「發音來源」選什麼）——單獨一個字母 GPT 常常唸不準，內建語音實測比較穩。發音是唸單一個字母/拼法本身，跟在真正單字裡的唸法可能會有點不一樣，僅供參考。";
   panel.appendChild(note);
 }
 document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
@@ -2395,7 +2398,7 @@ function renderArabicAlphabetPanel(){
 
   const note = document.createElement("div");
   note.className = "usage-note";
-  note.textContent = "這張表是固定不變的語言學事實（字母、名稱、開羅口語發音），寫死的比每次問 AI 可靠。發音鍵唸的是「字母本身」，跟它在真正單字裡的唸法會有點不一樣，僅供參考。開羅口語跟標準阿拉伯語差滿多：ج 唸 g、ق 多半是喉塞音、ث→s、ذ→z、重音字母拼法都簡化。";
+  note.textContent = "這張表是固定不變的語言學事實（字母、名稱、開羅口語發音），寫死的比每次問 AI 可靠。🔊 一律用電腦內建語音（單獨字母 GPT 唸不準），唸的是「字母名字」，跟它在真正單字裡的唸法會有點不一樣，僅供參考。開羅口語跟標準阿拉伯語差滿多：ج 唸 g、ق 多半是喉塞音、ث→s、ذ→z、重音字母拼法都簡化。";
   panel.appendChild(note);
 }
 document.getElementById("btnToggleArabicAlphabet").addEventListener("click", () => {
