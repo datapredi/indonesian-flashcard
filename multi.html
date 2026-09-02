@@ -2224,7 +2224,7 @@ function renderViAlphabetPanel(){
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
     item.appendChild(sound);
-    if(v.tones) item.appendChild(renderToneRow(v.tones));
+    // 只顯示不帶聲調的基本形（就是字母本身＝ngang/M 平聲）；其他 4 個聲調變體不列。
     vowelGrid.appendChild(item);
   });
   panel.appendChild(vowelGrid);
