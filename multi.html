@@ -254,6 +254,10 @@
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnListAutoplay">▶️ 依序播放發音（每字 3 次）</button>
+      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
+        <input type="checkbox" id="autoplayIncludeZh">
+        唸完 3 次後加唸一次中文
+      </label>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
@@ -5009,6 +5013,21 @@ function pauseListAutoplay(){
   if('speechSynthesis' in window) speechSynthesis.cancel();
   renderAutoplayControls();
 }
+// 依序播放時「加唸一次中文」用：走跟聽力模式一樣的路，GPT 語音用 gpt-4o-mini-tts，
+// 電腦內建語音用 zh-TW。zhForSpeech 會把（對女生）這種註記轉成唸得出來的形式。
+async function speakZhForAutoplay(zh){
+  const t = zhForSpeech(zh);
+  if(!t) return;
+  const voiceSource = document.getElementById("voiceSource").value;
+  try{
+    if(voiceSource === "gpt"){
+      const blob = await withTimeout(getTTSAudioBlob(t, TTS_INSTRUCTIONS_ZH), 20000, "中文語音生成逾時");
+      if(listAutoplayRunning) await playAudioBlob(blob);
+    } else {
+      await speakAsync(t, "zh-TW");
+    }
+  }catch(e){ /* 中文唸不出來就跳過，不要卡住整個播放 */ }
+}
 async function runListAutoplay(){
   const words = getVisibleWords();
   if(words.length === 0){ stopListAutoplay(); return; }
@@ -5049,6 +5068,16 @@ async function runListAutoplay(){
       if(r < 2) await delayMs(350);
     }
     if(!listAutoplayRunning) break;
+    // 勾了「加唸中文」：3 次外語之後停一下、唸一次中文意思。
+    if(document.getElementById("autoplayIncludeZh").checked){
+      const zh = (lookup(w.text) || {}).zh;
+      if(zh){
+        await delayMs(300);
+        if(!listAutoplayRunning) break;
+        await speakZhForAutoplay(zh);
+        if(!listAutoplayRunning) break;
+      }
+    }
     await delayMs(550);
   }
   if(listAutoplayPaused) return;   // 被暫停：保留 index / highlight / 浮動控制器 / 聲調面板
@@ -5066,6 +5095,12 @@ function toggleListAutoplay(){
 document.getElementById("btnListAutoplay").addEventListener("click", toggleListAutoplay);
 document.getElementById("autoplayFloatToggle").addEventListener("click", toggleListAutoplay);
 document.getElementById("autoplayFloatClose").addEventListener("click", stopListAutoplay);
+// 「加唸中文」勾選狀態記起來（全語言通用）
+const AUTOPLAY_ZH_LS = "flashcard_autoplay_include_zh_v1";
+if(localStorage.getItem(AUTOPLAY_ZH_LS) === "1") document.getElementById("autoplayIncludeZh").checked = true;
+document.getElementById("autoplayIncludeZh").addEventListener("change", (e) => {
+  localStorage.setItem(AUTOPLAY_ZH_LS, e.target.checked ? "1" : "0");
+});
 renderAutoplayControls();
 function updateNewlyImportedToggleLabel(){
   const btn = document.getElementById("btnToggleNewlyImportedOnly");
