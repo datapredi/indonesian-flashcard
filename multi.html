@@ -2321,21 +2321,23 @@ function renderArabicAlphabetPanel(){
   const panel = document.getElementById("arabicAlphabetPanel");
   panel.innerHTML = "";
 
-  // 用零寬連接符（ZWJ, U+200D）逼瀏覽器把字母顯示成該位置的字形，不用手打 28×4 個字形。
-  // 6 個不連後字的字母（ا د ذ ر ز و）字首＝單獨、字中＝字尾，所以看起來只有兩種。
-  const ZWJ = "\u200D";
-  const NON_CONNECTORS = new Set(["ا", "د", "ذ", "ر", "ز", "و", "ء", "ة"]);
+  // 用連接號 tatweel（ـ, U+0640）把字母夾在中間，逼瀏覽器套用該位置的字形——
+  // 這個比 ZWJ 可靠，每個阿拉伯字型都會跟 tatweel 相連。ا د ذ ر ز و 不連後字，
+  // 所以「字首」看起來會跟「單獨」一樣、「字中」跟「字尾」一樣，這是正常的。
+  const T = "ـ";
   function formsRow(letter){
     const wrap = document.createElement("div");
-    wrap.style.cssText = "display:flex; flex-wrap:wrap; justify-content:center; gap:4px 10px; margin-top:6px; font-size:0.72rem; color:var(--muted);";
-    const two = NON_CONNECTORS.has(letter);
-    const forms = two
-      ? [["字首/單獨", letter], ["字中/字尾", ZWJ + letter]]
-      : [["單獨", letter], ["字首", letter + ZWJ], ["字中", ZWJ + letter + ZWJ], ["字尾", ZWJ + letter]];
+    wrap.style.cssText = "display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; margin-top:8px; font-size:0.7rem; color:var(--muted);";
+    const forms = [
+      ["單獨", letter],
+      ["字首", letter + T],
+      ["字中", T + letter + T],
+      ["字尾", T + letter]
+    ];
     forms.forEach(([lbl, glyph]) => {
       const cell = document.createElement("div");
-      cell.style.cssText = "text-align:center; min-width:36px;";
-      cell.innerHTML = `<div style="font-size:1.5rem; color:var(--fg, inherit);">${glyph}</div>${lbl}`;
+      cell.style.cssText = "text-align:center; min-width:34px;";
+      cell.innerHTML = `<div style="font-size:1.5rem; line-height:1.3;" dir="rtl">${glyph}</div>${lbl}`;
       wrap.appendChild(cell);
     });
     return wrap;
@@ -2367,7 +2369,7 @@ function renderArabicAlphabetPanel(){
   const h1b = document.createElement("div");
   h1b.className = "usage-note";
   h1b.style.margin = "2px 0 0";
-  h1b.textContent = "每個字母下面是它在「單獨／字首／字中／字尾」四個位置的字形（阿拉伯字母會依位置變形）；ا د ذ ر ز و 不跟後面的字母相連，所以只有兩種樣子。";
+  h1b.textContent = "每個字母下面是它在「單獨／字首／字中／字尾」四個位置的字形（旁邊那條橫線是連接號，用來示範相連的樣子）；ا د ذ ر ز و 這 6 個不跟後面的字母相連，所以「字首」會長得跟「單獨」一樣、「字中」跟「字尾」一樣。";
   panel.appendChild(h1b);
   grid(ARABIC_LETTERS, "1.7rem", true);
 
