@@ -1036,6 +1036,7 @@ let showHiddenOnly = false;
 let listAutoplayRunning = false;   // 迴圈正在跑
 let listAutoplayPaused = false;    // 使用者暫停了（浮動控制器留著、可從同一個字繼續）
 let listAutoplayIndex = 0;
+let autoplayOpenedTonePanel = null;   // 依序播放自動展開的那個聲調面板（換字時收起來）
 
 // 每個單字自己的自由筆記（使用者手打）。跟 customDB 一樣用 w.text 當 key，換
 // 語言各存一份，也會一起進備份。
@@ -4186,10 +4187,11 @@ function createWordItem(w){
 
   const tonePanel = document.createElement("div");
   tonePanel.className = "usage-panel hidden";
+  tonePanel.dataset.tonePanelFor = w.id;   // 給「依序播放」找得到、播到這個字時自動展開
 
   const toneBtn = document.createElement("button");
   toneBtn.type = "button";
-  toneBtn.className = "usage-btn";
+  toneBtn.className = "usage-btn row-tone-btn";
   toneBtn.textContent = "🎵";
   toneBtn.title = `AI 標註聲調（${toneLetterLabel}）`;
   toneBtn.setAttribute("aria-label", `AI 標註 ${w.text} 的聲調`);
@@ -4847,6 +4849,8 @@ function stopListAutoplay(){
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
   clearAutoplayHighlight();
+  if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
+  autoplayOpenedTonePanel = null;
   renderAutoplayControls();
 }
 // 暫停：停在目前這個字，浮動控制器跟 highlight 都留著，之後從同一個字繼續。
@@ -4873,6 +4877,18 @@ async function runListAutoplay(){
       clearAutoplayHighlight();
       rowEl.classList.add("autoplay-current");
       rowEl.scrollIntoView({ block: "center", behavior: "smooth" });
+      // 聲調語言（泰文／越南文南部口音）：播到這個字時自動展開它的 🎵 聲調標記，
+      // 換到下一個字再把上一個收起來。
+      if(isToneLangActive()){
+        if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
+        autoplayOpenedTonePanel = null;
+        const tPanel = document.querySelector(`#wordList .usage-panel[data-tone-panel-for="${w.id}"]`);
+        const tBtn = rowEl.querySelector(".row-tone-btn");
+        if(tPanel && tBtn && tPanel.classList.contains("hidden")){
+          tBtn.click();   // 展開並（用快取或現生成）載入聲調標記
+          autoplayOpenedTonePanel = tPanel;
+        }
+      }
     }
     renderAutoplayControls();
     const text = getSpeechText(w);
@@ -4885,8 +4901,10 @@ async function runListAutoplay(){
     if(!listAutoplayRunning) break;
     await delayMs(550);
   }
-  if(listAutoplayPaused) return;   // 被暫停：保留 index / highlight / 浮動控制器
+  if(listAutoplayPaused) return;   // 被暫停：保留 index / highlight / 浮動控制器 / 聲調面板
   clearAutoplayHighlight();        // 正常播完一輪
+  if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
+  autoplayOpenedTonePanel = null;
   listAutoplayIndex = 0;
   listAutoplayRunning = false;
   renderAutoplayControls();
