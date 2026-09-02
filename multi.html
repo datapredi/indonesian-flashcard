@@ -2219,7 +2219,7 @@ function renderViAlphabetPanel(){
   VI_VOWELS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:170px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi", null, VI_LETTER_TTS));
+    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi", v.letter.split("/")[0].trim(), VI_LETTER_TTS));
     const sound = document.createElement("div");
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
@@ -2239,7 +2239,7 @@ function renderViAlphabetPanel(){
   VI_DIPHTHONGS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi", null, VI_CLUSTER_TTS));
+    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi", v.form.split("/")[0].trim(), VI_CLUSTER_TTS));
     const sound = document.createElement("div");
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
