@@ -2141,10 +2141,9 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
 // ================= 越南文母音／子音對照表（南部/胡志明市口音，純靜態參考資料） =================
 // tones：M/F/R/L/S 五個聲調字母對應的重音符號寫法，L 是南部合併的 hỏi/ngã
 // 兩種拼法（念起來一樣，但字還是要拼對，所以兩個都列出來）。
-// example：一個常見、單獨拿掉聲調也還算清楚的字，TTS 唸孤立的單一母音字母
-// （尤其是 ă/â/ơ/ư 這種帶變音符號、平常不會單獨出現的字母）常常會唸不準或
-// 亂猜，包在一個真正常見的單字裡唸，準確度好非常多，所以 🔊 按鈕實際上是
-// 唸這個範例字，不是唸孤立的字母本身；字母本身還是照樣大大顯示在上面。
+// example：一個含這個母音的常見字，只放在說明文字裡當參考（「例：ba」）。
+// 🔊 按鈕唸的是字母/拼法本身（使用者要求直接唸 alphabet，不要唸範例字）；
+// 注意 TTS 唸孤立的 ă/â/ơ/ư 這種帶變音符號的字母有時候會唸不準或亂猜。
 const VI_VOWELS = [
   { letter: "a", sound: "a（短）", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
   { letter: "ă", sound: "a（更短）", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
@@ -2208,10 +2207,10 @@ function renderViAlphabetPanel(){
   VI_VOWELS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:170px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi", v.example));
+    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi"));
     const sound = document.createElement("div");
     sound.className = "usage-note";
-    sound.textContent = v.example ? `${v.sound}（🔊 唸範例字「${v.example}」）` : v.sound;
+    sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
     item.appendChild(sound);
     if(v.tones) item.appendChild(renderToneRow(v.tones));
     vowelGrid.appendChild(item);
@@ -2228,10 +2227,10 @@ function renderViAlphabetPanel(){
   VI_DIPHTHONGS.forEach(v => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi", v.example));
+    item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi"));
     const sound = document.createElement("div");
     sound.className = "usage-note";
-    sound.textContent = v.example ? `${v.sound}（🔊 唸範例字「${v.example}」）` : v.sound;
+    sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
     item.appendChild(sound);
     diphGrid.appendChild(item);
   });
