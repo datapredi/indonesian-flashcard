@@ -2140,7 +2140,7 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
     panel.classList.add("hidden");
     return;
   }
-  if(panel.innerHTML === "") renderThaiAlphabetPanel();
+  renderThaiAlphabetPanel(); // 每次打開都重畫，內容是靜態的、重畫很便宜，也避免改了程式卻看到舊的
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
@@ -2284,7 +2284,7 @@ document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
     panel.classList.add("hidden");
     return;
   }
-  if(panel.innerHTML === "") renderViAlphabetPanel();
+  renderViAlphabetPanel(); // 每次打開都重畫
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
@@ -2417,7 +2417,7 @@ document.getElementById("btnToggleArabicAlphabet").addEventListener("click", () 
     panel.classList.add("hidden");
     return;
   }
-  if(panel.innerHTML === "") renderArabicAlphabetPanel();
+  renderArabicAlphabetPanel(); // 每次打開都重畫
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
