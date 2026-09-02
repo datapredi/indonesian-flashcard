@@ -2258,10 +2258,15 @@ function renderViAlphabetPanel(){
   VI_CONSONANTS.forEach(([letter, sound]) => {
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(letter, "1.1rem", "vi", letter.split("/")[0].trim(), VI_CLUSTER_TTS));
+    // 子音沒辦法單獨發音（塞音一定要配母音），TTS 唸孤立的「ch」會怪。用越南人
+    // 自己「bờ cờ」拼讀法，在後面加「ờ」變成一個音節（ch→chờ、b→bờ、ng→ngờ…），
+    // 這樣才唸得出這個子音的音。
+    const base = letter.split("/")[0].trim();
+    const spoken = base + "ờ";
+    item.appendChild(makeSpeakableLabel(letter, "1.1rem", "vi", spoken));
     const info = document.createElement("div");
     info.className = "usage-note";
-    info.textContent = sound;
+    info.textContent = `${sound}（🔊 唸「${spoken}」）`;
     item.appendChild(info);
     consGrid.appendChild(item);
   });
