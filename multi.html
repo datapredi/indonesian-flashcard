@@ -610,6 +610,14 @@ function getSpeechText(w){
   const data = lookup(w.text);
   if(currentLang === "arz") return arzRomanToSpeakable(w.text) || (data && data.nativeScript) || w.text;
   if(currentLang === "ja") return stripJaFurigana((data && data.nativeScript) || "") || (data && data.nativeScript) || w.text;
+  if(currentLang === "vi"){
+    const ns = ((data && data.nativeScript) || w.text).trim();
+    // 單一個短字、又完全沒有越南文變音符號（例：to、con、ba、me、la、ma…）很容易
+    // 被 TTS 當成英文唸。後面掛一個帶變音符號的越南文口語尾巴「đó」，逼 TTS 進
+    // 越南語模式——會多聽到一個字，但目標字的發音會對（就是你說「放進句子就對」的道理）。
+    if(/^[A-Za-z]{1,4}$/.test(ns)) return ns + " đó";
+    return ns;
+  }
   return (data && data.nativeScript) || w.text;
 }
 
