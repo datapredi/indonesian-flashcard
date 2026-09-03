@@ -2225,6 +2225,47 @@ function renderThaiAlphabetPanel(){
     });
     panel.appendChild(grp);
   });
+
+  // 第三張：按「字形」分組——字裡有沒有出現某個基本形狀。
+  const allLetters = {};
+  THAI_CONSONANT_CLASSES.forEach(cls => cls.letters.forEach(([letter, name, sound, extraNote]) => {
+    allLetters[letter] = { name, sound, extraNote, clsKey: cls.key };
+  }));
+  const shapeGroups = [
+    { title: "有「ก」形（尖尖的鉤，像 gor gai）", letters: ["ก", "ถ", "ภ"] },
+    { title: "有「ด」形（圓圈／捲彎，像 dor dek；不管圈圈朝哪邊）", letters: ["ค", "ฅ", "ด", "ต", "ล", "ส"] }
+  ];
+  const h3 = document.createElement("div");
+  h3.style.cssText = "font-weight:600; margin-top:18px;";
+  h3.textContent = "按字形分組（看字裡有沒有出現這個基本形狀）";
+  panel.appendChild(h3);
+  shapeGroups.forEach(g => {
+    const gh = document.createElement("div");
+    gh.className = "usage-note";
+    gh.style.cssText = "font-weight:600; margin:8px 0 4px;";
+    gh.textContent = g.title;
+    panel.appendChild(gh);
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;";
+    g.letters.forEach(letter => {
+      const info = allLetters[letter] || { name: "", sound: "", clsKey: "mid" };
+      const obsolete = info.extraNote && info.extraNote.indexOf("廢棄") !== -1;
+      const chip = document.createElement("div");
+      chip.style.cssText = `border:1px ${obsolete ? "dashed" : "solid"} ${classColors[info.clsKey]}; border-radius:8px; padding:4px 8px; text-align:center;${obsolete ? "opacity:0.55;" : ""}`;
+      chip.appendChild(makeSpeakableLabel(letter, "1.3rem", "th"));
+      const sub = document.createElement("div");
+      sub.className = "usage-note";
+      sub.style.fontSize = "0.68rem";
+      sub.innerHTML = `${info.name}<br>${info.sound}`;
+      chip.appendChild(sub);
+      row.appendChild(chip);
+    });
+    panel.appendChild(row);
+  });
+  const shapeNote = document.createElement("div");
+  shapeNote.className = "usage-note";
+  shapeNote.textContent = "泰文字母是由幾個基本筆畫組合的。ก／ถ／ภ 共用「ก」那個尖鉤；ค／ฅ／ด／ต／ล／ส 共用「ด」那種圓捲的彎，彼此差在多一撇、多一個小圈或圈的方向不同——初學最容易互相看錯的就是這幾組。";
+  panel.appendChild(shapeNote);
 }
 document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () => {
   const panel = document.getElementById("thaiAlphabetPanel");
