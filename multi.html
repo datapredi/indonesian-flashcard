@@ -2286,37 +2286,38 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
 // 🔊 按鈕唸的是字母/拼法本身（使用者要求直接唸 alphabet，不要唸範例字）；
 // 注意 TTS 唸孤立的 ă/â/ơ/ư 這種帶變音符號的字母有時候會唸不準或亂猜。
 // sound 裡的注音是「最接近的國語音」概略對照，方便台灣學生抓感覺，不是精準等值。
+// art：舌位＋嘴型的白話說明。
 const VI_VOWELS = [
-  { letter: "a", sound: "像ㄚ（短）", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
-  { letter: "ă", sound: "像ㄚ（更短、更急）", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
-  { letter: "â", sound: "像ㄜ（短）", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
-  { letter: "e", sound: "像ㄝ（嘴張比較大）", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
-  { letter: "ê", sound: "像ㄟ的前半、不往上滑", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
-  { letter: "o", sound: "像ㄛ（開口）", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
-  { letter: "ô", sound: "像ㄛ（收口，像「喔」）", example: "tô", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
-  { letter: "ơ", sound: "像ㄜ（拉長、不捲舌）", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
-  { letter: "u", sound: "像ㄨ", example: "thu", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
-  { letter: "ư", sound: "跟ㄨ嘴型一樣但不圓唇、嘴角往兩邊（注音沒有對應）", example: "thư", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } },
-  { letter: "i", sound: "像ㄧ（跟 y 同音，用哪個看字源）；最好發，擺最後", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } }
+  { letter: "a", sound: "像ㄚ（短）", art: "嘴張最大、舌位低、不圓唇", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
+  { letter: "ă", sound: "像ㄚ（更短、更急）", art: "跟 a 同嘴型舌位，只是收得很快、很短促", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
+  { letter: "â", sound: "像ㄜ（短）", art: "嘴半開、舌位放中間放鬆（schwa）、不圓唇；短促", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
+  { letter: "e", sound: "像ㄝ（嘴張比較大）", art: "舌往前、嘴張中偏大、嘴角往兩邊、不圓唇", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
+  { letter: "ê", sound: "像ㄟ的前半、不往上滑", art: "舌往前、抬高一點、嘴半開、不圓唇，全程不滑動", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
+  { letter: "o", sound: "像ㄛ（開口）", art: "舌往後、嘴張中偏大、圓唇但不縮很緊", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
+  { letter: "ô", sound: "像ㄛ（收口，像「喔」）", art: "舌往後抬高、嘴收圓縮小（比 o 更圓更小）", example: "tô", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
+  { letter: "ơ", sound: "像ㄜ（拉長、不捲舌）", art: "舌位中間偏後、嘴半開、不圓唇；就是拉長的 â", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
+  { letter: "u", sound: "像ㄨ", art: "舌往後抬高、嘴唇縮圓縮小", example: "thu", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
+  { letter: "ư", sound: "跟ㄨ嘴型一樣但不圓唇、嘴角往兩邊（注音沒有對應）", art: "舌位跟 u 一樣（後、高），但嘴唇「不圓」、嘴角往兩邊拉——關鍵就在嘴型", example: "thư", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } },
+  { letter: "i", sound: "像ㄧ（跟 y 同音，用哪個看字源）；最好發，擺最後", art: "舌往前抬到最高、嘴扁、嘴角往兩邊", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } }
 ];
 const VI_DIPHTHONGS = [
-  { form: "ia / iê / yê", sound: "像ㄧㄝ滑過去", example: "chia" },
-  { form: "ua / uô", sound: "像ㄨㄛ滑過去", example: "mua" },
-  { form: "ưa / ươ", sound: "像ㄜ滑到ㄚ（前段是 ư 的不圓唇音）", example: "chưa" }
+  { form: "ia / iê / yê", sound: "像ㄧㄝ滑過去", art: "從 i（舌前高、嘴扁）滑向 ơ/â（舌位放中間、放鬆）", example: "chia" },
+  { form: "ua / uô", sound: "像ㄨㄛ滑過去", art: "從 u（舌後高、圓唇）滑向 ơ/â（舌位放中間、嘴放鬆）", example: "mua" },
+  { form: "ưa / ươ", sound: "像ㄜ滑到ㄚ（前段是 ư 的不圓唇音）", art: "從 ư（舌後高、不圓唇）滑向 ơ（舌中、嘴半開）", example: "chưa" }
 ];
 const VI_CONSONANTS_SINGLE = [
-  ["b","像ㄅ，不送氣"], ["c / k / q","像ㄍ，不送氣（三個字母同音，看後面的母音決定用哪個）"], ["d","南部念像 y（ㄧ- 起音）"], ["đ","像ㄉ"],
-  ["g / gh","像ㄍ但更軟、帶點摩擦（接 e/i/ê 前面就寫 gh，同一個音）"], ["h","像ㄏ"], ["l","像ㄌ"], ["m","像ㄇ"], ["n","像ㄋ；舌尖頂上排牙齒後方的牙齦（三個鼻音裡最前面）"],
-  ["p","像ㄅ，不送氣（很少單獨當開頭，多半出現在 ph 或字尾）"], ["r","南部念捲舌，接近ㄖ"], ["s","南部念捲舌，接近ㄕ（跟 x 有分）"],
-  ["t","像ㄉ，不送氣"], ["v","北部像 v；南部常念像 y（ㄧ- 起音）"], ["x","不捲舌的 s，像ㄙ"]
+  ["b","像ㄅ，不送氣","雙唇緊閉再放開，不噴氣（濁音）"], ["c / k / q","像ㄍ，不送氣（三個字母同音，看後面的母音決定用哪個）","舌根往後頂住軟顎再放開，不噴氣"], ["d","南部念像 y（ㄧ- 起音）","南部：舌面靠近硬顎但不閉緊，像半母音 y"], ["đ","像ㄉ","舌尖頂上排牙齒後方的牙齦再放開，不噴氣（濁音）"],
+  ["g / gh","像ㄍ但更軟、帶點摩擦（接 e/i/ê 前面就寫 gh，同一個音）","舌根靠近軟顎、留一條縫讓氣摩擦（不完全閉）"], ["h","像ㄏ","嘴、舌都放鬆，氣直接從聲門摩擦出來"], ["l","像ㄌ","舌尖頂上齒齦，氣從舌頭兩側繞出去"], ["m","像ㄇ","雙唇閉起來、氣從鼻子出（鼻音）"], ["n","像ㄋ","舌尖頂上齒齦、氣從鼻子出（三個鼻音裡舌位最前）"],
+  ["p","像ㄅ，不送氣（很少單獨當開頭，多半出現在 ph 或字尾）","雙唇閉再放開、不噴氣；當字尾時只閉不放"], ["r","南部念捲舌，接近ㄖ","南部：舌尖往後翹、靠近齒齦後方，輕微摩擦或輕彈"], ["s","南部念捲舌，接近ㄕ（跟 x 有分）","南部：舌尖往後翹靠硬顎前緣，擦音，不噴氣"],
+  ["t","像ㄉ，不送氣","舌尖頂上齒齦再放開、不噴氣"], ["v","北部像 v；南部常念像 y（ㄧ- 起音）","北部：上排牙齒輕咬下唇摩擦；南部：舌面靠硬顎像 y"], ["x","不捲舌的 s，像ㄙ","舌尖靠近上齒齦（不翹舌）、擦音"]
 ];
 const VI_CONSONANTS_MULTI = [
-  ["gi","南部念像 y（ㄧ- 起音）"], ["kh","喉音，像用力磨的ㄏ"], ["ph","像ㄈ（f）"],
-  ["qu","像「刮」的起音（ㄍ+ㄨ）"], ["th","送氣，像ㄊ"],
-  ["nh","硬顎鼻音：舌面中段頂住上顎（硬顎）、舌尖放下——像「ㄋㄧ」連著念、西語 ñ"],
-  ["ng / ngh","軟顎鼻音：舌根往後頂住軟顎——就是英文 sing 的尾音（注音沒有這個當開頭）；接 e/i/ê 前面寫 ngh，同一個音"],
-  ["ch","接近ㄐ（不送氣、比ㄐ乾一點）；南部：舌面貼硬顎"],
-  ["tr","南部念捲舌、舌尖往後捲，接近ㄓ；南部 ch／tr 分得開，北部合併成 ch"]
+  ["gi","南部念像 y（ㄧ- 起音）","南部：舌面靠近硬顎、不閉緊，像半母音 y"], ["kh","喉音，像用力磨的ㄏ","舌根靠近軟顎、留縫用力摩擦（清擦音）"], ["ph","像ㄈ（f）","上排牙齒輕咬下唇、摩擦（清擦音）"],
+  ["qu","像「刮」的起音（ㄍ+ㄨ）","舌根頂軟顎 ＋ 同時嘴唇縮圓（帶 w）"], ["th","送氣，像ㄊ","舌尖頂上齒齦再放開，放開時明顯噴一口氣"],
+  ["nh","硬顎鼻音：舌面中段頂住硬顎、舌尖放下，氣從鼻子出——像「ㄋㄧ」連著念、西語 ñ"],
+  ["ng / ngh","軟顎鼻音：舌根往後頂住軟顎，氣從鼻子出——英文 sing 的尾音（注音沒有這個當開頭）；接 e/i/ê 前面寫 ngh，同一個音"],
+  ["ch","接近ㄐ（不送氣、比ㄐ乾一點）","舌面中段貼住硬顎再放開，不噴氣"],
+  ["tr","南部念捲舌、舌尖往後捲，接近ㄓ；南部 ch／tr 分得開，北部合併成 ch","南部：舌尖往後翹頂住齒齦後方再放開（塞擦）"]
 ];
 // 母音的 5 個聲調變化（M/F/R/L/S）小標籤列，每個都能點下去聽發音——直接
 // 把重音符號寫法跟聲調字母放在一起看，比只看字母抽象的說明更直覺。
@@ -2366,6 +2367,13 @@ function renderViAlphabetPanel(){
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
     item.appendChild(sound);
+    if(v.art){
+      const art = document.createElement("div");
+      art.className = "usage-note";
+      art.style.cssText = "font-size:0.72rem; margin-top:2px;";
+      art.textContent = "👄 " + v.art;
+      item.appendChild(art);
+    }
     // 只顯示不帶聲調的基本形（就是字母本身＝ngang/M 平聲）；其他 4 個聲調變體不列。
     vowelGrid.appendChild(item);
   });
@@ -2386,6 +2394,13 @@ function renderViAlphabetPanel(){
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
     item.appendChild(sound);
+    if(v.art){
+      const art = document.createElement("div");
+      art.className = "usage-note";
+      art.style.cssText = "font-size:0.72rem; margin-top:2px;";
+      art.textContent = "👄 " + v.art;
+      item.appendChild(art);
+    }
     diphGrid.appendChild(item);
   });
   panel.appendChild(diphGrid);
@@ -2396,9 +2411,9 @@ function renderViAlphabetPanel(){
   function consGrid(list){
     const g = document.createElement("div");
     g.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
-    list.forEach(([letter, sound]) => {
+    list.forEach(([letter, sound, art]) => {
       const item = document.createElement("div");
-      item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;";
+      item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:120px; flex:1 1 150px; text-align:center;";
       const base = letter.split("/")[0].trim();
       const spoken = base + "ờ";
       item.appendChild(makeSpeakableLabel(letter, "1.1rem", "vi", spoken));
@@ -2406,6 +2421,13 @@ function renderViAlphabetPanel(){
       info.className = "usage-note";
       info.textContent = `${sound}（🔊 唸「${spoken}」）`;
       item.appendChild(info);
+      if(art){
+        const a = document.createElement("div");
+        a.className = "usage-note";
+        a.style.cssText = "font-size:0.72rem; margin-top:2px;";
+        a.textContent = "👅 " + art;
+        item.appendChild(a);
+      }
       g.appendChild(item);
     });
     panel.appendChild(g);
