@@ -2057,7 +2057,7 @@ async function getAntonyms(text, zh, nativeScript){
 const THAI_VOWEL_PAIRS = [
   { short: "อะ", long: "อา", sound: "a / aa" },
   { short: "อิ", long: "อี", sound: "i / ii" },
-  { short: "อึ", long: "อื", sound: "ue / ueh" },
+  { short: "อึ", long: "อื", sound: "ue（不圓唇的 u，嘴角往兩邊；短／長）", speakShort: "อึ", speakLong: "อือ" },
   { short: "อุ", long: "อู", sound: "u / uu" },
   { short: "เอะ", long: "เอ", sound: "e / eh" },
   { short: "แอะ", long: "แอ", sound: "ae / aeh" },
@@ -2127,9 +2127,9 @@ function renderThaiAlphabetPanel(){
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
     const row = document.createElement("div");
-    row.appendChild(makeSpeakableLabel(v.short, "1.1rem", "th"));
+    row.appendChild(makeSpeakableLabel(v.short, "1.1rem", "th", v.speakShort || null));
     row.appendChild(document.createTextNode(" / "));
-    row.appendChild(makeSpeakableLabel(v.long, "1.1rem", "th"));
+    row.appendChild(makeSpeakableLabel(v.long, "1.1rem", "th", v.speakLong || null));
     item.appendChild(row);
     const sound = document.createElement("div");
     sound.className = "usage-note";
@@ -2150,9 +2150,9 @@ function renderThaiAlphabetPanel(){
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
     const row = document.createElement("div");
-    row.appendChild(makeSpeakableLabel(v.short, "1.1rem", "th"));
+    row.appendChild(makeSpeakableLabel(v.short, "1.1rem", "th", v.speakShort || null));
     row.appendChild(document.createTextNode(" / "));
-    row.appendChild(makeSpeakableLabel(v.long, "1.1rem", "th"));
+    row.appendChild(makeSpeakableLabel(v.long, "1.1rem", "th", v.speakLong || null));
     item.appendChild(row);
     const sound = document.createElement("div");
     sound.className = "usage-note";
