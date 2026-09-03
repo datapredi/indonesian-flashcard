@@ -2296,17 +2296,17 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
 // sound 裡的注音是「最接近的國語音」概略對照，方便台灣學生抓感覺，不是精準等值。
 // art：舌位＋嘴型的白話說明。
 const VI_VOWELS = [
-  { letter: "a", sound: "像ㄚ（短）", art: "嘴張最大、舌位低、不圓唇", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
-  { letter: "ă", sound: "像ㄚ（更短、更急）", art: "跟 a 同嘴型舌位，只是收得很快、很短促", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
-  { letter: "ơ", sound: "像ㄜ（拉長、不捲舌）", art: "舌位中間偏後、嘴半開、不圓唇；â 是它的短音版", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
-  { letter: "â", sound: "像ㄜ（短）", art: "嘴半開、舌位放中間放鬆（schwa）、不圓唇；短促——就是 ơ 的短音版", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
-  { letter: "e", sound: "像ㄝ（嘴張比較大）", art: "舌往前、嘴張中偏大、嘴角往兩邊、不圓唇", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
-  { letter: "ê", sound: "像ㄟ的前半、不往上滑", art: "舌往前、抬高一點、嘴半開、不圓唇，全程不滑動", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
-  { letter: "o", sound: "像ㄛ（開口）", art: "舌往後、嘴張中偏大、圓唇但不縮很緊", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
-  { letter: "ô", sound: "像ㄛ（收口，像「喔」）", art: "舌往後抬高、嘴收圓縮小（比 o 更圓更小）", example: "tô", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
-  { letter: "u", sound: "像ㄨ", art: "舌往後抬高、嘴唇縮圓縮小", example: "thu", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
-  { letter: "ư", sound: "跟ㄨ嘴型一樣但不圓唇、嘴角往兩邊（注音沒有對應）", art: "舌位跟 u 一樣（後、高），但嘴唇「不圓」、嘴角往兩邊拉——關鍵就在嘴型", example: "thư", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } },
-  { letter: "i", sound: "像ㄧ（跟 y 同音，用哪個看字源）；最好發，擺最後", art: "舌往前抬到最高、嘴扁、嘴角往兩邊", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } }
+  { letter: "a", sound: "像ㄚ（短）", art: "上下：張到最大（下巴掉下來）｜左右：放鬆、不特別拉；舌位低", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
+  { letter: "ă", sound: "像ㄚ（更短、更急）", art: "上下／左右跟 a 一樣，只是收得很快、很短促", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
+  { letter: "ơ", sound: "像ㄜ（拉長、不捲舌）", art: "上下：半開｜左右：完全放鬆（不往兩邊也不縮圓）；舌位放中間。â 是它的短音版", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
+  { letter: "â", sound: "像ㄜ（短）", art: "上下／左右跟 ơ 一樣（半開、嘴放鬆），只是短促——ơ 的短音版", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
+  { letter: "e", sound: "像ㄝ（嘴張比較大）", art: "上下：中偏大｜左右：嘴角往兩邊拉（不圓唇）；舌往前", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
+  { letter: "ê", sound: "像ㄟ的前半、不往上滑", art: "上下：半開｜左右：嘴角微微往兩邊（不圓唇）；舌往前抬高一點，全程不滑動", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
+  { letter: "o", sound: "像ㄛ（開口）", art: "上下：中偏大｜左右：嘴唇往前縮圓（不是往兩邊拉）；舌往後", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
+  { letter: "ô", sound: "像ㄛ（收口，像「喔」）", art: "上下：半開｜左右：嘴唇縮圓縮小、往前嘟（比 o 更圓更小）；舌往後抬高", example: "tô", tones: { M: "ô", F: "ồ", R: "ố", L: "ổ/ỗ", S: "ộ" } },
+  { letter: "u", sound: "像ㄨ", art: "上下：幾乎閉起來｜左右：嘴唇縮圓嘟出；舌往後抬到最高", example: "thu", tones: { M: "u", F: "ù", R: "ú", L: "ủ/ũ", S: "ụ" } },
+  { letter: "ư", sound: "跟ㄨ嘴型一樣但不圓唇、嘴角往兩邊（注音沒有對應）", art: "上下：幾乎閉｜左右：嘴角往兩邊拉、不圓唇（跟 u 唯一的差別就在這）；舌往後抬到最高", example: "thư", tones: { M: "ư", F: "ừ", R: "ứ", L: "ử/ữ", S: "ự" } },
+  { letter: "i", sound: "像ㄧ（跟 y 同音，用哪個看字源）；最好發，擺最後", art: "上下：幾乎閉｜左右：嘴角往兩邊拉、嘴扁；舌往前抬到最高", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } }
 ];
 const VI_DIPHTHONGS = [
   { form: "ia / iê / yê", sound: "像ㄧㄝ滑過去", art: "從 i（舌前高、嘴扁）滑向 ơ/â（舌位放中間、放鬆）", example: "chia" },
