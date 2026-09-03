@@ -2297,9 +2297,9 @@ document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () =>
 // art：舌位＋嘴型的白話說明。
 const VI_VOWELS = [
   { letter: "a", sound: "像ㄚ（短）", art: "上下：張到最大（下巴掉下來）｜左右：放鬆、不特別拉；舌位低", example: "ba", tones: { M: "a", F: "à", R: "á", L: "ả/ã", S: "ạ" } },
-  { letter: "ă", sound: "像ㄚ（更短、更急）", art: "上下／左右跟 a 一樣，只是收得很快、很短促", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
+  { letter: "ă", sound: "像ㄚ（更短、更急）", short: true, art: "上下／左右跟 a 一樣，只是收得很快、很短促", example: "ăn", tones: { M: "ă", F: "ằ", R: "ắ", L: "ẳ/ẵ", S: "ặ" } },
   { letter: "ơ", sound: "像ㄜ（拉長、不捲舌）", art: "上下：半開｜左右：完全放鬆（不往兩邊也不縮圓）；舌位放中間。â 是它的短音版", example: "bơ", tones: { M: "ơ", F: "ờ", R: "ớ", L: "ở/ỡ", S: "ợ" } },
-  { letter: "â", sound: "像ㄜ（短）", art: "上下／左右跟 ơ 一樣（半開、嘴放鬆），只是短促——ơ 的短音版", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
+  { letter: "â", sound: "像ㄜ（短）", short: true, art: "上下／左右跟 ơ 一樣（半開、嘴放鬆），只是短促——ơ 的短音版", example: "cân", tones: { M: "â", F: "ầ", R: "ấ", L: "ẩ/ẫ", S: "ậ" } },
   { letter: "e", sound: "像ㄝ（嘴張比較大）", art: "上下：中偏大｜左右：嘴角往兩邊拉（不圓唇）；舌往前", example: "em", tones: { M: "e", F: "è", R: "é", L: "ẻ/ẽ", S: "ẹ" } },
   { letter: "ê", sound: "像ㄟ的前半、不往上滑", art: "上下：半開｜左右：嘴角微微往兩邊（不圓唇）；舌往前抬高一點，全程不滑動", example: "đêm", tones: { M: "ê", F: "ề", R: "ế", L: "ể/ễ", S: "ệ" } },
   { letter: "o", sound: "像ㄛ（開口）", art: "上下：中偏大｜左右：嘴唇往前縮圓（不是往兩邊拉）；舌往後", example: "to", tones: { M: "o", F: "ò", R: "ó", L: "ỏ/õ", S: "ọ" } },
@@ -2369,8 +2369,18 @@ function renderViAlphabetPanel(){
   vowelGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
   VI_VOWELS.forEach(v => {
     const item = document.createElement("div");
-    item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:170px; text-align:center;";
-    item.appendChild(makeSpeakableLabel(v.letter, "1.2rem", "vi", v.letter.split("/")[0].trim(), VI_LETTER_TTS));
+    // 本身就是「短母音」的（ă、â）用黃色框＋黃底標出來
+    const YEL = "#c9a227";
+    item.style.cssText = `border:${v.short ? "2px solid " + YEL : "1px solid var(--border)"}; border-radius:8px; padding:6px 10px; min-width:170px; text-align:center;${v.short ? "background:color-mix(in srgb, " + YEL + " 14%, transparent);" : ""}`;
+    const lab = makeSpeakableLabel(v.letter, "1.2rem", "vi", v.letter.split("/")[0].trim(), VI_LETTER_TTS);
+    if(v.short){ lab.style.color = YEL; lab.style.fontWeight = "700"; }
+    item.appendChild(lab);
+    if(v.short){
+      const tag = document.createElement("span");
+      tag.textContent = " ⏱短母音";
+      tag.style.cssText = `font-size:0.7rem; color:${YEL}; font-weight:700;`;
+      item.appendChild(tag);
+    }
     const sound = document.createElement("div");
     sound.className = "usage-note";
     sound.textContent = v.example ? `${v.sound}（例：${v.example}）` : v.sound;
