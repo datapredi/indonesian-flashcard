@@ -2189,6 +2189,42 @@ function renderThaiAlphabetPanel(){
   note.className = "usage-note";
   note.textContent = "共 44 個子音。分成中／高／低三個 class 是因為同一個聲調符號、在不同 class 的子音上唸出來的聲調不一樣，這張表主要是給你查子音屬於哪個 class 用的。虛線＋變淡的兩個（ฃ、ฅ）是已廢棄的字母，現代單字都不會出現，只在字母表裡；標「少見」的字現代還在用，只是集中在少數字（多半是巴利／梵語借詞）。發音是唸單一個字母本身，跟它在真正單字裡的唸法可能會有點不一樣，僅供參考。"
   panel.appendChild(note);
+
+  // 第二張表：不分 class，按「發音代號」的英文字母順序排，同一個音的字母排在一起。
+  const h2 = document.createElement("div");
+  h2.style.cssText = "font-weight:600; margin-top:18px;";
+  h2.textContent = "按發音分組（不分中／高／低，同音的排一起）";
+  panel.appendChild(h2);
+
+  const bySound = {};
+  const clsShort = { mid: "中", high: "高", low: "低" };
+  THAI_CONSONANT_CLASSES.forEach(cls => {
+    cls.letters.forEach(([letter, name, sound, extraNote]) => {
+      (bySound[sound] = bySound[sound] || []).push({ letter, name, extraNote, clsKey: cls.key });
+    });
+  });
+  const sortKey = k => (k.charAt(0) === "（" ? "~~~" : k.toLowerCase());
+  Object.keys(bySound).sort((a, b) => sortKey(a).localeCompare(sortKey(b))).forEach(sound => {
+    const grp = document.createElement("div");
+    grp.style.cssText = "display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:6px 0; padding-bottom:6px; border-bottom:1px dashed var(--border);";
+    const lbl = document.createElement("div");
+    lbl.style.cssText = "font-weight:700; min-width:56px;";
+    lbl.textContent = sound;
+    grp.appendChild(lbl);
+    bySound[sound].forEach(({ letter, name, extraNote, clsKey }) => {
+      const obsolete = extraNote && extraNote.indexOf("廢棄") !== -1;
+      const chip = document.createElement("div");
+      chip.style.cssText = `border:1px ${obsolete ? "dashed" : "solid"} ${classColors[clsKey]}; border-radius:8px; padding:4px 8px; text-align:center;${obsolete ? "opacity:0.55;" : ""}`;
+      chip.appendChild(makeSpeakableLabel(letter, "1.2rem", "th"));
+      const sub = document.createElement("div");
+      sub.className = "usage-note";
+      sub.style.fontSize = "0.68rem";
+      sub.innerHTML = `${name}<br><span style="color:${classColors[clsKey]};">${clsShort[clsKey]}音</span>${extraNote ? `<br><span style="color:${obsolete ? "var(--danger)" : "var(--muted)"};">${extraNote}</span>` : ""}`;
+      chip.appendChild(sub);
+      grp.appendChild(chip);
+    });
+    panel.appendChild(grp);
+  });
 }
 document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () => {
   const panel = document.getElementById("thaiAlphabetPanel");
