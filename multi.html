@@ -2122,6 +2122,52 @@ function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions){
   wrap.appendChild(btn);
   return wrap;
 }
+
+// 字母表每張卡片可以打自己的筆記——key＝"語言:字母"，全域存一份、也進備份。
+const LETTER_NOTES_LS = "flashcard_letter_notes_v1";
+let letterNotes = {};
+try{ letterNotes = JSON.parse(localStorage.getItem(LETTER_NOTES_LS)) || {}; }catch(e){ letterNotes = {}; }
+function saveLetterNotes(){ localStorage.setItem(LETTER_NOTES_LS, JSON.stringify(letterNotes)); }
+function attachLetterNote(cardEl, key){
+  const has = () => !!(letterNotes[key] && String(letterNotes[key]).trim());
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "speak-btn";
+  btn.style.cssText = "padding:2px 6px; font-size:0.72rem; margin-top:4px;";
+  const panel = document.createElement("div");
+  panel.className = "hidden";
+  panel.style.cssText = "margin-top:4px; text-align:left;";
+  const ta = document.createElement("textarea");
+  ta.className = "note-ta";
+  ta.style.minHeight = "48px";
+  ta.placeholder = "自己的筆記…（自動存）";
+  const saved = document.createElement("div");
+  saved.className = "note-saved";
+  let timer = null;
+  function refreshBtn(){ btn.textContent = has() ? "📝 筆記 ✓" : "📝 筆記"; btn.classList.toggle("primary", has()); }
+  function commit(){
+    const v = ta.value.trim();
+    if(v) letterNotes[key] = v; else delete letterNotes[key];
+    saveLetterNotes();
+    refreshBtn();
+    saved.textContent = has() ? "已儲存 ✓" : "";
+  }
+  ta.addEventListener("input", () => { saved.textContent = "儲存中…"; clearTimeout(timer); timer = setTimeout(commit, 500); });
+  ta.addEventListener("blur", () => { clearTimeout(timer); commit(); });
+  btn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!panel.classList.contains("hidden")){ panel.classList.add("hidden"); return; }
+    ta.value = letterNotes[key] || "";
+    saved.textContent = "";
+    panel.classList.remove("hidden");
+    ta.focus();
+  });
+  panel.appendChild(ta);
+  panel.appendChild(saved);
+  refreshBtn();
+  cardEl.appendChild(btn);
+  cardEl.appendChild(panel);
+}
 function renderThaiAlphabetPanel(){
   const panel = document.getElementById("thaiAlphabetPanel");
   panel.innerHTML = "";
@@ -2395,6 +2441,7 @@ function renderViAlphabetPanel(){
       item.appendChild(art);
     }
     // 只顯示不帶聲調的基本形（就是字母本身＝ngang/M 平聲）；其他 4 個聲調變體不列。
+    attachLetterNote(item, "vi:" + v.letter);
     vowelGrid.appendChild(item);
   });
   panel.appendChild(vowelGrid);
@@ -2421,6 +2468,7 @@ function renderViAlphabetPanel(){
       art.textContent = "👄 " + v.art;
       item.appendChild(art);
     }
+    attachLetterNote(item, "vi:" + v.form);
     diphGrid.appendChild(item);
   });
   panel.appendChild(diphGrid);
@@ -2448,6 +2496,7 @@ function renderViAlphabetPanel(){
         a.textContent = "👅 " + art;
         item.appendChild(a);
       }
+      attachLetterNote(item, "vi:" + letter);
       g.appendChild(item);
     });
     panel.appendChild(g);
@@ -5707,7 +5756,7 @@ const BACKUP_PER_LANG_BASES = [
   TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS
 ];
-const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS];
+const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS];
 
 function exportBackup(){
   const data = { version: 1, exportedAt: new Date().toISOString(), keys: {} };
