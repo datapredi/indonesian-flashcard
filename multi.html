@@ -2071,21 +2071,21 @@ const THAI_DIPHTHONGS = [
 ];
 const THAI_CONSONANT_CLASSES = [
   { key: "mid", label: "中音 กลาง（Mid Class）", letters: [
-    ["ก","gor gai","g"], ["จ","jor jaan","j"], ["ฎ","dor chada","d"], ["ฏ","tor patak","t"],
+    ["ก","gor gai","g"], ["จ","jor jaan","j"], ["ฎ","dor chada","d","少見，多為巴利／梵語借詞、王室用語"], ["ฏ","tor patak","t","少見，多為巴利／梵語借詞、王室用語"],
     ["ด","dor dek","d"], ["ต","tor tao","t"], ["บ","bor baimai","b"], ["ป","por pla","p"], ["อ","o ang","（無聲／母音載體）"]
   ]},
   { key: "high", label: "高音 สูง（High Class）", letters: [
-    ["ข","khor khai","kh"], ["ฉ","chor ching","ch"], ["ฐ","thor thaan","th"], ["ถ","thor thung","th"],
+    ["ข","khor khai","kh"], ["ฃ","khor khuat","kh","⚠️ 已廢棄，現代單字都不用了（被 ข 取代），只出現在字母表"], ["ฉ","chor ching","ch"], ["ฐ","thor thaan","th"], ["ถ","thor thung","th"],
     ["ผ","phor phueng","ph"], ["ฝ","for fa","f"], ["ศ","sor sala","s"], ["ษ","sor reusi","s"],
     ["ส","sor suea","s"], ["ห","hor hip","h"]
   ]},
   { key: "low", label: "低音 ต่ำ（Low Class）", letters: [
-    ["ค","khor khwaai","kh"], ["ฆ","khor rakhang","kh"], ["ง","ngor ngu","ng"], ["ช","chor chang","ch"],
-    ["ซ","sor so","s"], ["ฌ","chor choe","ch"], ["ญ","yor ying","y"], ["ฑ","thor montho","th"],
-    ["ฒ","thor phuthao","th"], ["ณ","nor nen","n"], ["ท","thor thahaan","th"], ["ธ","thor thong","th"],
+    ["ค","khor khwaai","kh"], ["ฅ","khor khon","kh","⚠️ 已廢棄，現代單字都不用了（被 ค 取代），只出現在字母表"], ["ฆ","khor rakhang","kh","少見，只有 เมฆ（雲）、ระฆัง（鐘）、ฆ่า（殺）等幾個字"], ["ง","ngor ngu","ng"], ["ช","chor chang","ch"],
+    ["ซ","sor so","s"], ["ฌ","chor choe","ch","少見，幾乎只在 เฌอ、ฌาน 等少數字"], ["ญ","yor ying","y"], ["ฑ","thor montho","th","少見，多為巴利／梵語借詞"],
+    ["ฒ","thor phuthao","th","少見，如 ผู้เฒ่า（老人）"], ["ณ","nor nen","n"], ["ท","thor thahaan","th"], ["ธ","thor thong","th"],
     ["น","nor nu","n"], ["พ","phor phaan","ph"], ["ฟ","for fan","f"], ["ภ","phor samphao","ph"],
     ["ม","mor ma","m"], ["ย","yor yak","y"], ["ร","ror ruea","r"], ["ล","lor ling","l"],
-    ["ว","wor waen","w"], ["ฬ","lor chula","l"], ["ฮ","hor nokhuk","h"]
+    ["ว","wor waen","w"], ["ฬ","lor chula","l","少見，如 กีฬา（運動）、จุฬา"], ["ฮ","hor nokhuk","h"]
   ]}
 ];
 // 做一個小小的「文字＋喇叭」列，點喇叭就照 text 用泰文發音唸出來——子音／
@@ -2171,13 +2171,14 @@ function renderThaiAlphabetPanel(){
 
     const grid = document.createElement("div");
     grid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
-    cls.letters.forEach(([letter, name, sound]) => {
+    cls.letters.forEach(([letter, name, sound, extraNote]) => {
+      const obsolete = extraNote && extraNote.indexOf("廢棄") !== -1;
       const item = document.createElement("div");
-      item.style.cssText = `border:1px solid ${classColors[cls.key]}; border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;`;
+      item.style.cssText = `border:1px ${obsolete ? "dashed" : "solid"} ${classColors[cls.key]}; border-radius:8px; padding:6px 10px; min-width:90px; text-align:center;${obsolete ? "opacity:0.55;" : ""}`;
       item.appendChild(makeSpeakableLabel(letter, "1.2rem", "th"));
       const info = document.createElement("div");
       info.className = "usage-note";
-      info.innerHTML = `${name}<br>${sound}`;
+      info.innerHTML = `${name}<br>${sound}${extraNote ? `<br><span style="color:${obsolete ? "var(--danger)" : "var(--muted)"};">${extraNote}</span>` : ""}`;
       item.appendChild(info);
       grid.appendChild(item);
     });
@@ -2186,7 +2187,7 @@ function renderThaiAlphabetPanel(){
 
   const note = document.createElement("div");
   note.className = "usage-note";
-  note.textContent = "子音分成中／高／低三個 class 是因為同一個聲調符號、在不同 class 的子音上唸出來的聲調不一樣，這張表主要是給你查子音屬於哪個 class 用的參考資料，不是 AI 生成的。發音是唸單一個字母本身（沒有搭配其他母音），跟它在真正單字裡的唸法可能會有點不一樣，僅供參考。"
+  note.textContent = "共 44 個子音。分成中／高／低三個 class 是因為同一個聲調符號、在不同 class 的子音上唸出來的聲調不一樣，這張表主要是給你查子音屬於哪個 class 用的。虛線＋變淡的兩個（ฃ、ฅ）是已廢棄的字母，現代單字都不會出現，只在字母表裡；標「少見」的字現代還在用，只是集中在少數字（多半是巴利／梵語借詞）。發音是唸單一個字母本身，跟它在真正單字裡的唸法可能會有點不一樣，僅供參考。"
   panel.appendChild(note);
 }
 document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () => {
