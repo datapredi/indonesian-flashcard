@@ -256,6 +256,7 @@
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
+      <button id="btnToggleTeacherOnly">🎓 只顯示老師講過</button>
       <button id="btnListAutoplay">▶️ 依序播放發音（每字 3 次）</button>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
         <input type="checkbox" id="autoplayIncludeZh">
@@ -1032,6 +1033,13 @@ function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMaster
 const PRON_FLAG_LS = "flashcard_pron_flag_v1";
 let pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
 function savePronFlag(){ saveMasteredSet(lsKey(PRON_FLAG_LS), pronFlagIds); }
+
+// 「上課老師特別講過的字」標記——標完可以用「🎓 只顯示老師講過」一次看／選出來練。
+// 分語言各存一份，也進備份。
+const TEACHER_FLAG_LS = "flashcard_teacher_flag_v1";
+let teacherFlagIds = loadMasteredSet(lsKey(TEACHER_FLAG_LS));
+function saveTeacherFlag(){ saveMasteredSet(lsKey(TEACHER_FLAG_LS), teacherFlagIds); }
+let showTeacherOnly = false;
 
 // 「太難、現在完全不想看到，但也不想刪掉」的字：藏起來——不在單字表顯示，也
 // 不進 Flash Card／測驗／跑步模式（藏的時候順便取消勾選）。用「🙈 顯示隱藏的」
@@ -4163,6 +4171,7 @@ function getVisibleWords(){
     if(hiddenIds.has(w.id)) return false;
     if(showSelectedOnly && !selected.has(w.id)) return false;
     if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
+    if(showTeacherOnly && !teacherFlagIds.has(w.id)) return false;
     if(showNumbersOnly && !isNumberWord(w)) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
@@ -4815,6 +4824,28 @@ function createWordItem(w){
   refreshPronFlagBtn();
   row.appendChild(pronFlagBtn);
 
+  const teacherBtn = document.createElement("button");
+  teacherBtn.type = "button";
+  teacherBtn.className = "diff-chip";
+  function refreshTeacherBtn(){
+    const flagged = teacherFlagIds.has(w.id);
+    teacherBtn.classList.toggle("diff-E", flagged);
+    teacherBtn.textContent = "🎓";
+    teacherBtn.style.opacity = flagged ? "1" : "0.35";
+    teacherBtn.setAttribute("aria-label", `${w.text}${flagged ? "（已標記：老師講過，點一下取消）" : "（點一下標記：這個字上課老師特別講過）"}`);
+    teacherBtn.title = flagged ? "老師講過（點一下取消標記）" : "標記：上課老師特別講過的字";
+  }
+  teacherBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(teacherFlagIds.has(w.id)) teacherFlagIds.delete(w.id); else teacherFlagIds.add(w.id);
+    saveTeacherFlag();
+    refreshTeacherBtn();
+    updateTeacherToggleLabel();
+    if(showTeacherOnly) renderList();
+  });
+  refreshTeacherBtn();
+  row.appendChild(teacherBtn);
+
   const crossLangPanel = document.createElement("div");
   crossLangPanel.className = "usage-panel hidden";
 
@@ -4958,6 +4989,7 @@ function updateCount(){
   document.getElementById("selCount").textContent = parts.join("・");
   if(typeof updateNumbersToggleLabel === "function") updateNumbersToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
+  if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
 function deleteWord(id){
   const target = allWords.find(w => w.id === id);
@@ -4974,6 +5006,7 @@ function deleteWord(id){
   saveCardMastered();
   saveQuizMastered();
   if(hiddenIds.delete(id)) saveHidden();
+  if(teacherFlagIds.delete(id)) saveTeacherFlag();
   // 把這個字的 AI 生成資料也一起清掉（你自己打的 📝 筆記保留），這樣之後重新
   // 輸入同一個字會重新生成，不會撈到刪掉前的舊翻譯／舊變化形。
   if(target){
@@ -5168,6 +5201,7 @@ document.getElementById("btnRenumber").onclick = () => {
   cardMasteredIds = remapIdSet(cardMasteredIds);
   quizMasteredIds = remapIdSet(quizMasteredIds);
   pronFlagIds = remapIdSet(pronFlagIds);
+  teacherFlagIds = remapIdSet(teacherFlagIds);
   hiddenIds = remapIdSet(hiddenIds);
   useRecordingIds = remapIdSet(useRecordingIds);
   compareSet = remapIdSet(compareSet);
@@ -5180,6 +5214,7 @@ document.getElementById("btnRenumber").onclick = () => {
   saveCardMastered();
   saveQuizMastered();
   savePronFlag();
+  saveTeacherFlag();
   saveHidden();
   saveUseRecordingIds();
   saveCompareSet();
@@ -5229,6 +5264,18 @@ function updatePronFlagToggleLabel(){
   btn.textContent = showPronFlagOnly ? `顯示全部單字 (發音待複習 ${pronFlagIds.size} 個)` : `⚠️ 只顯示發音待複習 (${pronFlagIds.size})`;
   btn.classList.toggle("primary", showPronFlagOnly);
 }
+function updateTeacherToggleLabel(){
+  const btn = document.getElementById("btnToggleTeacherOnly");
+  btn.textContent = showTeacherOnly ? `顯示全部單字 (老師講過 ${teacherFlagIds.size} 個)` : `🎓 只顯示老師講過 (${teacherFlagIds.size})`;
+  btn.classList.toggle("primary", showTeacherOnly);
+  btn.classList.toggle("hidden", teacherFlagIds.size === 0 && !showTeacherOnly);
+}
+document.getElementById("btnToggleTeacherOnly").addEventListener("click", () => {
+  showTeacherOnly = !showTeacherOnly;
+  updateTeacherToggleLabel();
+  renderList();
+});
+updateTeacherToggleLabel();
 document.getElementById("btnTogglePronFlagOnly").addEventListener("click", () => {
   showPronFlagOnly = !showPronFlagOnly;
   updatePronFlagToggleLabel();
@@ -5555,7 +5602,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 // 存成一個 JSON 檔下載。刻意不含 API Key（安全考量）、不含錄音（IndexedDB 存的音檔，
 // 太大也沒必要備份，重錄就好）。
 const BACKUP_PER_LANG_BASES = [
-  LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS,
+  LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
   TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS
