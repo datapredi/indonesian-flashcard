@@ -201,6 +201,9 @@
     <div class="note hidden" id="convertNote"></div>
     <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
     <div class="toolbar">
+      <button id="btnJumpToActions2">⬇ 跳到最下面（開始 Flash Card／測驗／跑步模式）</button>
+    </div>
+    <div class="toolbar">
       <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
       <input type="text" id="wordSearch" placeholder="搜尋目前語言、中文或英文..." style="flex:1 1 180px;">
     </div>
@@ -3144,10 +3147,13 @@ document.getElementById("btnJumpBack").addEventListener("click", (e) => {
 });
 // 單字表一長，開始 Flash Card／測驗／跑步模式的按鈕就要捲很久才到得了，
 // 在最上面放一個直接跳過去的按鈕，不用每次都捲過整個單字表。
-document.getElementById("btnJumpToActions").addEventListener("click", (e) => {
-  e.preventDefault();
-  const actions = document.getElementById("mainActions");
-  if(actions) actions.scrollIntoView({ behavior: "smooth", block: "start" });
+["btnJumpToActions", "btnJumpToActions2"].forEach(id => {
+  const b = document.getElementById(id);
+  if(b) b.addEventListener("click", (e) => {
+    e.preventDefault();
+    const actions = document.getElementById("mainActions");
+    if(actions) actions.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 });
 function doJumpToIdInput(){
   const id = Number(document.getElementById("jumpToIdInput").value);
