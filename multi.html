@@ -2032,6 +2032,57 @@ async function getEgyptianLetterBreakdown(nativeScript, romanized, force){
   return parsed;
 }
 
+// 印尼文詞根／構詞分析：印尼文靠前綴（me-、ber-、di-、ter-、pe-、per-、ke-）、
+// 後綴（-kan、-i、-an）、環綴（me-...-kan、pe-...-an、ke-...-an）從詞根（kata dasar）
+// 衍生出大量單字（mengajar ← ajar；makan → makanan）。這個面板顯示詞根、詞性、
+// 詞綴作用，跟同詞根的其他常見衍生字。
+const ID_MORPH_CACHE_LS = "flashcard_id_morph_cache_v1";
+let idMorphCache = {};
+try{ idMorphCache = JSON.parse(localStorage.getItem(lsKey(ID_MORPH_CACHE_LS))) || {}; }catch(e){ idMorphCache = {}; }
+function saveIdMorphCache(){ localStorage.setItem(lsKey(ID_MORPH_CACHE_LS), JSON.stringify(idMorphCache)); }
+async function getIndoMorphology(text, zh, force){
+  if(!force && idMorphCache[text]) return idMorphCache[text];
+  const schema = {
+    type: "object",
+    properties: {
+      root: { type: "string" },
+      pos: { type: "string" },
+      affixNote: { type: "string" },
+      related: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            form: { type: "string" },
+            pos: { type: "string" },
+            zh: { type: "string" }
+          },
+          required: ["form", "pos", "zh"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["root", "pos", "affixNote", "related"],
+    additionalProperties: false
+  };
+  const prompt = `你是印尼語老師。學生在背的印尼文單字/片語：${text}${zh ? `（中文意思：${zh}）` : ""}
+
+印尼文常用詞綴——前綴 me-／ber-／di-／ter-／pe-／per-／ke-，後綴 -kan／-i／-an，環綴 me-…-kan、pe-…-an、ke-…-an 等——會從詞根（kata dasar）衍生出大量單字（例如 mengajar 的詞根是 ajar；makan 加 -an 變成 makanan）。請分析這個字：
+
+- root：這個字的詞根（kata dasar，字典查得到的最基本形式）。如果這個字本身就是詞根（沒有加任何詞綴），root 就填它自己
+- pos：這個字**目前這個形式**的詞性/語態，用簡短繁體中文（例如「主動動詞」「被動動詞」「名詞」「形容詞」「副詞」）
+- affixNote：一句繁體中文說明這個字加了什麼詞綴、詞綴的作用（例如「me- 前綴：表示主動語態的動詞」；如果本身就是詞根就寫「這個字本身就是詞根，沒有加詞綴」）
+- related：同一個詞根衍生出的其他常見形式（不包含學生正在背的這個形式本身），依常用程度列 4~8 個，每個給：
+  - form：衍生出來的字
+  - pos：詞性/語態（跟 pos 欄位一樣簡短）
+  - zh：這個衍生字的中文意思
+  詞根本身如果是常用的獨立字，也列進 related`;
+  const parsed = await callClaude(prompt, schema, 2048);
+  idMorphCache[text] = parsed;
+  saveIdMorphCache();
+  return parsed;
+}
+
 async function getEgyptianInflections(text, zh, nativeScript, force){
   if(!force && inflectionsCache[text]) return inflectionsCache[text];
   const schema = {
@@ -3651,6 +3702,78 @@ function renderAntonymsPanel(panel, antonyms){
   });
 }
 
+function renderIndoMorphPanel(panel, r, onRegenerate){
+  panel.innerHTML = "";
+
+  const rootLine = document.createElement("div");
+  rootLine.innerHTML = `<span class="usage-note">詞根（kata dasar）：</span><b style="font-size:1.1rem;">${r.root}</b>`;
+  panel.appendChild(rootLine);
+
+  const posLine = document.createElement("div");
+  posLine.className = "usage-note";
+  posLine.style.margin = "2px 0 4px";
+  posLine.textContent = `這個形式的詞性：${r.pos}`;
+  panel.appendChild(posLine);
+
+  if(r.affixNote){
+    const affixLine = document.createElement("div");
+    affixLine.className = "usage-note";
+    affixLine.style.marginBottom = "8px";
+    affixLine.textContent = r.affixNote;
+    panel.appendChild(affixLine);
+  }
+
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:flex; flex-wrap:wrap; gap:6px;";
+  (r.related || []).forEach(item => {
+    const cell = document.createElement("div");
+    cell.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:5px 10px; text-align:center;";
+    const label = document.createElement("span");
+    label.style.fontWeight = "600";
+    label.textContent = item.form;
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(item.form, speakBtn); });
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "speak-btn";
+    const inList = isWordInList(item.form);
+    addBtn.textContent = inList ? "已加入" : "➕";
+    if(inList) addBtn.disabled = true;
+    addBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      let t = item.form.trim();
+      if(allWords.some(w => w.text.toLowerCase() === t.toLowerCase())){
+        let suffix = 2;
+        while(allWords.some(w => w.text.toLowerCase() === `${t} (${suffix})`.toLowerCase())) suffix++;
+        t = `${t} (${suffix})`;
+      }
+      if(addWordToList(t)){
+        if(item.zh){ customDB[t] = Object.assign({}, customDB[t], { zh: item.zh }); saveCustomDB(); }
+        addBtn.textContent = "已加入"; addBtn.disabled = true;
+      }
+    });
+    const info = document.createElement("div");
+    info.className = "usage-note";
+    info.style.fontSize = "0.72rem";
+    info.textContent = `${item.pos}・${item.zh}`;
+    const row1 = document.createElement("div");
+    row1.appendChild(label); row1.appendChild(speakBtn); row1.appendChild(addBtn);
+    cell.appendChild(row1);
+    cell.appendChild(info);
+    grid.appendChild(cell);
+  });
+  panel.appendChild(grid);
+
+  if(onRegenerate){
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "speak-btn"; b.textContent = "🔄 重新分析";
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); onRegenerate(); });
+    panel.appendChild(b);
+  }
+}
 function renderArBreakdownPanel(panel, r, romanized, onRegenerate){
   panel.innerHTML = "";
   const kindColor = { "子音": "var(--fg, inherit)", "長母音": "var(--accent2)", "短母音": "var(--accent)", "ال 冠詞": "var(--muted)", "陰性字尾": "var(--accent)", "疊音": "var(--danger)", "喉塞音": "var(--muted)", "其他": "var(--muted)" };
@@ -4777,6 +4900,37 @@ function createWordItem(w){
     row.appendChild(brkBtn);
   }
 
+  // 印尼文：詞根／構詞分析（mengajar → 詞根 ajar；makan → 衍生字 makanan）。
+  if(currentLang === "id"){
+    const morphPanel = document.createElement("div");
+    morphPanel.className = "usage-panel hidden";
+    row.querySelector("div").appendChild(morphPanel);
+    const morphBtn = document.createElement("button");
+    morphBtn.type = "button";
+    morphBtn.className = "usage-btn";
+    morphBtn.textContent = "🌱詞根";
+    morphBtn.title = "AI 分析詞根／詞綴：這個字的詞根是什麼、加了什麼詞綴、同詞根還有哪些常見衍生字";
+    morphBtn.setAttribute("aria-label", `分析 ${w.text} 的詞根與衍生字`);
+    async function loadMorphPanel(force){
+      if(!force && morphPanel.dataset.loaded === "1") return;
+      if(!getApiKey()){ morphPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+      morphPanel.textContent = "分析中...";
+      try{
+        const r = await getIndoMorphology(w.text, data ? data.zh : "", force);
+        renderIndoMorphPanel(morphPanel, r, () => loadMorphPanel(true));
+        morphPanel.dataset.loaded = "1";
+      }catch(err){ morphPanel.textContent = "分析失敗：" + err.message; }
+    }
+    morphBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!morphPanel.classList.contains("hidden")){ morphPanel.classList.add("hidden"); morphBtn.classList.remove("primary"); return; }
+      morphPanel.classList.remove("hidden");
+      morphBtn.classList.add("primary");
+      await loadMorphPanel(false);
+    });
+    row.appendChild(morphBtn);
+  }
+
   // 聲調標記功能目前支援泰文（HLMRF）跟越南文南部口音（MFRLS）。兩種語言
   // 用同一套按鈕/面板/快取機制，只是呼叫的 AI 函式跟顯示文字不同。
   const toneLangActive = isToneLangActive();
@@ -5820,7 +5974,7 @@ const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
   TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
-  INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS
+  INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS];
 
