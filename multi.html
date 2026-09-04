@@ -257,12 +257,10 @@
       <button id="btnGenerateAllTones" class="hidden">🎵 全部生成聲調標記</button>
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
       <button id="btnBackfillRegisterCefr">🏷️ 補齊口語/難易度標籤</button>
-      <button id="btnBackfillReplies" class="hidden">💬 補上常見回覆（埃及）</button>
       <button id="btnJaKanjiBackfill" class="hidden">🈶 幫舊字補上漢字寫法（日文）</button>
       <button id="btnViScriptBackfill" class="hidden">🇻🇳 幫舊字補／修正越南文寫法（帶聲調符號）</button>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
-    <div class="note hidden" id="repliesNote">埃及阿拉伯文專用：掃過勾選的字，判斷哪些是有固定口語對答的客套話（打招呼、道謝、道賀…），有的話把「對方通常會怎麼回」顯示在那個字下面。一般字彙不會有這行。</div>
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
     <div class="toolbar">
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
@@ -580,10 +578,8 @@ function updateLangButtons(){
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", !toneLangActiveTop || currentLang === "vi");
   document.getElementById("btnGenerateAllTones").textContent = "🎵 全部生成聲調標記";
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
-  document.getElementById("btnBackfillReplies").classList.toggle("hidden", currentLang !== "arz");
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
   document.getElementById("btnViScriptBackfill").classList.toggle("hidden", currentLang !== "vi");
-  document.getElementById("repliesNote").classList.toggle("hidden", currentLang !== "arz");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -4009,7 +4005,7 @@ document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
 
 // 埃及阿拉伯文「常見回覆」補資料：判斷每個字要不要有對方回覆，有的話存成
 // data.reply（{romanized, nativeScript, zh, note}），沒有的話存 reply=null，
-// 這樣下次就不會再問一次。btnBackfillReplies 跟「全部生成」共用這個。
+// 這樣下次就不會再問一次。「全部生成」流程會用到這個。
 async function backfillEgyptianReplies(list, btn, labelPrefix){
   const batches = chunkArr(list, 20);
   let done = 0;
@@ -4037,27 +4033,6 @@ async function backfillEgyptianReplies(list, btn, labelPrefix){
   }
   return { done, failCount };
 }
-
-document.getElementById("btnBackfillReplies").onclick = async () => {
-  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
-  const list = allWords.filter(w => selected.has(w.id)).filter(w => {
-    const data = lookup(w.text);
-    return data && data.zh && !("reply" in data);
-  });
-  if(list.length === 0){ alert("勾選的字裡面，沒有「已經有意思、但還沒查過常見回覆」的字（可以先按上面的「全選」再試一次）。"); return; }
-  const btn = document.getElementById("btnBackfillReplies");
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  await acquireWakeLock();
-  try{
-    const { done, failCount } = await backfillEgyptianReplies(list, btn, "查常見回覆中");
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    alert(`完成，掃過 ${done} 個字，有回覆的會顯示在字下面。${failCount > 0 ? `有 ${failCount} 個失敗（可能是網路不穩），可以再按一次，已經處理過的不會重跑。` : ""}`);
-  } finally {
-    releaseWakeLock();
-  }
-};
 
 // ===== 幫舊的日文單字，把 nativeScript 補成「漢字（かな讀音）」的寫法 =====
 // （新生成的字 prompt 已經會這樣寫；這顆按鈕是回頭補舊資料。）
