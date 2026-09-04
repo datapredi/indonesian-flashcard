@@ -194,6 +194,10 @@
         <input type="checkbox" id="useProvidedZh">
         貼上的內容含中文（直接貼中文翻成目前語言；也支援每行「原文 = 中文」）
       </label>
+      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
+        <input type="checkbox" id="numberToWords">
+        數字轉成該語言的說法（例：100 → 該語言「一百」的唸法）
+      </label>
     </div>
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
       <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
@@ -1705,7 +1709,7 @@ async function convertWordsToTargetLang(words, hints){
   };
   const list = words.map((w, i) => `${i + 1}. ${w}${hints && hints[w] ? `　【學生指定中文意思：「${hints[w]}」】` : ""}`).join("\n");
   const hintLine = hints && Object.keys(hints).length
-    ? `\n\n注意：清單裡標了【學生指定中文意思：「…」】的項目，zh 欄位一定要原封不動照學生寫的那串輸出（連（對女生）這種括號註記都要保留），不要改寫、不要自己重新翻譯、不要調整用詞；其他欄位（en、quizEn、correct、distractors）還是照這個指定的意思去做。沒有標的項目照原本規則自己判斷意思。`
+    ? `\n\n注意：清單裡標了【學生指定中文意思：「…」】的項目，zh 欄位一定要原封不動照那串輸出（連（對女生）這種括號註記都要保留），不要改寫、不要自己重新翻譯；其他欄位照這個指定的意思去做。**如果那個「指定意思」是一個數字（例如「100」「1000」「一萬」），romanized 要給${L().label}裡「唸這個數字」的數詞說法（例如 100 給該語言「一百」怎麼唸），nativeScript 給該語言數字的正確書寫，zh 就寫那個數字本身。** 沒有標的項目照原本規則自己判斷意思。`
     : "";
   const scriptLine = hasScript ? `\n- nativeScript：對應的正確${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
   const prompt = `以下是一份單字/片語清單，來源語言不限（可能是中文、印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼；如果某一項本身就是中文，代表學生要把這個中文意思翻成${L().label}）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
@@ -5829,7 +5833,11 @@ async function processConvertImportText(rawText){
     // 寫的中文收進 providedZhBySource，轉換完直接拿它當 zh，不讓 AI 自己翻。
     // 分隔符接受 =、tab、：/:、|、—/–、//；「中文」那半一定要含中文字才算數。
     const useProvidedZh = document.getElementById("useProvidedZh").checked;
+    const numberToWords = document.getElementById("numberToWords").checked;
     const providedZhBySource = {};
+    // 純數字（阿拉伯數字，或中文數字：一二三…十百千萬億）＋逗號分位。勾了「數字轉說法」
+    // 才放行——平常這種行會被 extractConvertSourceLine 濾掉（那個要求有字母/文字腳本）。
+    const numRe = /^[\d０-９,，.\s]+$|^[零〇一二三四五六七八九十百千万萬億兆兩\d,\s]+$/;
     function splitProvidedZh(raw){
       const s = raw.replace(/\r/g, "").replace(/\*\*/g, "").replace(/^\s*\d+[\.\)]\s*/, "").replace(/^[\s\-\*]+/, "").trim();
       const m = s.match(/^(.+?)\s*(?:=+>?|-+>|::?|：|→|\t|\||—|–|\/\/)\s*(.+)$/);
@@ -5845,6 +5853,18 @@ async function processConvertImportText(rawText){
     const indoWords = [];
     const seen = new Set();
     lines.forEach(line => {
+      // 勾了「數字轉說法」：整行是數字的話，直接收進來，並把數字本身當 zh，
+      // 讓 AI 給出這個語言「唸這個數字」的數詞說法。
+      if(numberToWords){
+        const t = line.replace(/\r/g, "").replace(/^\s*\d+[\.\)]\s*/, "").trim();
+        if(t && numRe.test(t)){
+          const num = t.replace(/\s+/g, "");
+          const k = num.toLowerCase();
+          if(!seen.has(k)){ seen.add(k); indoWords.push(num); }
+          providedZhBySource[k] = num;
+          return;
+        }
+      }
       if(useProvidedZh){
         const pair = splitProvidedZh(line);
         if(pair){
@@ -5932,7 +5952,7 @@ async function processConvertImportText(rawText){
       // 跟原本「AI 自動生成翻譯」那個功能的做法一致。
       for(const batch of batches){
         btn.textContent = `轉換中... (${done}/${wordsToConvert.length})`;
-        const batchHints = useProvidedZh
+        const batchHints = (useProvidedZh || numberToWords)
           ? Object.fromEntries(batch.map(w => [w, providedZhBySource[w.toLowerCase()]]).filter(([, v]) => v))
           : null;
         const entries = await convertWordsToTargetLang(batch, batchHints);
