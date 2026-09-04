@@ -255,7 +255,6 @@
       <button id="btnGenerateAll">🚀 全部生成例句＋發音（出發前先跑一輪，離線也能用）</button>
       <button id="btnGenerateAllTones" class="hidden">🎵 全部生成聲調標記</button>
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
-      <button id="btnBackfillRegisterCefr">🏷️ 補齊口語/難易度標籤</button>
       <button id="btnJaKanjiBackfill" class="hidden">🈶 幫舊字補上漢字寫法（日文）</button>
       <button id="btnViScriptBackfill" class="hidden">🇻🇳 幫舊字補／修正越南文寫法（帶聲調符號）</button>
     </div>
@@ -3960,45 +3959,6 @@ document.getElementById("btnGenerateAllNativeTones").onclick = async () => {
   }
 };
 
-document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
-  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
-  const list = allWords.filter(w => selected.has(w.id)).filter(w => {
-    const data = lookup(w.text);
-    return data && data.zh && (!data.register || !data.cefr);
-  });
-  if(list.length === 0){ alert("勾選的字裡面，沒有「已經有意思、但缺口語/難易度標籤」的字（可以先按上面的「全選」再試一次）。"); return; }
-  const btn = document.getElementById("btnBackfillRegisterCefr");
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  await acquireWakeLock();
-  try{
-    const batches = chunkArr(list, 20);
-    let done = 0;
-    let failCount = 0;
-    for(const batch of batches){
-      btn.textContent = `補標籤中... (${done}/${list.length})`;
-      try{
-        const items = batch.map(w => {
-          const d = lookup(w.text);
-          return { text: w.text, nativeScript: d.nativeScript, zh: d.zh };
-        });
-        const entries = await generateRegisterCefrForKnownWords(items);
-        batch.forEach((w, i) => {
-          if(!entries[i]) return;
-          customDB[w.text] = Object.assign({}, lookup(w.text), entries[i]);
-        });
-        saveCustomDB();
-      }catch(e){ failCount += batch.length; }
-      done += batch.length;
-      renderList();
-    }
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 個失敗（可能是網路不穩），可以再按一次補齊，已經成功的不會重跑。` : "全部成功。"}`);
-  } finally {
-    releaseWakeLock();
-  }
-};
 
 // 埃及阿拉伯文「常見回覆」補資料：判斷每個字要不要有對方回覆，有的話存成
 // data.reply（{romanized, nativeScript, zh, note}），沒有的話存 reply=null，
