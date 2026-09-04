@@ -192,7 +192,6 @@
         <input type="checkbox" id="useProvidedZh">
         貼上的內容含中文（直接貼中文翻成目前語言；也支援每行「原文 = 中文」）
       </label>
-      <button id="btnExportWordListTxt">📋 複製目前語言單字（給貼到 Obsidian 或轉到其他語言用）</button>
     </div>
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
       <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
@@ -206,6 +205,13 @@
     <div class="toolbar">
       <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
       <input type="text" id="wordSearch" placeholder="搜尋目前語言、中文或英文..." style="flex:1 1 180px;">
+    </div>
+    <div class="toolbar">
+      <button id="btnListAutoplay">▶️ 依序播放發音（每字 3 次）</button>
+      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
+        <input type="checkbox" id="autoplayIncludeZh">
+        唸完 3 次後加唸一次中文
+      </label>
     </div>
 
     <div class="toolbar">
@@ -264,11 +270,6 @@
       <button id="btnClearCompare">🗑️ 清空比對清單</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnToggleTeacherOnly">🎓 只顯示老師講過</button>
-      <button id="btnListAutoplay">▶️ 依序播放發音（每字 3 次）</button>
-      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
-        <input type="checkbox" id="autoplayIncludeZh">
-        唸完 3 次後加唸一次中文
-      </label>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
@@ -5720,23 +5721,6 @@ document.getElementById("btnExportBackup").addEventListener("click", exportBacku
 // 文字，這樣拿去給另一個語言的「匯入並自動生成資料」用時，AI 才能直接
 // 讀懂原本的字是什麼、準確翻成新語言，不用只靠羅馬拼音自己猜）。直接複製
 // 貼到 Obsidian 或另一個語言的匯入檔案就好，不用另外下載檔案再開檔複製。
-document.getElementById("btnExportWordListTxt").addEventListener("click", async () => {
-  if(allWords.length === 0){ alert("目前語言還沒有任何字可以複製。"); return; }
-  const hasScript = L().hasScript;
-  const lines = allWords.map(w => {
-    if(!hasScript) return w.text;
-    const data = lookup(w.text);
-    return (data && data.nativeScript) || w.text;
-  });
-  const text = lines.join("\n");
-  try{
-    await navigator.clipboard.writeText(text);
-    alert(`已複製 ${lines.length} 個${L().label}單字，直接貼到 Obsidian 或另一個語言的匯入檔案就好。`);
-  }catch(e){
-    prompt("自動複製失敗，請手動全選複製以下內容：", text);
-  }
-});
-
 document.getElementById("btnImportBackupTrigger").addEventListener("click", () => {
   document.getElementById("fileInputBackup").click();
 });
