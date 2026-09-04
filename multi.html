@@ -232,6 +232,7 @@
       <button id="btnClearWordList">🗑️ 清空目前單字表</button>
       <button id="btnDedupByMeaning">🧹 合併真正重複的字（拼法不同但背後同一個字）</button>
       <button id="btnRenumber">🔢 重新編號（讓編號連續）</button>
+      <button id="btnRecoverFromCustomDB">🩹 從翻譯資料救回不見的單字</button>
     </div>
     <div class="list hidden" id="dedupReviewPanel" style="padding:14px;"></div>
     <div class="toolbar">
@@ -5336,6 +5337,26 @@ function showDedupReviewPanel(dupGroups){
   panel.appendChild(actions);
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+// 救援：從翻譯快取（customDB）把不在清單裡的字補回單字表。轉換貼上曾經誤刪了
+// 一批字，但翻譯/例句資料都還在 customDB，靠這個重建清單。
+document.getElementById("btnRecoverFromCustomDB").onclick = () => {
+  const have = new Set(allWords.map(w => w.text.toLowerCase()));
+  let nextId = allWords.length ? Math.max(...allWords.map(w => w.id || 0)) : 0;
+  const toAdd = [];
+  Object.keys(customDB || {}).forEach(t => {
+    if(!t || have.has(t.toLowerCase())) return;
+    const d = customDB[t];
+    if(!d || (typeof d === "object" && Object.keys(d).length === 0)) return;
+    toAdd.push(t);
+  });
+  if(toAdd.length === 0){ alert("沒有找到可以救回的字——清單看起來已經涵蓋所有有翻譯資料的字。"); return; }
+  if(!confirm(`找到 ${toAdd.length} 個「有翻譯資料、但不在單字表裡」的字，要把它們加回單字表嗎？（編號會接在現有最大編號後面，之後可以按「重新編號」整理）`)) return;
+  toAdd.forEach(t => { allWords.push({ id: ++nextId, text: t }); });
+  saveWordList(allWords);
+  renderList();
+  alert(`已救回 ${toAdd.length} 個字，單字表現在有 ${allWords.length} 個。`);
+};
+
 document.getElementById("btnRenumber").onclick = () => {
   if(allWords.length === 0) return;
   const alreadySequential = allWords.every((w, i) => w.id === i + 1);
