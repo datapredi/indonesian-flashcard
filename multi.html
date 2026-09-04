@@ -5922,14 +5922,10 @@ async function processConvertImportText(rawText){
     // 每次真的開始處理一個檔案，就重新開始記錄這次匯入對應到哪些字，
     // 不要跟上一次匯入的結果混在一起。
     newlyImportedIds = new Set();
-    // 如果之前不小心用「一般匯入」把這些印尼文原字直接加進了泰文清單，
-    // 這裡先把那些殘留的印尼文原字清掉，改用轉換後的泰文版本取代，
-    // 避免印尼文原字跟轉換後的泰文版本兩份都留著。
-    const indoWordSet = new Set(indoWords.map(w => w.toLowerCase()));
-    const staleCount = allWords.filter(w => indoWordSet.has(w.text.toLowerCase())).length;
-    if(staleCount > 0){
-      allWords = allWords.filter(w => !indoWordSet.has(w.text.toLowerCase()));
-    }
+    // （曾經在這裡「把跟貼上原文相同的既有字整批刪掉」——當目標語言就是來源語言、
+    // 或逗號分隔炸出很多剛好撞名的碎片時，會誤刪一大批既有單字。已移除：改成完全
+    // 不主動刪字，重複的字由後面每一筆各自判斷「跳過／原地更新」。）
+    const staleCount = 0;
     // 只轉「還沒轉過」或「轉過但對應的字後來不見了（被刪掉/合併掉/當初其實
     // 沒轉成功）」的來源字，已經轉過而且結果還在清單裡的完全不會被動到，
     // 不用整批重轉、也不會因為 AI 拼法飄移產生新的重複。勾了「強制重新轉換」
