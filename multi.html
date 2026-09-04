@@ -1068,6 +1068,8 @@ let showHiddenOnly = false;
 let listAutoplayRunning = false;   // 迴圈正在跑
 let listAutoplayPaused = false;    // 使用者暫停了（浮動控制器留著、可從同一個字繼續）
 let listAutoplayIndex = 0;
+let autoplayJump = 0;   // AirPods／鎖定畫面控制：+1 = 跳下一個字，-1 = 回上一個字（0 = 沒有）
+let autoplayCurrentWord = null;   // 目前依序播放到的字（給媒體鍵 handler 用）
 let autoplayOpenedTonePanel = null;   // 依序播放自動展開的那個聲調面板（換字時收起來）
 
 // 每個單字自己的自由筆記（使用者手打）。跟 customDB 一樣用 w.text 當 key，換
@@ -5480,6 +5482,7 @@ function renderAutoplayControls(){
     document.getElementById("autoplayFloatStatus").textContent =
       `${Math.min(listAutoplayIndex + 1, total)} / ${total}${listAutoplayPaused ? "（已暫停）" : ""}`;
     document.getElementById("autoplayFloatToggle").textContent = listAutoplayRunning ? "⏸️" : "▶️";
+    float.title = "AirPods／耳機：單按=暫停·繼續；雙按=標這個字待複習＋跳下一個；三按=回上一個（限 GPT 語音）";
   }
 }
 // 完整停止（離開畫面、按 ✕）：重設進度、收起浮動控制器。
@@ -5488,20 +5491,71 @@ function stopListAutoplay(){
   listAutoplayRunning = false;
   listAutoplayPaused = false;
   listAutoplayIndex = 0;
+  autoplayJump = 0;
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
   clearAutoplayHighlight();
+  clearAutoplayMediaSession();
   if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
   autoplayOpenedTonePanel = null;
   renderAutoplayControls();
+}
+
+// ===== AirPods / 鎖定畫面 / 控制中心：依序播放時可以用媒體鍵控制 =====
+// 單按＝暫停/繼續；雙按(下一首)＝把目前這個字標成 ⚠️ 待複習 並跳下一個；三按(上一首)＝回上一個。
+// 只在 GPT 語音（有真的在播 <audio>）時才會有系統媒體控制；電腦內建語音沒有。
+function setupAutoplayMediaSession(w, total){
+  if(!("mediaSession" in navigator)) return;
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: w.text,
+      artist: (lookup(w.text) || {}).zh || "",
+      album: `依序播放　${listAutoplayIndex + 1} / ${total}`
+    });
+    navigator.mediaSession.setActionHandler("play", () => { if(!listAutoplayRunning) runListAutoplay(); });
+    navigator.mediaSession.setActionHandler("pause", () => { if(listAutoplayRunning) pauseListAutoplay(); });
+    navigator.mediaSession.setActionHandler("nexttrack", () => autoplayMarkAndNext());
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      autoplayJump = -1;
+      abortCurrentPlayback();
+      if('speechSynthesis' in window) speechSynthesis.cancel();
+    });
+    navigator.mediaSession.playbackState = "playing";
+  }catch(e){ /* 某些瀏覽器不支援部分 action，忽略 */ }
+}
+function clearAutoplayMediaSession(){
+  if(!("mediaSession" in navigator)) return;
+  try{
+    ["play", "pause", "nexttrack", "previoustrack"].forEach(a => navigator.mediaSession.setActionHandler(a, null));
+    navigator.mediaSession.playbackState = "none";
+  }catch(e){}
+}
+function autoplayMarkAndNext(){
+  const w = autoplayCurrentWord;
+  if(w && !pronFlagIds.has(w.id)){
+    pronFlagIds.add(w.id);
+    savePronFlag();
+    if(typeof updatePronFlagToggleLabel === "function") updatePronFlagToggleLabel();
+    const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
+    if(rowEl){
+      rowEl.classList.add("jump-highlight");
+      setTimeout(() => rowEl.classList.remove("jump-highlight"), 1600);
+      if(typeof renderList === "function"){ /* 列表下次重繪時 ⚠️ 標記就會顯示 */ }
+    }
+  }
+  autoplayJump = 1;
+  abortCurrentPlayback();
+  if('speechSynthesis' in window) speechSynthesis.cancel();
 }
 // 暫停：停在目前這個字，浮動控制器跟 highlight 都留著，之後從同一個字繼續。
 function pauseListAutoplay(){
   if(!listAutoplayRunning) return;
   listAutoplayRunning = false;
   listAutoplayPaused = true;
+  autoplayJump = 0;
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
+  if("mediaSession" in navigator){ try{ navigator.mediaSession.playbackState = "paused"; }catch(e){} }
   renderAutoplayControls();
 }
 // 依序播放時「加唸一次中文」用：走跟聽力模式一樣的路，GPT 語音用 gpt-4o-mini-tts，
@@ -5526,8 +5580,10 @@ async function runListAutoplay(){
   listAutoplayRunning = true;
   listAutoplayPaused = false;
   renderAutoplayControls();
-  for(; listAutoplayIndex < words.length && listAutoplayRunning; listAutoplayIndex++){
+  autoplayJump = 0;
+  while(listAutoplayRunning && listAutoplayIndex < words.length){
     const w = words[listAutoplayIndex];
+    autoplayCurrentWord = w;
     const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
     const btn = rowEl ? rowEl.querySelector(".row-speak") : null;
     if(rowEl){
@@ -5551,28 +5607,35 @@ async function runListAutoplay(){
       }
     }
     renderAutoplayControls();
+    setupAutoplayMediaSession(w, words.length);
     const text = getSpeechText(w);
     const recKey = useRecordingIds.has(w.id) ? recKeyFor(w.text) : null;
-    for(let r = 0; r < 3 && listAutoplayRunning; r++){
+    for(let r = 0; r < 3 && listAutoplayRunning && !autoplayJump; r++){
       try{ await speak(text, btn, null, recKey); }catch(e){ /* 播不出來就跳過這次，繼續 */ }
-      if(!listAutoplayRunning) break;
+      if(!listAutoplayRunning || autoplayJump) break;
       if(r < 2) await delayMs(350);
     }
     if(!listAutoplayRunning) break;
     // 勾了「加唸中文」：3 次外語之後停一下、唸一次中文意思。
-    if(document.getElementById("autoplayIncludeZh").checked){
+    if(!autoplayJump && document.getElementById("autoplayIncludeZh").checked){
       const zh = (lookup(w.text) || {}).zh;
       if(zh){
         await delayMs(300);
         if(!listAutoplayRunning) break;
-        await speakZhForAutoplay(zh);
+        if(!autoplayJump) await speakZhForAutoplay(zh);
         if(!listAutoplayRunning) break;
       }
     }
-    await delayMs(550);
+    if(!autoplayJump) await delayMs(550);
+    // 決定下一個字：AirPods 三按(previoustrack)＝回上一個，其餘＝下一個
+    if(autoplayJump === -1) listAutoplayIndex = Math.max(0, listAutoplayIndex - 1);
+    else listAutoplayIndex++;
+    autoplayJump = 0;
   }
+  autoplayCurrentWord = null;
   if(listAutoplayPaused) return;   // 被暫停：保留 index / highlight / 浮動控制器 / 聲調面板
   clearAutoplayHighlight();        // 正常播完一輪
+  clearAutoplayMediaSession();
   if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
   autoplayOpenedTonePanel = null;
   listAutoplayIndex = 0;
