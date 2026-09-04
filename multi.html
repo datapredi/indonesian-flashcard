@@ -240,8 +240,8 @@
       <input type="file" id="fileInputBackup" accept=".json">
     </div>
     <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。不含 API Key（安全考量，換裝置要自己重新輸入）、不含你自己的錄音（IndexedDB 音檔太大，錄音本來就是重錄就好）。還原會直接覆蓋目前資料，請小心操作。</div>
-    <div class="toolbar hidden" id="pendingSyncBar">
-      <button id="btnCopyPending">📋 複製句子新增、還沒同步進 Obsidian 的單字</button>
+    <div class="toolbar" id="pendingSyncBar">
+      <button id="btnCopyPending">📋 複製所有單字</button>
     </div>
     <div class="toolbar">
       <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
@@ -5081,23 +5081,21 @@ function createWordItem(w){
 }
 
 function updatePendingSyncBar(){
-  const pending = allWords.filter(w => w.source === "sentence");
-  const bar = document.getElementById("pendingSyncBar");
   const btn = document.getElementById("btnCopyPending");
-  if(pending.length === 0){
-    bar.classList.add("hidden");
-    return;
-  }
-  bar.classList.remove("hidden");
-  btn.textContent = `📋 複製句子新增、還沒同步進 Obsidian 的單字 (${pending.length})`;
+  if(btn) btn.textContent = `📋 複製所有單字 (${allWords.length})`;
 }
 
 document.getElementById("btnCopyPending").addEventListener("click", async () => {
-  const text = allWords.filter(w => w.source === "sentence").map(w => w.text).join("\n");
-  if(!text){ return; }
+  if(allWords.length === 0){ alert("目前語言還沒有任何字可以複製。"); return; }
+  const hasScript = L().hasScript;
+  const text = allWords.map(w => {
+    if(!hasScript) return w.text;
+    const data = lookup(w.text);
+    return (data && data.nativeScript) || w.text;
+  }).join("\n");
   try{
     await navigator.clipboard.writeText(text);
-    alert(`已複製 ${text.split("\n").length} 個單字，貼到 Obsidian 就好。`);
+    alert(`已複製 ${allWords.length} 個${L().label}單字。`);
   }catch(e){
     prompt("自動複製失敗，請手動全選複製以下內容：", text);
   }
