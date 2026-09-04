@@ -4359,10 +4359,7 @@ function regCefrTagHtml(data){
 }
 // 從其他語言轉換過來、拼法跟原文一模一樣的字（常見於印尼文/馬來文這種近親
 // 語言），標起來讓使用者一眼看出這個不用特別背，兩種語言長得一樣。
-function sameAsSourceTagHtml(data){
-  if(!data || !data.sameAsSource) return "";
-  return ` <span class="reg-cefr-tag" title="從其他語言轉換過來時，拼法跟原文一模一樣">🟰 跟原文相同</span>`;
-}
+function sameAsSourceTagHtml(){ return ""; }  // 「🟰 跟原文相同」標記已停用（對馬來文不保證、參考價值低）
 
 function createWordItem(w){
   const data = lookup(w.text);
@@ -4379,7 +4376,7 @@ function createWordItem(w){
       <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
       ${currentLang === "vi" && data && data.nativeScript ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${data.nativeScript}</div>` : ""}
-      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data) + sameAsSourceTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
       ${currentLang === "arz" && data && data.reply ? `<div class="reply-line" title="${(data.reply.note || "").replace(/"/g, "&quot;")}">↩︎ 對方回：<bdi dir="rtl" class="native-ar">${data.reply.nativeScript || ""}</bdi> ${data.reply.romanized || ""}${data.reply.zh ? " · " + data.reply.zh : ""}</div>` : ""}
     </div>
   `;
@@ -6054,7 +6051,7 @@ async function processConvertImportText(rawText){
           // 語言（貼上的文字本來就沒有語言標籤），只知道現在轉換的目標語言，
           // 所以只在目標語言是印尼文/馬來文時才判斷，避免英文等其他語言的字剛好
           // 拼法相同（專有名詞、外來語）也被誤標成「近親語言不用背」。
-          const sameAsSource = (currentLang === "id" || currentLang === "ms") && text.toLowerCase() === sourceKey;
+          const sameAsSource = false;   // 「跟原文相同」標記已停用
           // 不管這個字是新加的還是本來就存在（同字重複），都記住這個原字對應
           // 到哪個結果字，下次匯入才有辦法確認「這個結果字是不是還在」。
           convertedMap[sourceKey] = text;
