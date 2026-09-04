@@ -76,6 +76,8 @@
   .usage-word:hover{background:var(--bg);}
   .usage-word.in-list{color:var(--accent2); text-decoration:underline; text-decoration-style:dotted;}
   .usage-word.phrase-selected{background:var(--accent); color:#fff;}
+  .align-hl{background:var(--accent); color:#fff; border-radius:3px; padding:0 2px;}
+  .usage-zh span{border-radius:3px;}
   .item.jump-highlight{animation:jumpFlash 1.6s ease-out;}
   @keyframes jumpFlash{ 0%{background:rgba(255,196,0,0.55);} 100%{background:transparent;} }
   .jump-back-btn{position:fixed; right:16px; bottom:16px; z-index:50; border-radius:999px; padding:10px 16px; box-shadow:0 2px 10px rgba(0,0,0,0.25);}
@@ -1725,7 +1727,7 @@ ${list}`;
   return parsed.entries;
 }
 
-async function callClaude(prompt, schema, maxTokens){
+async function callClaude(prompt, schema, maxTokens, model){
   const key = getApiKey();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -1736,7 +1738,7 @@ async function callClaude(prompt, schema, maxTokens){
       "anthropic-dangerous-direct-browser-access": "true"
     },
     body: JSON.stringify({
-      model: "claude-opus-4-8",
+      model: model || "claude-opus-4-8",
       max_tokens: maxTokens,
       output_config: { format: { type: "json_schema", schema } },
       messages: [{ role: "user", content: prompt }]
@@ -1858,6 +1860,53 @@ async function getGrammarBreakdown(sentenceNative){
   grammarBreakdownCache[sentenceNative] = parsed.breakdown;
   saveGrammarBreakdownCache();
   return parsed.breakdown;
+}
+
+// 例句字詞 ←→ 中文對齊：把整句的字（照順序）對到中文翻譯的哪一段。用 Haiku（便宜、
+// 對齊是簡單任務）。快取 key＝「例句原文||中文」。
+const ALIGN_CACHE_LS = "flashcard_align_cache_v1";
+let alignCache = {};
+try{ alignCache = JSON.parse(localStorage.getItem(lsKey(ALIGN_CACHE_LS))) || {}; }catch(e){ alignCache = {}; }
+function saveAlignCache(){ localStorage.setItem(lsKey(ALIGN_CACHE_LS), JSON.stringify(alignCache)); }
+async function getSentenceAlignment(sentence, zh, words){
+  const key = sentence + "||" + zh;
+  if(alignCache[key]) return alignCache[key];
+  const schema = {
+    type: "object",
+    properties: {
+      zhSegs: { type: "array", items: { type: "string" } },
+      links: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            w: { type: "integer" },
+            segs: { type: "array", items: { type: "integer" } }
+          },
+          required: ["w", "segs"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["zhSegs", "links"],
+    additionalProperties: false
+  };
+  const numbered = words.map((w, i) => `${i}=${w}`).join("  ");
+  const prompt = `這是一句${L().label}例句和它的中文翻譯，請做「字詞對齊」。
+
+例句（已照順序把可點的字編號）：${numbered}
+中文翻譯：${zh}
+
+輸出：
+- zhSegs：把「中文翻譯」照順序切成小段（詞或字），每一段是一個可以獨立對應的單位；把 zhSegs 全部接起來要等於原本的中文翻譯（含標點）。段數不要太細也不要太粗，一個中文詞一段。
+- links：每一個例句字（用上面的編號 w）對應到 zhSegs 的哪幾段（segs 填 zhSegs 的索引，從 0 開始）。
+  - 一個字可以對到 0 段（例如純語法功能詞、時態詞、語助詞，就給空陣列）
+  - 一個字可以對到多段；多個字也可以對到同一段
+  - 照「意思對應」來連，不是照位置`;
+  const parsed = await callClaude(prompt, schema, 1024, "claude-haiku-4-5-20251001");
+  alignCache[key] = parsed;
+  saveAlignCache();
+  return parsed;
 }
 
 async function getUsageExamples(text, zh, force){
@@ -3354,7 +3403,8 @@ function renderUsagePanel(panel, examples, onRegenerate){
 
     const idLine = document.createElement("div");
     idLine.className = "usage-id";
-    idLine.appendChild(renderTappableSentence(ex.id, ex.nativeScript));
+    const sentEl = renderTappableSentence(ex.id, ex.nativeScript);
+    idLine.appendChild(sentEl);
     const speakBtn = document.createElement("button");
     speakBtn.type = "button";
     speakBtn.className = "speak-btn";
@@ -3431,6 +3481,90 @@ function renderUsagePanel(panel, examples, onRegenerate){
     const zhLine = document.createElement("div");
     zhLine.className = "usage-zh";
     zhLine.textContent = ex.zh;
+
+    // 🔗中：字詞←→中文對齊。按一下進入對齊模式：點例句裡的字，中文對應的段落變色
+    // （反過來點中文也會標出對應的字）。用 Haiku 做，結果快取，同一句只問一次。
+    const alignBtn = document.createElement("button");
+    alignBtn.type = "button";
+    alignBtn.className = "speak-btn";
+    alignBtn.textContent = "🔗中";
+    alignBtn.title = "字詞對齊：點例句的字，看它對到中文的哪一段";
+    let alignOn = false, alignData = null, alignCapture = null, activeIdx = null;
+    function clearHl(){
+      sentEl.querySelectorAll(".usage-word.align-hl").forEach(el => el.classList.remove("align-hl"));
+      zhLine.querySelectorAll(".align-hl").forEach(el => el.classList.remove("align-hl"));
+      activeIdx = null;
+    }
+    function highlightWord(i){
+      clearHl();
+      if(i == null) return;
+      activeIdx = i;
+      const wEls = sentEl.querySelectorAll(".usage-word");
+      if(wEls[i]) wEls[i].classList.add("align-hl");
+      const link = (alignData.links || []).find(l => l.w === i);
+      if(link) (link.segs || []).forEach(si => {
+        const s = zhLine.querySelector(`[data-seg="${si}"]`);
+        if(s) s.classList.add("align-hl");
+      });
+    }
+    function highlightSeg(si){
+      clearHl();
+      const s = zhLine.querySelector(`[data-seg="${si}"]`);
+      if(s) s.classList.add("align-hl");
+      const wEls = sentEl.querySelectorAll(".usage-word");
+      (alignData.links || []).forEach(l => {
+        if((l.segs || []).includes(si) && wEls[l.w]) wEls[l.w].classList.add("align-hl");
+      });
+    }
+    function buildZhSpans(){
+      zhLine.innerHTML = "";
+      (alignData.zhSegs || []).forEach((seg, si) => {
+        const sp = document.createElement("span");
+        sp.textContent = seg;
+        sp.dataset.seg = si;
+        sp.style.cursor = "pointer";
+        sp.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); highlightSeg(si); });
+        zhLine.appendChild(sp);
+      });
+    }
+    async function enterAlign(){
+      if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+      const words = [...sentEl.querySelectorAll(".usage-word")].map(el => (el.textContent.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "") || el.textContent).trim());
+      if(!alignData){
+        alignBtn.textContent = "對齊中…"; alignBtn.disabled = true;
+        try{ alignData = await getSentenceAlignment(ex.id, ex.zh, words); }
+        catch(err){ alignBtn.disabled = false; alignBtn.textContent = "🔗中"; alert("對齊失敗：" + err.message); return; }
+        alignBtn.disabled = false;
+      }
+      alignOn = true;
+      alignBtn.textContent = "🔗中✓";
+      alignBtn.classList.add("primary");
+      buildZhSpans();
+      // 對齊模式下，攔截例句字的點擊：不加入單字表，改成highlight對應中文
+      alignCapture = (e) => {
+        const w = e.target.closest(".usage-word");
+        if(!w) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        const wEls = [...sentEl.querySelectorAll(".usage-word")];
+        const i = wEls.indexOf(w);
+        highlightWord(activeIdx === i ? null : i);
+      };
+      sentEl.addEventListener("click", alignCapture, true);
+    }
+    function exitAlign(){
+      alignOn = false;
+      alignBtn.textContent = "🔗中";
+      alignBtn.classList.remove("primary");
+      if(alignCapture){ sentEl.removeEventListener("click", alignCapture, true); alignCapture = null; }
+      clearHl();
+      zhLine.innerHTML = "";
+      zhLine.textContent = ex.zh;
+    }
+    alignBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(alignOn) exitAlign(); else enterAlign();
+    });
+    idLine.appendChild(alignBtn);
 
     const noteLine = document.createElement("div");
     noteLine.className = "usage-note";
@@ -5620,7 +5754,7 @@ const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
   TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
-  INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS
+  INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS];
 
