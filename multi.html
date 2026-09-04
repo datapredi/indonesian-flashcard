@@ -5847,7 +5847,18 @@ async function processConvertImportText(rawText){
       return { src: srcClean, zh: zhPart };
     }
 
-    const lines = rawText.split(/\r?\n/);
+    // 除了換行，也用逗號分隔。例外：數字分位的逗號（1,000）不切；有「原文 = 中文」
+    // 分隔符的行不切（中文那半可能有逗號）。全形頓號／逗號一律當分隔。
+    const lines = [];
+    rawText.split(/\r?\n/).forEach(ln => {
+      if(/[=＝]|::|：|→|｜|\||—|–|\/\//.test(ln)){ lines.push(ln); return; }
+      const parts = ln
+        .replace(/(\d),(\d)/g, "$1\uE000$2")   // 保護 1,000 這種數字分位逗號（緊貼、沒空格）
+        .split(/\s*[,，、]\s*/)
+        .map(s => s.replace(/\uE000/g, ","))
+        .filter(s => s.trim() !== "");
+      if(parts.length > 1) lines.push(...parts); else lines.push(ln);
+    });
     const indoWords = [];
     const seen = new Set();
     lines.forEach(line => {
