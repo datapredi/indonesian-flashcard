@@ -197,7 +197,6 @@
       <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
       <button id="btnImportConvertPaste">📥 轉換貼上的文字</button>
     </div>
-    <div class="note hidden" id="convertNote"></div>
     <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
     <div class="toolbar">
       <button id="btnJumpToActions2">⬇ 跳到最下面（開始 Flash Card／測驗／跑步模式）</button>
@@ -560,12 +559,10 @@ function updateLangButtons(){
   // 不是只有其他語言才需要，所以每種語言都顯示。
   document.getElementById("convertBar").classList.remove("hidden");
   document.getElementById("convertPasteBar").classList.remove("hidden");
-  document.getElementById("convertNote").classList.remove("hidden");
   // 全部語言統一只用「匯入並自動生成資料」——其他語言本來就沒有「跟著來源
   // 刪除」這個能力也一樣用得好好的，代表這不是必要功能，印尼文沒必要特例。
   document.getElementById("btnImport").classList.add("hidden");
   document.getElementById("btnImportConvertTh").textContent = `📥 匯入並自動生成${L().label}資料（新增不覆蓋）`;
-  document.getElementById("convertNote").textContent = `不管你匯入的檔案原本是${L().label}羅馬拼音、${L().label}原生文字、還是其他語言，都會用 AI 判斷意思，補上羅馬拼音＋中英文意思＋發音用的原生文字，加進目前的${L().label}單字表，已存在的字會自動跳過，不會重複加入、也不會覆蓋掉原本的清單。`;
   document.getElementById("viDialectBar").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("thaiAlphabetBar").classList.toggle("hidden", currentLang !== "th");
   if(currentLang !== "th") document.getElementById("thaiAlphabetPanel").classList.add("hidden");
