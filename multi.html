@@ -2281,6 +2281,56 @@ function attachLetterNote(cardEl, key){
   cardEl.appendChild(btn);
   cardEl.appendChild(panel);
 }
+
+// 字母卡片可以錄自己的發音（例如錄老師唸的），跟單字表的錄音用同一套
+// IndexedDB／recKeyFor（key 是 "目前語言::字母"）。錄好之後 ▶️ 就會出現，
+// 可以直接聽，不影響旁邊 🔊（那顆還是唸系統內建語音）。
+function attachLetterRecording(cardEl, letter){
+  const recBtn = document.createElement("button");
+  recBtn.type = "button";
+  recBtn.className = "speak-btn";
+  recBtn.textContent = "🎙️";
+  recBtn.title = "錄下真人唸這個字的發音（例如老師的聲音，最長 8 秒）";
+  recBtn.style.cssText = "padding:2px 6px; font-size:0.72rem; margin-top:4px;";
+  const playBtn = document.createElement("button");
+  playBtn.type = "button";
+  playBtn.className = "speak-btn";
+  playBtn.textContent = "▶️";
+  playBtn.title = "播放錄音";
+  playBtn.style.cssText = "padding:2px 6px; font-size:0.72rem; margin-top:4px; display:none;";
+  playBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const rec = await getUserRecording(recKeyFor(letter));
+    if(!rec) return;
+    const url = URL.createObjectURL(rec);
+    const audioEl = document.getElementById("listenAudio");
+    audioEl.src = url;
+    audioEl.play().catch(() => {});
+    audioEl.onended = () => URL.revokeObjectURL(url);
+  });
+  async function refreshPlayBtn(){
+    const rec = await getUserRecording(recKeyFor(letter));
+    playBtn.style.display = rec ? "" : "none";
+  }
+  refreshPlayBtn();
+  recBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(recBtn.classList.contains("recording")){ stopRecording(); return; }
+    recBtn.classList.add("recording");
+    recBtn.textContent = "⏹️";
+    startRecording(letter, () => {
+      recBtn.classList.remove("recording");
+      recBtn.textContent = "🎙️";
+      refreshPlayBtn();
+    }, (err) => {
+      recBtn.classList.remove("recording");
+      recBtn.textContent = "🎙️";
+      alert("錄音失敗：" + (err && err.message ? err.message : err));
+    });
+  });
+  cardEl.appendChild(recBtn);
+  cardEl.appendChild(playBtn);
+}
 function renderThaiAlphabetPanel(){
   const panel = document.getElementById("thaiAlphabetPanel");
   panel.innerHTML = "";
@@ -2576,6 +2626,7 @@ function renderViAlphabetPanel(){
     }
     // 只顯示不帶聲調的基本形（就是字母本身＝ngang/M 平聲）；其他 4 個聲調變體不列。
     attachLetterNote(item, "vi:" + v.letter);
+    attachLetterRecording(item, v.letter);
     vowelGrid.appendChild(item);
   });
   panel.appendChild(vowelGrid);
@@ -2614,6 +2665,7 @@ function renderViAlphabetPanel(){
       item.appendChild(art);
     }
     attachLetterNote(item, "vi:" + v.form);
+    attachLetterRecording(item, v.form.split("/")[0].trim());
     diphGrid.appendChild(item);
   });
 
@@ -2641,6 +2693,7 @@ function renderViAlphabetPanel(){
         item.appendChild(a);
       }
       attachLetterNote(item, "vi:" + letter);
+      attachLetterRecording(item, letter.split("/")[0].trim());
       g.appendChild(item);
     });
     panel.appendChild(g);
