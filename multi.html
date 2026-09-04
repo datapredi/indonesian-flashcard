@@ -4544,6 +4544,8 @@ function createWordItem(w){
   forvoBtn.textContent = "🔎";
   forvoBtn.title = currentLang === "arz"
     ? "在 Forvo 查真人發音（開新分頁，已鎖定阿拉伯語；埃及口音要自己挑 🇪🇬 錄音者）"
+    : currentLang === "vi"
+    ? "在 Forvo 聽越南真人發音（開新分頁，已鎖定越南語；南部發音要挑 🇻🇳 標南部/西貢的錄音者）"
     : "在 Forvo 查真人發音（開新分頁）";
   forvoBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -4554,9 +4556,8 @@ function createWordItem(w){
     // Forvo 沒有「埃及口語」這個獨立語言（埃及只是 Arabic 底下的口音標籤），URL 沒辦法
     // 直接篩到埃及；能做到的是把搜尋鎖在 Arabic（/ar/），少一層「先選語言」的步驟，
     // 剩下埃及口音還是得看國旗自己挑。其他語言維持原本的全站搜尋。
-    const url = currentLang === "arz"
-      ? `https://forvo.com/search/${encodeURIComponent(query)}/ar/`
-      : `https://forvo.com/search/${encodeURIComponent(query)}/`;
+    const langScope = currentLang === "arz" ? "/ar/" : currentLang === "vi" ? "/vi/" : "/";
+    const url = `https://forvo.com/search/${encodeURIComponent(query)}${langScope}`;
     // "_blank" 在同一個網站（forvo.com）重複開會被某些瀏覽器直接重用上一個分頁，
     // 每次給一個獨一無二的分頁名稱，強制一定開新的分頁，不會被跳去共用舊的。
     window.open(url, `forvo_${Date.now()}`, "noopener");
