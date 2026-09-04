@@ -4959,7 +4959,7 @@ function createWordItem(w){
 
   const pronFlagBtn = document.createElement("button");
   pronFlagBtn.type = "button";
-  pronFlagBtn.className = "diff-chip";
+  pronFlagBtn.className = "diff-chip row-pron-btn";
   function refreshPronFlagBtn(){
     const flagged = pronFlagIds.has(w.id);
     pronFlagBtn.classList.toggle("diff-H", flagged);
@@ -5499,6 +5499,7 @@ function stopListAutoplay(){
   if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
   autoplayOpenedTonePanel = null;
   renderAutoplayControls();
+  renderList();   // 把這次用 AirPods 標的 ⚠️ 待複習刷出來
 }
 
 // ===== AirPods / 鎖定畫面 / 控制中心：依序播放時可以用媒體鍵控制 =====
@@ -5540,7 +5541,9 @@ function autoplayMarkAndNext(){
     if(rowEl){
       rowEl.classList.add("jump-highlight");
       setTimeout(() => rowEl.classList.remove("jump-highlight"), 1600);
-      if(typeof renderList === "function"){ /* 列表下次重繪時 ⚠️ 標記就會顯示 */ }
+      // 立刻把這一列的 ⚠️ 標記顯示出來，不用等整個列表重繪
+      const pfBtn = rowEl.querySelector(".row-pron-btn");
+      if(pfBtn){ pfBtn.classList.add("diff-H"); pfBtn.style.opacity = "1"; }
     }
   }
   autoplayJump = 1;
@@ -5633,9 +5636,10 @@ async function runListAutoplay(){
     autoplayJump = 0;
   }
   autoplayCurrentWord = null;
-  if(listAutoplayPaused) return;   // 被暫停：保留 index / highlight / 浮動控制器 / 聲調面板
+  if(listAutoplayPaused){ renderList(); return; }   // 被暫停：保留 index/highlight，但把這次標的 ⚠️ 刷出來
   clearAutoplayHighlight();        // 正常播完一輪
   clearAutoplayMediaSession();
+  renderList();                    // 把這輪用 AirPods 標的 ⚠️ 待複習全部刷新顯示
   if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
   autoplayOpenedTonePanel = null;
   listAutoplayIndex = 0;
