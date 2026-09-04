@@ -2471,9 +2471,29 @@ const VI_VOWELS = [
   { letter: "i", sound: "像ㄧ（跟 y 同音，用哪個看字源）；最好發，擺最後", art: "嘴巴幾乎閉、最扁（嘴角往兩邊、嘴扁）。舌往前抬到最高", example: "đi", tones: { M: "i", F: "ì", R: "í", L: "ỉ/ĩ", S: "ị" } }
 ];
 const VI_DIPHTHONGS = [
-  { form: "ia / iê / yê", sound: "像ㄧㄝ滑過去", art: "從 i（嘴巴幾乎閉、最扁）滑向 ơ/â（嘴巴變中高、放鬆）", example: "chia" },
-  { form: "ua / uô", sound: "像ㄨㄛ滑過去", art: "從 u（嘴巴幾乎閉、圓唇）滑向 ơ/â（嘴巴變中高、放鬆）", example: "mua" },
-  { form: "ưa / ươ", sound: "像ㄜ滑到ㄚ（前段是 ư 的不圓唇音）", art: "從 ư（嘴巴幾乎閉、變扁、不圓）滑向 ơ（嘴巴變中高、放鬆）", example: "chưa" }
+  // 央元音組（短/長兩種拼法，開音節用長的、有韻尾子音用短的）
+  { group: "央元音組（開音節 iê/uô/ươ，接韻尾子音時用短的 ia/ua/ưa）", form: "ia / iê / yê", sound: "像ㄧㄝ滑過去", art: "從 i（嘴巴幾乎閉、最扁）滑向 ơ/â（嘴巴變中高、放鬆）", example: "chia" },
+  { group: "央元音組（開音節 iê/uô/ươ，接韻尾子音時用短的 ia/ua/ưa）", form: "ua / uô", sound: "像ㄨㄛ滑過去", art: "從 u（嘴巴幾乎閉、圓唇）滑向 ơ/â（嘴巴變中高、放鬆）", example: "mua" },
+  { group: "央元音組（開音節 iê/uô/ươ，接韻尾子音時用短的 ia/ua/ưa）", form: "ưa / ươ", sound: "像ㄜ滑到ㄚ（前段是 ư 的不圓唇音）", art: "從 ư（嘴巴幾乎閉、變扁、不圓）滑向 ơ（嘴巴變中高、放鬆）", example: "chưa" },
+  // 收尾 i/y（滑向嘴巴幾乎閉、扁的 i）
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ai", sound: "像ㄞ", art: "從 a（嘴巴變到最高）滑向 i（幾乎閉、最扁）", example: "mai" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ay", sound: "像ㄞ（比 ai 短促）", art: "跟 ai 類似，但起點更短促", example: "tay" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ây", sound: "像ㄟ", art: "從 â（嘴巴中高、放鬆）滑向 i（幾乎閉、最扁）", example: "đây" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "oi", sound: "像ㄛㄧ滑過去", art: "從 o（嘴巴偏高、圓唇）滑向 i（幾乎閉、扁）", example: "nói" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ôi", sound: "像ㄡㄧ滑過去", art: "從 ô（嘴巴不高、很圓）滑向 i（幾乎閉、扁）", example: "tôi" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ơi", sound: "像ㄜㄧ滑過去", art: "從 ơ（嘴巴中高、放鬆）滑向 i（幾乎閉、扁）", example: "mời" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ui", sound: "像ㄨㄧ滑過去", art: "從 u（幾乎閉、圓）滑向 i（幾乎閉、扁）", example: "vui" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ưi", sound: "像不圓唇的ㄨㄧ滑過去", art: "從 ư（幾乎閉、扁、不圓）滑向 i（幾乎閉、扁）", example: "gửi" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "uôi", sound: "像ㄨㄛㄧ滑過去", art: "從 uô（幾乎閉滑到中高、圓）再滑向 i（幾乎閉、扁）", example: "muối" },
+  { group: "收尾 i／y（滑向「嘴巴幾乎閉、扁」的 i）", form: "ươi", sound: "像不圓唇ㄨㄜㄧ滑過去", art: "從 ươ（幾乎閉滑到中高、不圓）再滑向 i（幾乎閉、扁）", example: "cười" },
+  // 收尾 u/o（滑向嘴巴幾乎閉、圓唇的 u）
+  { group: "收尾 u／o（滑向「嘴巴幾乎閉、圓唇」的 u）", form: "ao", sound: "像ㄠ", art: "從 a（嘴巴變到最高）滑向 u/o（幾乎閉、圓唇）", example: "cao" },
+  { group: "收尾 u／o（滑向「嘴巴幾乎閉、圓唇」的 u）", form: "au", sound: "像ㄠ（比 ao 短促）", art: "跟 ao 類似，但起點更短促", example: "sau" },
+  { group: "收尾 u／o（滑向「嘴巴幾乎閉、圓唇」的 u）", form: "âu", sound: "像ㄡ", art: "從 â（嘴巴中高、放鬆）滑向 u（幾乎閉、圓唇）——đâu 的 âu 就是這個", example: "đâu" },
+  { group: "收尾 u／o（滑向「嘴巴幾乎閉、圓唇」的 u）", form: "eo", sound: "像ㄝㄛ滑過去", art: "從 e（偏高、偏扁）滑向 o（偏高、圓）", example: "kéo" },
+  { group: "收尾 u／o（滑向「嘴巴幾乎閉、圓唇」的 u）", form: "êu", sound: "像ㄟㄡ滑過去", art: "從 ê（中高、略扁）滑向 u（幾乎閉、圓唇）", example: "kêu" },
+  { group: "收尾 u／o（滑向「嘴巴幾乎閉、圓唇」的 u）", form: "iu", sound: "像ㄧㄡ滑過去", art: "從 i（幾乎閉、最扁）滑向 u（幾乎閉、圓唇）", example: "chịu" },
+  { group: "收尾 u／o（滑向「嘴巴幾乎閉、圓唇」的 u）", form: "ưu", sound: "像不圓唇的ㄨ滑向ㄡ", art: "從 ư（幾乎閉、扁、不圓）滑向 u（幾乎閉、圓唇）", example: "lưu" }
 ];
 const VI_CONSONANTS_SINGLE = [
   ["b","像ㄅ，不送氣","雙唇緊閉再放開，不噴氣（濁音）"], ["c / k / q","像ㄍ，不送氣（三個字母同音，看後面的母音決定用哪個）","舌根往後頂住軟顎再放開，不噴氣"], ["d","南部念像 y（ㄧ- 起音）","南部：舌面靠近硬顎但不閉緊，像半母音 y"], ["đ","像ㄉ","舌尖頂上排牙齒後方的牙齦再放開，不噴氣（濁音）"],
@@ -2560,14 +2580,25 @@ function renderViAlphabetPanel(){
   });
   panel.appendChild(vowelGrid);
 
-  const diphHeader = document.createElement("div");
-  diphHeader.style.fontWeight = "600";
-  diphHeader.textContent = "常見複合母音（滑音）";
-  panel.appendChild(diphHeader);
+  const diphTopHeader = document.createElement("div");
+  diphTopHeader.style.fontWeight = "600";
+  diphTopHeader.textContent = "常見複合母音（滑音）";
+  panel.appendChild(diphTopHeader);
 
-  const diphGrid = document.createElement("div");
-  diphGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+  let lastDiphGroup = null;
+  let diphGrid = null;
   VI_DIPHTHONGS.forEach(v => {
+    if(v.group !== lastDiphGroup){
+      lastDiphGroup = v.group;
+      const gh = document.createElement("div");
+      gh.className = "usage-note";
+      gh.style.cssText = "font-weight:600; margin:8px 0 4px;";
+      gh.textContent = v.group;
+      panel.appendChild(gh);
+      diphGrid = document.createElement("div");
+      diphGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px;";
+      panel.appendChild(diphGrid);
+    }
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
     item.appendChild(makeSpeakableLabel(v.form, "1.1rem", "vi", v.form.split("/")[0].trim(), VI_CLUSTER_TTS));
@@ -2585,7 +2616,6 @@ function renderViAlphabetPanel(){
     attachLetterNote(item, "vi:" + v.form);
     diphGrid.appendChild(item);
   });
-  panel.appendChild(diphGrid);
 
   // 子音沒辦法單獨發音（塞音一定要配母音），TTS 唸孤立的「ch」會怪。用越南人自己
   // 「bờ cờ」拼讀法，在後面加「ờ」變成一個音節（ch→chờ、b→bờ、ng→ngờ…）才唸得出來。
