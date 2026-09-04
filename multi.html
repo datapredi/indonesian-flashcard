@@ -53,6 +53,11 @@
   .item.no-data .id-text{color:var(--muted);}
   .item.no-data .meaning{color:var(--danger);}
   .item.autoplay-current{box-shadow:inset 4px 0 0 var(--accent); background:color-mix(in srgb, var(--accent) 10%, transparent);}
+  .item.color-yellow{background:color-mix(in srgb, #ffd400 20%, var(--bg));}
+  .item.color-red{background:color-mix(in srgb, #ff4d4d 20%, var(--bg));}
+  .item.color-green{background:color-mix(in srgb, #34c759 20%, var(--bg));}
+  .item.autoplay-current.color-yellow, .item.autoplay-current.color-red, .item.autoplay-current.color-green{box-shadow:inset 4px 0 0 var(--accent);}
+  .color-flag-select{border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--fg); font-size:13px; padding:2px 4px;}
   /* 文字區塊固定佔滿一整行，按鈕多的話會自動排到下一行，不會把單字擠成一個字母一行 */
   .item > div{flex:1 1 100%; min-width:0;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
@@ -1055,6 +1060,18 @@ const TEACHER_FLAG_LS = "flashcard_teacher_flag_v1";
 let teacherFlagIds = loadMasteredSet(lsKey(TEACHER_FLAG_LS));
 function saveTeacherFlag(){ saveMasteredSet(lsKey(TEACHER_FLAG_LS), teacherFlagIds); }
 let showTeacherOnly = false;
+
+// 單字自己選的「重要程度」顏色（無／黃／紅／綠），整列變色。跟 pron/teacher 那種
+// 是非題不一樣，這個是多選一，所以存成 { id: "yellow"|"red"|"green" } 而不是 Set。
+const COLOR_FLAG_LS = "flashcard_color_flag_v1";
+let colorFlags = {};
+try{ colorFlags = JSON.parse(localStorage.getItem(lsKey(COLOR_FLAG_LS))) || {}; }catch(e){ colorFlags = {}; }
+function saveColorFlags(){ localStorage.setItem(lsKey(COLOR_FLAG_LS), JSON.stringify(colorFlags)); }
+const COLOR_FLAG_META = {
+  yellow: { label: "黃", emoji: "🟨", hex: "#ffd400" },
+  red:    { label: "紅", emoji: "🟥", hex: "#ff4d4d" },
+  green:  { label: "綠", emoji: "🟩", hex: "#34c759" }
+};
 
 // 「太難、現在完全不想看到，但也不想刪掉」的字：藏起來——不在單字表顯示，也
 // 不進 Flash Card／測驗／跑步模式（藏的時候順便取消勾選）。用「🙈 顯示隱藏的」
@@ -5235,6 +5252,31 @@ function createWordItem(w){
   refreshTeacherBtn();
   row.appendChild(teacherBtn);
 
+  const colorSelect = document.createElement("select");
+  colorSelect.className = "color-flag-select";
+  colorSelect.innerHTML = `
+    <option value="">🏳️ 無標記</option>
+    <option value="yellow">🟨 黃</option>
+    <option value="red">🟥 紅</option>
+    <option value="green">🟩 綠</option>
+  `;
+  function applyColorFlagClass(){
+    row.classList.remove("color-yellow", "color-red", "color-green");
+    const c = colorFlags[w.id];
+    if(c) row.classList.add("color-" + c);
+  }
+  colorSelect.value = colorFlags[w.id] || "";
+  applyColorFlagClass();
+  colorSelect.addEventListener("click", (e) => e.stopPropagation());
+  colorSelect.addEventListener("change", (e) => {
+    e.stopPropagation();
+    const v = colorSelect.value;
+    if(v) colorFlags[w.id] = v; else delete colorFlags[w.id];
+    saveColorFlags();
+    applyColorFlagClass();
+  });
+  row.appendChild(colorSelect);
+
   const crossLangPanel = document.createElement("div");
   crossLangPanel.className = "usage-panel hidden";
 
@@ -5394,6 +5436,7 @@ function deleteWord(id){
   saveQuizMastered();
   if(hiddenIds.delete(id)) saveHidden();
   if(teacherFlagIds.delete(id)) saveTeacherFlag();
+  if(colorFlags[id]){ delete colorFlags[id]; saveColorFlags(); }
   // 把這個字的 AI 生成資料也一起清掉（你自己打的 📝 筆記保留），這樣之後重新
   // 輸入同一個字會重新生成，不會撈到刪掉前的舊翻譯／舊變化形。
   if(target){
@@ -5584,6 +5627,14 @@ document.getElementById("btnRenumber").onclick = () => {
   sorted.forEach((w, i) => { w.id = i + 1; });
   allWords = sorted;
   function remapIdSet(set){ return new Set([...set].map(id => idMap.get(id)).filter(id => id !== undefined)); }
+  function remapIdMap(obj){
+    const out = {};
+    Object.keys(obj).forEach(id => {
+      const newId = idMap.get(Number(id));
+      if(newId !== undefined) out[newId] = obj[id];
+    });
+    return out;
+  }
   selected = remapIdSet(selected);
   cardMasteredIds = remapIdSet(cardMasteredIds);
   quizMasteredIds = remapIdSet(quizMasteredIds);
@@ -5592,6 +5643,8 @@ document.getElementById("btnRenumber").onclick = () => {
   hiddenIds = remapIdSet(hiddenIds);
   useRecordingIds = remapIdSet(useRecordingIds);
   compareSet = remapIdSet(compareSet);
+  colorFlags = remapIdMap(colorFlags);
+  saveColorFlags();
   // 剛匯入清單只是這次瀏覽階段暫時用的標記，編號全部變了之後對應不上，
   // 直接清空比留著錯誤的對應關係安全。
   newlyImportedIds = new Set();
@@ -6057,7 +6110,7 @@ const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
   TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
-  INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS
+  INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS];
 
