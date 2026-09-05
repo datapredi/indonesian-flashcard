@@ -282,7 +282,7 @@
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <button id="btnSortCefr">📊 難易度排序</button>
-      <button id="btnSortNewest">🆕 新單字在前</button>
+      <button id="btnSortNewest">🆕 新單字在後</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
         <option value="S">S 超簡單</option>
@@ -1165,7 +1165,7 @@ let showSelectedOnly = false;
 let sortAZ = false;
 let sortCefr = false;
 let sortCefrDesc = false;
-let sortNewest = false;
+let sortNewest = true; // 預設新單字在前面比較合理——剛加的字最需要馬上看到、補資料
 const CEFR_SORT_RANK = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
 // 比對清單跟「已選取（練習用）」故意分開——這個只是暫時釘選幾個字方便你跨搜尋
 // 收集起來比對發音，不會動到你原本為了練習勾選的那份清單。原本設計成只存在
@@ -6073,6 +6073,7 @@ document.getElementById("btnSortAZ").addEventListener("click", (e) => {
     document.getElementById("btnSortCefr").classList.remove("primary");
     document.getElementById("btnSortNewest").classList.remove("primary");
     updateCefrSortLabel();
+    updateSortNewestLabel();
   }
   e.currentTarget.classList.toggle("primary", sortAZ);
   renderList();
@@ -6100,11 +6101,18 @@ document.getElementById("btnSortCefr").addEventListener("click", (e) => {
     sortNewest = false;
     document.getElementById("btnSortAZ").classList.remove("primary");
     document.getElementById("btnSortNewest").classList.remove("primary");
+    updateSortNewestLabel();
   }
   e.currentTarget.classList.toggle("primary", sortCefr);
   updateCefrSortLabel();
   renderList();
 });
+// 按鈕文字要照「點下去會發生什麼事」顯示，不是照目前狀態：預設就是新單字
+// 在前面，所以按鈕預設顯示「新單字在後」（點了就變回舊的、新字排在最後面的
+// 順序）；關掉之後再顯示「新單字在前」，點了就變回預設的新字在前。
+function updateSortNewestLabel(){
+  document.getElementById("btnSortNewest").textContent = sortNewest ? "🆕 新單字在後" : "🆕 新單字在前";
+}
 document.getElementById("btnSortNewest").addEventListener("click", (e) => {
   sortNewest = !sortNewest;
   if(sortNewest){
@@ -6116,8 +6124,13 @@ document.getElementById("btnSortNewest").addEventListener("click", (e) => {
     updateCefrSortLabel();
   }
   e.currentTarget.classList.toggle("primary", sortNewest);
+  updateSortNewestLabel();
   renderList();
 });
+// sortNewest 預設是開的，按鈕外觀（primary 底色）跟文字要在頁面載入時就同步
+// 顯示，不用等使用者自己點一次才看得出目前是哪個排序狀態。
+document.getElementById("btnSortNewest").classList.toggle("primary", sortNewest);
+updateSortNewestLabel();
 
 // ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留目標語言文字） ----
 // 允許的文字腳本依目前的目標語言而定：任何語言的羅馬拼音都是拉丁字母，一律
