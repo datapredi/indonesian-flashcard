@@ -5393,15 +5393,16 @@ function createWordItem(w){
   });
   row.appendChild(colorSelect);
 
-  // 輸入一個編號，把這個字搬到那個編號的字後面，方便把兩個容易搞混的字擺
-  // 在一起比較。搬動的是 allWords 陣列本身的順序，只有排序方式都關掉（無
-  // 排序、照原始順序顯示）才看得出來，所以搬完後順便把三個排序按鈕都關掉，
-  // 不然使用者會覺得「怎麼沒有搬過去」。
+  // 輸入一個編號，把「那個編號的字」搬到「這個字」下面——這個字本身不動，
+  // 動的是被輸入的那個字，方便把兩個容易搞混的字擺在一起比較。搬動的是
+  // allWords 陣列本身的順序，只有排序方式都關掉（無排序、照原始順序顯示）
+  // 才看得出來，所以搬完後順便把三個排序按鈕都關掉，不然使用者會覺得
+  // 「怎麼沒有搬過去」。
   const moveInput = document.createElement("input");
   moveInput.type = "number";
   moveInput.className = "move-after-input";
-  moveInput.placeholder = "移到#後";
-  moveInput.title = "輸入編號，把這個字搬到那個編號的字後面（方便比較）";
+  moveInput.placeholder = "把#搬下面";
+  moveInput.title = "輸入編號，把那個編號的字搬到這個字下面（這個字本身不動，方便比較）";
   moveInput.addEventListener("click", (e) => e.stopPropagation());
   moveInput.addEventListener("keydown", (e) => {
     e.stopPropagation();
@@ -5412,16 +5413,16 @@ function createWordItem(w){
     const raw = moveInput.value.trim();
     moveInput.value = "";
     if(!raw) return;
-    const targetId = Number(raw);
-    if(!Number.isFinite(targetId)) return;
-    if(targetId === w.id){ alert("不能把這個字移到自己後面。"); return; }
-    const target = allWords.find(x => x.id === targetId);
-    if(!target){ alert(`找不到編號 ${targetId} 的字。`); return; }
-    const idx = allWords.indexOf(w);
-    if(idx === -1) return;
-    allWords.splice(idx, 1);
-    const targetIdx = allWords.indexOf(target);
-    allWords.splice(targetIdx + 1, 0, w);
+    const movedId = Number(raw);
+    if(!Number.isFinite(movedId)) return;
+    if(movedId === w.id){ alert("不能把這個字搬到自己下面。"); return; }
+    const moved = allWords.find(x => x.id === movedId);
+    if(!moved){ alert(`找不到編號 ${movedId} 的字。`); return; }
+    const movedIdx = allWords.indexOf(moved);
+    if(movedIdx === -1) return;
+    allWords.splice(movedIdx, 1);
+    const anchorIdx = allWords.indexOf(w);
+    allWords.splice(anchorIdx + 1, 0, moved);
     saveWordList(allWords);
     disableAllSorts();
     renderList();
