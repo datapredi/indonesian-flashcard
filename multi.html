@@ -5394,10 +5394,14 @@ function createWordItem(w){
   row.appendChild(colorSelect);
 
   // 輸入一個編號，把「那個編號的字」搬到「這個字」下面——這個字本身不動，
-  // 動的是被輸入的那個字，方便把兩個容易搞混的字擺在一起比較。搬動的是
-  // allWords 陣列本身的順序，只有排序方式都關掉（無排序、照原始順序顯示）
-  // 才看得出來，所以搬完後順便把三個排序按鈕都關掉，不然使用者會覺得
-  // 「怎麼沒有搬過去」。
+  // 動的是被輸入的那個字，方便把兩個容易搞混的字擺在一起比較。原本用
+  // disableAllSorts()+renderList()：因為預設是「新單字在前」（照 id 倒序
+  // 顯示），一關掉排序整個列表就會整批換成照 allWords 陣列順序顯示，看起來
+  // 像是「其他字也全部被搬動了」，其實只是排序方式整個換掉造成的視覺錯覺。
+  // 改成不動排序設定、不整批重繪，只把「被搬動那個字」自己的列＋8個面板這一
+  // 整組 DOM 直接搬到「這個字」的列＋面板後面，畫面上真的就只有那一個字的
+  // 位置變了。allWords 陣列順序還是照樣更新（給以後真的切到無排序模式時用），
+  // 只是不會逼著使用者切排序模式。
   const moveInput = document.createElement("input");
   moveInput.type = "number";
   moveInput.className = "move-after-input";
@@ -5418,15 +5422,34 @@ function createWordItem(w){
     if(movedId === w.id){ alert("不能把這個字搬到自己下面。"); return; }
     const moved = allWords.find(x => x.id === movedId);
     if(!moved){ alert(`找不到編號 ${movedId} 的字。`); return; }
+    if(!getVisibleWords().some(x => x.id === movedId)){
+      alert(`編號 ${movedId} 的字目前被篩選/搜尋條件擋住，沒有顯示在畫面上，沒辦法直接搬過來。`);
+      return;
+    }
     const movedIdx = allWords.indexOf(moved);
     if(movedIdx === -1) return;
     allWords.splice(movedIdx, 1);
     const anchorIdx = allWords.indexOf(w);
     allWords.splice(anchorIdx + 1, 0, moved);
     saveWordList(allWords);
-    disableAllSorts();
-    renderList();
-    jumpToWordObj(w);
+    function collectGroup(rowEl){
+      const group = [rowEl];
+      let sib = rowEl.nextElementSibling;
+      for(let i = 0; i < 8 && sib; i++){ group.push(sib); sib = sib.nextElementSibling; }
+      return group;
+    }
+    const movedRowEl = document.querySelector(`#wordList .item[data-word-id="${movedId}"]`);
+    const anchorGroup = collectGroup(row);
+    if(movedRowEl){
+      const movedGroup = collectGroup(movedRowEl);
+      const insertPoint = anchorGroup[anchorGroup.length - 1].nextSibling;
+      const parent = row.parentNode;
+      movedGroup.forEach(el => parent.insertBefore(el, insertPoint));
+      movedRowEl.classList.remove("jump-highlight");
+      void movedRowEl.offsetWidth;
+      movedRowEl.classList.add("jump-highlight");
+      movedRowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   });
   row.appendChild(moveInput);
 
@@ -6178,19 +6201,6 @@ document.getElementById("btnSortNewest").addEventListener("click", (e) => {
 // 顯示，不用等使用者自己點一次才看得出目前是哪個排序狀態。
 document.getElementById("btnSortNewest").classList.toggle("primary", sortNewest);
 updateSortNewestLabel();
-// 「移到#後」這種手動搬動順序的功能，只有在三種排序都關掉（照 allWords
-// 陣列本身順序顯示）才看得出來，搬動之後直接呼叫這個把排序都關掉。
-function disableAllSorts(){
-  sortAZ = false;
-  sortCefr = false;
-  sortCefrDesc = false;
-  sortNewest = false;
-  document.getElementById("btnSortAZ").classList.remove("primary");
-  document.getElementById("btnSortCefr").classList.remove("primary");
-  document.getElementById("btnSortNewest").classList.remove("primary");
-  updateCefrSortLabel();
-  updateSortNewestLabel();
-}
 
 // ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留目標語言文字） ----
 // 允許的文字腳本依目前的目標語言而定：任何語言的羅馬拼音都是拉丁字母，一律
