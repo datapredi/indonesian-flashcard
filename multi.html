@@ -428,6 +428,7 @@
 <div id="autoplayFloat" class="autoplay-float hidden">
   <span class="ap-status" id="autoplayFloatStatus"></span>
   <button type="button" id="autoplayFloatToggle" title="暫停／繼續">⏸️</button>
+  <button type="button" id="autoplayFloatNext" title="這個字已經會了，跳過去聽下一個（不會標待複習）">⏭️</button>
   <button type="button" id="autoplayFloatClose" title="結束依序播放">✕</button>
 </div>
 
@@ -6175,6 +6176,22 @@ function autoplayMarkAndNext(){
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
 }
+// 浮動控制器的 ⏭️：這個字已經太簡單、不用再聽三遍，直接跳去下一個。跟
+// AirPods 雙按（autoplayMarkAndNext）不一樣的地方是這個「不會」把字標成
+// ⚠️ 待複習。
+function autoplaySkipNext(){
+  if(!listAutoplayRunning && !listAutoplayPaused) return;
+  if(listAutoplayPaused){
+    // 暫停中：把進度往前推一個，再從那裡接回播放。
+    const total = getVisibleWords().length;
+    if(listAutoplayIndex < total - 1) listAutoplayIndex++;
+    runListAutoplay();
+    return;
+  }
+  autoplayJump = 1;   // 播放迴圈看到就會中斷這個字的三遍＋中文，index++ 換下一個
+  abortCurrentPlayback();
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+}
 // 暫停：停在目前這個字，浮動控制器跟 highlight 都留著，之後從同一個字繼續。
 function pauseListAutoplay(){
   if(!listAutoplayRunning) return;
@@ -6277,6 +6294,7 @@ function toggleListAutoplay(){
 }
 document.getElementById("btnListAutoplay").addEventListener("click", toggleListAutoplay);
 document.getElementById("autoplayFloatToggle").addEventListener("click", toggleListAutoplay);
+document.getElementById("autoplayFloatNext").addEventListener("click", autoplaySkipNext);
 document.getElementById("autoplayFloatClose").addEventListener("click", stopListAutoplay);
 // 「加唸中文」勾選狀態記起來（全語言通用）
 const AUTOPLAY_ZH_LS = "flashcard_autoplay_include_zh_v1";
