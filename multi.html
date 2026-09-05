@@ -282,6 +282,7 @@
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <button id="btnSortCefr">📊 難易度排序 A1→C2</button>
+      <button id="btnSortNewest">🆕 新單字在前</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
         <option value="S">S 超簡單</option>
@@ -1163,6 +1164,7 @@ let selected = savedSelected
 let showSelectedOnly = false;
 let sortAZ = false;
 let sortCefr = false;
+let sortNewest = false;
 const CEFR_SORT_RANK = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
 // 比對清單跟「已選取（練習用）」故意分開——這個只是暫時釘選幾個字方便你跨搜尋
 // 收集起來比對發音，不會動到你原本為了練習勾選的那份清單。原本設計成只存在
@@ -4570,6 +4572,9 @@ function getVisibleWords(){
     });
   }else if(sortAZ){
     list.sort((a, b) => a.text.localeCompare(b.text, "id"));
+  }else if(sortNewest){
+    // id 是新增時「目前最大 id + 1」給的，所以 id 越大代表越晚加進來、越新。
+    list.sort((a, b) => b.id - a.id);
   }
   return list;
 }
@@ -5962,7 +5967,9 @@ document.getElementById("btnSortAZ").addEventListener("click", (e) => {
   sortAZ = !sortAZ;
   if(sortAZ){
     sortCefr = false;
+    sortNewest = false;
     document.getElementById("btnSortCefr").classList.remove("primary");
+    document.getElementById("btnSortNewest").classList.remove("primary");
   }
   e.currentTarget.classList.toggle("primary", sortAZ);
   renderList();
@@ -5971,9 +5978,22 @@ document.getElementById("btnSortCefr").addEventListener("click", (e) => {
   sortCefr = !sortCefr;
   if(sortCefr){
     sortAZ = false;
+    sortNewest = false;
     document.getElementById("btnSortAZ").classList.remove("primary");
+    document.getElementById("btnSortNewest").classList.remove("primary");
   }
   e.currentTarget.classList.toggle("primary", sortCefr);
+  renderList();
+});
+document.getElementById("btnSortNewest").addEventListener("click", (e) => {
+  sortNewest = !sortNewest;
+  if(sortNewest){
+    sortAZ = false;
+    sortCefr = false;
+    document.getElementById("btnSortAZ").classList.remove("primary");
+    document.getElementById("btnSortCefr").classList.remove("primary");
+  }
+  e.currentTarget.classList.toggle("primary", sortNewest);
   renderList();
 });
 
