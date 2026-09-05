@@ -1323,22 +1323,31 @@ async function completeMissingWordData(missing, btn, labelPrefix, skipRender){
     if(!skipRender) renderList();
   }
 }
-// 只更新單一個字的列（外觀：no-data 紅字提示、中文/英文意思那一行），不重繪
-// 整個列表——給「在展開中的面板裡補資料」這種情境用，避免 renderList() 把
-// 使用者正在看的面板收合掉。
+// 重新整個換掉單一個字的列（+ 跟著它的 8 個面板），不重繪整個列表——給「在
+// 展開中的面板裡補資料」這種情境用，避免 renderList() 把使用者正在看的其他
+// 面板收合掉。原本只用 innerHTML 補「意思」那一行文字，結果剛加入時因為還
+// 沒有資料，原文（nativeScript）顯示、埃及文 أ 切換／字母拆解／變位按鈕、
+// Forvo 連結這些會依資料有無決定「要不要畫出來」的東西，從一開始就沒被
+// 建到 row 裡，光改文字不會讓它們補畫出來——所以改成用 createWordItem()
+// 整組重新產生，直接換掉舊的 row 跟緊接在後面的 8 個面板（renderList()／
+// addWordToList() 每一列都是固定按這個順序排的：row, usagePanel,
+// antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel,
+// minimalPairsPanel, crossLangPanel）。這個字剛加進來，這些面板一定都還沒
+// 展開過，整組換掉不會影響使用者正在看的別的字的面板。
 function refreshWordRowDisplay(id){
   const w = allWords.find(x => x.id === id);
   if(!w) return;
-  const rowEl = document.querySelector(`#wordList .item[data-word-id="${id}"]`);
-  if(!rowEl) return;
-  const data = lookup(w.text);
-  rowEl.classList.toggle("no-data", needsGeneration(w));
-  const meaningEl = rowEl.querySelector(".meaning");
-  if(meaningEl){
-    meaningEl.innerHTML = data && data.zh
-      ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data))
-      : "尚無翻譯資料，可用上面「AI 自動生成」按鈕";
-  }
+  const oldRow = document.querySelector(`#wordList .item[data-word-id="${id}"]`);
+  if(!oldRow) return;
+  const parent = oldRow.parentNode;
+  const toRemove = [oldRow];
+  let sib = oldRow.nextElementSibling;
+  for(let i = 0; i < 8 && sib; i++){ toRemove.push(sib); sib = sib.nextElementSibling; }
+  const anchor = toRemove[toRemove.length - 1].nextSibling;
+  const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
+  [row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel]
+    .forEach(el => parent.insertBefore(el, anchor));
+  toRemove.forEach(el => parent.removeChild(el));
 }
 
 // 跨語言查詢：不同語言的單字表是各自獨立的，沒有天生的「這是同一個概念」連結
