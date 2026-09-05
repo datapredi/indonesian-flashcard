@@ -58,6 +58,7 @@
   .item.color-green{background:color-mix(in srgb, #34c759 20%, var(--bg));}
   .item.autoplay-current.color-yellow, .item.autoplay-current.color-red, .item.autoplay-current.color-green{box-shadow:inset 4px 0 0 var(--accent);}
   .color-flag-select{border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--fg); font-size:13px; padding:2px 4px;}
+  .move-after-input{width:56px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--fg); font-size:13px; padding:2px 4px; text-align:center;}
   /* 文字區塊固定佔滿一整行，按鈕多的話會自動排到下一行，不會把單字擠成一個字母一行 */
   .item > div{flex:1 1 100%; min-width:0;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
@@ -5383,6 +5384,42 @@ function createWordItem(w){
   });
   row.appendChild(colorSelect);
 
+  // 輸入一個編號，把這個字搬到那個編號的字後面，方便把兩個容易搞混的字擺
+  // 在一起比較。搬動的是 allWords 陣列本身的順序，只有排序方式都關掉（無
+  // 排序、照原始順序顯示）才看得出來，所以搬完後順便把三個排序按鈕都關掉，
+  // 不然使用者會覺得「怎麼沒有搬過去」。
+  const moveInput = document.createElement("input");
+  moveInput.type = "number";
+  moveInput.className = "move-after-input";
+  moveInput.placeholder = "移到#後";
+  moveInput.title = "輸入編號，把這個字搬到那個編號的字後面（方便比較）";
+  moveInput.addEventListener("click", (e) => e.stopPropagation());
+  moveInput.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if(e.key === "Enter"){ e.preventDefault(); moveInput.blur(); }
+  });
+  moveInput.addEventListener("change", (e) => {
+    e.stopPropagation();
+    const raw = moveInput.value.trim();
+    moveInput.value = "";
+    if(!raw) return;
+    const targetId = Number(raw);
+    if(!Number.isFinite(targetId)) return;
+    if(targetId === w.id){ alert("不能把這個字移到自己後面。"); return; }
+    const target = allWords.find(x => x.id === targetId);
+    if(!target){ alert(`找不到編號 ${targetId} 的字。`); return; }
+    const idx = allWords.indexOf(w);
+    if(idx === -1) return;
+    allWords.splice(idx, 1);
+    const targetIdx = allWords.indexOf(target);
+    allWords.splice(targetIdx + 1, 0, w);
+    saveWordList(allWords);
+    disableAllSorts();
+    renderList();
+    jumpToWordObj(w);
+  });
+  row.appendChild(moveInput);
+
   const crossLangPanel = document.createElement("div");
   crossLangPanel.className = "usage-panel hidden";
 
@@ -6131,6 +6168,19 @@ document.getElementById("btnSortNewest").addEventListener("click", (e) => {
 // 顯示，不用等使用者自己點一次才看得出目前是哪個排序狀態。
 document.getElementById("btnSortNewest").classList.toggle("primary", sortNewest);
 updateSortNewestLabel();
+// 「移到#後」這種手動搬動順序的功能，只有在三種排序都關掉（照 allWords
+// 陣列本身順序顯示）才看得出來，搬動之後直接呼叫這個把排序都關掉。
+function disableAllSorts(){
+  sortAZ = false;
+  sortCefr = false;
+  sortCefrDesc = false;
+  sortNewest = false;
+  document.getElementById("btnSortAZ").classList.remove("primary");
+  document.getElementById("btnSortCefr").classList.remove("primary");
+  document.getElementById("btnSortNewest").classList.remove("primary");
+  updateCefrSortLabel();
+  updateSortNewestLabel();
+}
 
 // ---- 匯入 txt/md（自動去除中文意思、注音口訣、Markdown 符號，只留目標語言文字） ----
 // 允許的文字腳本依目前的目標語言而定：任何語言的羅馬拼音都是拉丁字母，一律
