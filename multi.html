@@ -269,6 +269,7 @@
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
       <button id="btnJaKanjiBackfill" class="hidden">🈶 幫舊字補上漢字寫法（日文）</button>
       <button id="btnViScriptBackfill" class="hidden">🇻🇳 幫舊字補／修正越南文寫法（帶聲調符號）</button>
+      <button id="btnBackfillRegisterCefr">🏷️ 掃描全部單字，補難易度 A1~C2／口語標籤</button>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
@@ -4620,6 +4621,53 @@ ${lines}`;
   btn.textContent = originalLabel;
   return { done, changed, failCount };
 }
+document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  // 掃全部單字（不只勾選的）：已經有中文意思、但還沒有難易度（cefr）或口語
+  // 標籤（register）的字。意思／例句／測驗題完全不動，只補這兩個欄位。
+  const list = allWords.filter(w => {
+    const d = lookup(w.text);
+    return d && d.zh && (!d.cefr || !d.register);
+  });
+  if(list.length === 0){ alert("目前每個有翻譯的單字都已經有難易度／口語標籤了，不用補。"); return; }
+  if(!confirm(`會用 AI 掃過 ${list.length} 個還沒有難易度標籤的單字，補上 A1~C2 難易度和口語／正式標籤。原本的意思、例句、測驗題都不會動。要開始嗎？`)) return;
+  const btn = document.getElementById("btnBackfillRegisterCefr");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  await acquireWakeLock();
+  try{
+    const batches = chunkArr(list, 12);
+    let done = 0, failCount = 0;
+    for(const batch of batches){
+      btn.textContent = `補難易度標籤中... (${done}/${list.length})`;
+      try{
+        const items = batch.map(w => {
+          const d = lookup(w.text);
+          return { text: w.text, nativeScript: d.nativeScript, zh: d.zh };
+        });
+        const entries = await generateRegisterCefrForKnownWords(items);
+        batch.forEach((w, i) => {
+          if(!entries[i]) return;
+          customDB[w.text] = Object.assign({}, lookup(w.text), {
+            register: entries[i].register,
+            cefr: entries[i].cefr
+          });
+        });
+        saveCustomDB();
+        renderList();
+      }catch(e){
+        failCount += batch.length;
+      }
+      done += batch.length;
+    }
+    alert(`完成，掃過 ${done} 個字。${failCount > 0 ? `有 ${failCount} 個失敗（可能網路不穩），可以再按一次補齊，已經補好的會自動跳過。` : "全部成功。"}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    releaseWakeLock();
+  }
+};
+
 document.getElementById("btnViScriptBackfill").onclick = async () => {
   if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
   const list = allWords.filter(w => selected.has(w.id)).filter(w => {
