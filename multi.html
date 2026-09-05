@@ -5462,6 +5462,46 @@ function createWordItem(w){
   });
   row.appendChild(moveInput);
 
+  // 「當作新字」：有些字以前就存在，但老師最近又重新教了一次，想把它當成剛學
+  // 的新字。做法是重新編號成目前最大編號 +1、搬到 allWords 最後面——這樣
+  // 「🆕 新單字在前」的預設檢視裡它就排到最前面（最新），無排序檢視裡則排在
+  // 最後面。編號會變（跟「重新編號」按鈕一樣的副作用），所以先跳確認。
+  const bumpNewBtn = document.createElement("button");
+  bumpNewBtn.type = "button";
+  bumpNewBtn.className = "speak-btn";
+  bumpNewBtn.textContent = "⏬";
+  bumpNewBtn.title = "當作新字：重新編號成最新、移到最後面（老師最近重新教過的舊字用這個）";
+  bumpNewBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const oldId = w.id;
+    const newId = allWords.length ? Math.max(...allWords.map(x => x.id)) + 1 : 1;
+    if(newId === oldId) return; // 本來就是最新、又在最後面，不用動
+    if(!confirm(`把「${w.text}」當作新字：編號會從 ${oldId} 改成 ${newId}，移到最後面（在「新單字在前」檢視裡會變成排最前面）。編號變了之後，如果你在別的地方用舊編號記過東西會對不上。確定嗎？`)) return;
+    const idx = allWords.indexOf(w);
+    if(idx === -1) return;
+    allWords.splice(idx, 1);
+    w.id = newId;
+    allWords.push(w);
+    // 所有「用編號當 key」的資料，把這個字的舊編號換成新編號。
+    [selected, cardMasteredIds, quizMasteredIds, pronFlagIds, teacherFlagIds, hiddenIds, useRecordingIds, compareSet, newlyImportedIds].forEach(set => {
+      if(set && set.has(oldId)){ set.delete(oldId); set.add(newId); }
+    });
+    if(colorFlags[oldId] !== undefined){ colorFlags[newId] = colorFlags[oldId]; delete colorFlags[oldId]; }
+    saveWordList(allWords);
+    saveSelected();
+    saveCardMastered();
+    saveQuizMastered();
+    savePronFlag();
+    saveTeacherFlag();
+    saveHidden();
+    saveUseRecordingIds();
+    saveCompareSet();
+    saveColorFlags();
+    renderList();
+    jumpToWordObj(w);
+  });
+  row.appendChild(bumpNewBtn);
+
   const crossLangPanel = document.createElement("div");
   crossLangPanel.className = "usage-panel hidden";
 
