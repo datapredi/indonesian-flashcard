@@ -281,7 +281,7 @@
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
-      <button id="btnSortCefr">📊 難易度排序 A1→C2</button>
+      <button id="btnSortCefr">📊 難易度排序</button>
       <button id="btnSortNewest">🆕 新單字在前</button>
       <select id="difficultyFilter">
         <option value="">全部難度</option>
@@ -1164,6 +1164,7 @@ let selected = savedSelected
 let showSelectedOnly = false;
 let sortAZ = false;
 let sortCefr = false;
+let sortCefrDesc = false;
 let sortNewest = false;
 const CEFR_SORT_RANK = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
 // 比對清單跟「已選取（練習用）」故意分開——這個只是暫時釘選幾個字方便你跨搜尋
@@ -4563,11 +4564,16 @@ function getVisibleWords(){
     return haystack.includes(query);
   });
   if(sortCefr){
-    // 沒標過 CEFR 的字排最後面（99），已標的照 A1→C2 排，同等級內再照字母排。
+    // 沒標過 CEFR 的字永遠排最後面（99），不管正排倒排都一樣，只有已標的
+    // A1~C2 之間才會依 sortCefrDesc 決定方向；同等級內再照字母排。
     list.sort((a, b) => {
       const ra = CEFR_SORT_RANK[(lookup(a.text) || {}).cefr] || 99;
       const rb = CEFR_SORT_RANK[(lookup(b.text) || {}).cefr] || 99;
-      if(ra !== rb) return ra - rb;
+      if(ra !== rb){
+        if(ra === 99) return 1;
+        if(rb === 99) return -1;
+        return sortCefrDesc ? rb - ra : ra - rb;
+      }
       return a.text.localeCompare(b.text, "id");
     });
   }else if(sortAZ){
@@ -5967,15 +5973,33 @@ document.getElementById("btnSortAZ").addEventListener("click", (e) => {
   sortAZ = !sortAZ;
   if(sortAZ){
     sortCefr = false;
+    sortCefrDesc = false;
     sortNewest = false;
     document.getElementById("btnSortCefr").classList.remove("primary");
     document.getElementById("btnSortNewest").classList.remove("primary");
+    updateCefrSortLabel();
   }
   e.currentTarget.classList.toggle("primary", sortAZ);
   renderList();
 });
+function updateCefrSortLabel(){
+  const btn = document.getElementById("btnSortCefr");
+  btn.textContent = sortCefr
+    ? (sortCefrDesc ? "📊 難易度排序 C2→A1" : "📊 難易度排序 A1→C2")
+    : "📊 難易度排序";
+}
 document.getElementById("btnSortCefr").addEventListener("click", (e) => {
-  sortCefr = !sortCefr;
+  // 三段式切換：關 → A1→C2 → C2→A1 → 關，再點一次同一顆鈕就直接反向排序，
+  // 不用先關掉再重開。
+  if(!sortCefr){
+    sortCefr = true;
+    sortCefrDesc = false;
+  }else if(!sortCefrDesc){
+    sortCefrDesc = true;
+  }else{
+    sortCefr = false;
+    sortCefrDesc = false;
+  }
   if(sortCefr){
     sortAZ = false;
     sortNewest = false;
@@ -5983,6 +6007,7 @@ document.getElementById("btnSortCefr").addEventListener("click", (e) => {
     document.getElementById("btnSortNewest").classList.remove("primary");
   }
   e.currentTarget.classList.toggle("primary", sortCefr);
+  updateCefrSortLabel();
   renderList();
 });
 document.getElementById("btnSortNewest").addEventListener("click", (e) => {
@@ -5990,8 +6015,10 @@ document.getElementById("btnSortNewest").addEventListener("click", (e) => {
   if(sortNewest){
     sortAZ = false;
     sortCefr = false;
+    sortCefrDesc = false;
     document.getElementById("btnSortAZ").classList.remove("primary");
     document.getElementById("btnSortCefr").classList.remove("primary");
+    updateCefrSortLabel();
   }
   e.currentTarget.classList.toggle("primary", sortNewest);
   renderList();
