@@ -4652,6 +4652,15 @@ function foldForSearch(s){
     .replace(COMBINING_MARKS_RE, "")
     .replace(/đ/g, "d"); // đ
 }
+// 拆掉越南文聲調符號但保留大小寫，拿來當「英文拼音」顯示用（ă/â/ơ/ư→a/o/u，
+// đ→d）。是純規則轉換、不用問 AI，所以就算當初是直接用越南文原文輸入、
+// 沒有另外存英文拼音，也能即時算出來。
+function stripVietToneMarks(s){
+  return (s || "").toString()
+    .normalize("NFD")
+    .replace(COMBINING_MARKS_RE, "")
+    .replace(/đ/g, "d").replace(/Đ/g, "D"); // đ / Đ
+}
 function getVisibleWords(){
   // 「顯示隱藏的」檢視模式：只列被藏起來的字，方便一次檢視／取消隱藏。
   if(showHiddenOnly){
@@ -4726,12 +4735,21 @@ function createWordItem(w){
   // 「AI 自動生成缺少的翻譯」才會有測驗需要的完整資料。
   row.className = "item" + (needsGeneration(w) ? " no-data" : "");
   row.dataset.wordId = w.id;
+  // 越南文：主標題顯示英文拼音（拆掉聲調符號的版本），帶聲調的原文放在下面
+  // 那一行。就算當初是直接用越南文原文輸入、沒有另外存英文拼音也沒關係——
+  // stripVietToneMarks 是純規則轉換，即時算得出來。
+  let viNative = null, viMain = null;
+  if(currentLang === "vi"){
+    viNative = (data && data.nativeScript) || w.text;
+    viMain = stripVietToneMarks(viNative);
+  }
+  const mainText = currentLang === "vi" ? viMain : w.text;
   row.innerHTML = `
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
-      <div class="id-text">${w.id}. ${w.text}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
+      <div class="id-text">${w.id}. ${mainText}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}</div>
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
-      ${currentLang === "vi" && data && data.nativeScript ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${data.nativeScript}</div>` : ""}
+      ${currentLang === "vi" && viNative && viNative !== viMain ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${viNative}</div>` : ""}
       <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
       ${currentLang === "arz" && data && data.reply ? `<div class="reply-line" title="${(data.reply.note || "").replace(/"/g, "&quot;")}">↩︎ 對方回：<bdi dir="rtl" class="native-ar">${data.reply.nativeScript || ""}</bdi> ${data.reply.romanized || ""}${data.reply.zh ? " · " + data.reply.zh : ""}</div>` : ""}
     </div>
