@@ -1268,7 +1268,12 @@ function lookup(text){
 // 這個按鈕補齊，測驗模式也會少資料壞掉。改用這個檢查資料是不是真的完整。
 function needsGeneration(w){
   const data = lookup(w.text);
-  return !data || !data.quizEn;
+  if(!data || !data.quizEn) return true;
+  // hasScript 語言（泰文、越南文…）少了原生文字也算不完整——發音、Forvo、
+  // 聲調面板都要靠它。例句點字新增的字有時候會卡在「有 quizEn、卻沒有
+  // nativeScript」的半成品狀態，要讓「AI 自動生成」抓得到、能補。
+  if(L().hasScript && !data.nativeScript) return true;
+  return false;
 }
 // 這個字目前處於哪個補資料階段：
 // - "known"：意思已經確定（hasScript 語言要連原生文字都有才算，那才是背後真正
@@ -5007,8 +5012,14 @@ function createWordItem(w){
     e.stopPropagation();
     // hasScript 語言用背後的原生文字查，Forvo 是照各語言原生文字收錄的。埃及口語
     // 的 getSpeechText 現在回傳的是給 TTS 用的羅馬拼音，Forvo 要的是阿拉伯文，
-    // 所以這裡直接取 nativeScript。
-    const query = (L().hasScript && data && data.nativeScript) || w.text;
+    // 所以這裡直接取 nativeScript。點下去當下才重新 lookup 一次，不要用建立
+    // 這一列時就抓好的 data——例句點字新增、之後才生成原生文字的字，那份
+    // data 會是舊的（沒有 nativeScript），害 Forvo 拿羅馬拼音去查。
+    const freshData = lookup(w.text);
+    const query = (L().hasScript && freshData && freshData.nativeScript) || w.text;
+    if(L().hasScript && (!freshData || !freshData.nativeScript)){
+      alert(`「${w.text}」還沒有${L().label}原生文字資料，Forvo 只能先用羅馬拼音查（可能查不到）。先按「✨ AI 自動生成」或展開的面板把原生文字補起來會比較準。`);
+    }
     const langCode = FORVO_LANG_CODE[currentLang];
     const langScope = langCode ? `/${langCode}/` : "/";
     const url = `https://forvo.com/search/${encodeURIComponent(query)}${langScope}`;
