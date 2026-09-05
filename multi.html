@@ -2243,10 +2243,34 @@ const THAI_VOWEL_PAIRS = [
   { short: "โอะ", long: "โอ", sound: "o / oh" },
   { short: "เอาะ", long: "ออ", sound: "o / aw" }
 ];
+// 泰文的「複合母音」按傳統教法其實有好幾組：真正的雙元音（สระประสม，主母音
+// 滑向央元音 a）、สระเกิน（本身就帶一個尾音、字典當獨立母音收）、以及母音再
+// 接 ย(-i) / ว(-u) 半母音收尾（有些是三合母音）。分組列出來比較清楚。
 const THAI_DIPHTHONGS = [
-  { short: "เอียะ", long: "เอีย", sound: "ia" },
-  { short: "เอือะ", long: "เอือ", sound: "uea" },
-  { short: "อัวะ", long: "อัว", sound: "ua" }
+  { group: "核心雙元音（สระประสม，短／長成對）", forms: ["เอียะ", "เอีย"], sound: "ia：i 滑向 a" },
+  { group: "核心雙元音（สระประสม，短／長成對）", forms: ["เอือะ", "เอือ"], sound: "uea：ue（不圓唇 u）滑向 a" },
+  { group: "核心雙元音（สระประสม，短／長成對）", forms: ["อัวะ", "อัว"], sound: "ua：u 滑向 a" },
+
+  { group: "สระเกิน 特殊母音（本身已含尾音）", forms: ["อำ"], sound: "am：a + m 尾音" },
+  { group: "สระเกิน 特殊母音（本身已含尾音）", forms: ["ไอ"], sound: "ai：a + i；ไม้มลาย，一般拼法" },
+  { group: "สระเกิน 特殊母音（本身已含尾音）", forms: ["ใอ"], sound: "ai：a + i；ไม้ม้วน，只有 20 個固定字用" },
+  { group: "สระเกิน 特殊母音（本身已含尾音）", forms: ["เอา"], sound: "ao：a + o/u 尾音" },
+  { group: "สระเกิน 特殊母音（本身已含尾音）", forms: ["ฤ", "ฤๅ"], sound: "rue／ri／rœ：借自梵語，讀音看字（ฤกษ์、อังกฤษ、ฤๅดี）；ฤๅ 為長音" },
+
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["อาย"], sound: "aai：長 a + i" },
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["อัย", "ไอย"], sound: "ai：短 a + i" },
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["อุย"], sound: "ui：u + i" },
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["โอย"], sound: "ooi：長 o + i" },
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["ออย"], sound: "ɔɔi：長開口 o + i" },
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["เอย"], sound: "əəi：長央元音 + i" },
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["เอือย"], sound: "ueai：三合，uea + i" },
+  { group: "母音 + ย（-i 收尾，含三合母音）", forms: ["อวย"], sound: "uai：三合，ua + i" },
+
+  { group: "母音 + ว（-u 收尾，含三合母音）", forms: ["อิว"], sound: "iu：i + u" },
+  { group: "母音 + ว（-u 收尾，含三合母音）", forms: ["เอ็ว", "เอว"], sound: "eo／eeo：e + u（短／長）" },
+  { group: "母音 + ว（-u 收尾，含三合母音）", forms: ["แอ็ว", "แอว"], sound: "aeo／aaeo：ae + u（短／長）" },
+  { group: "母音 + ว（-u 收尾，含三合母音）", forms: ["อาว"], sound: "aao：長 a + u" },
+  { group: "母音 + ว（-u 收尾，含三合母音）", forms: ["เอียว"], sound: "iao：三合，ia + u" }
 ];
 const THAI_CONSONANT_CLASSES = [
   { key: "mid", label: "中音 กลาง（Mid Class）", letters: [
@@ -2416,18 +2440,30 @@ function renderThaiAlphabetPanel(){
 
   const diphHeader = document.createElement("div");
   diphHeader.style.fontWeight = "600";
-  diphHeader.textContent = "複合母音（滑音，短音／長音）";
+  diphHeader.textContent = "複合母音／滑音母音";
   panel.appendChild(diphHeader);
 
-  const diphGrid = document.createElement("div");
-  diphGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;";
+  let lastDiphGroup = null;
+  let diphGrid = null;
   THAI_DIPHTHONGS.forEach(v => {
+    if(v.group !== lastDiphGroup){
+      const sub = document.createElement("div");
+      sub.className = "usage-note";
+      sub.style.cssText = "margin:6px 0 2px; font-weight:600;";
+      sub.textContent = v.group;
+      panel.appendChild(sub);
+      diphGrid = document.createElement("div");
+      diphGrid.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 10px;";
+      panel.appendChild(diphGrid);
+      lastDiphGroup = v.group;
+    }
     const item = document.createElement("div");
     item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:130px; text-align:center;";
     const row = document.createElement("div");
-    row.appendChild(makeSpeakableLabel(v.short, "1.1rem", "th", v.speakShort || null));
-    row.appendChild(document.createTextNode(" / "));
-    row.appendChild(makeSpeakableLabel(v.long, "1.1rem", "th", v.speakLong || null));
+    v.forms.forEach((f, i) => {
+      if(i) row.appendChild(document.createTextNode(" / "));
+      row.appendChild(makeSpeakableLabel(f, "1.1rem", "th"));
+    });
     item.appendChild(row);
     const sound = document.createElement("div");
     sound.className = "usage-note";
@@ -2435,7 +2471,6 @@ function renderThaiAlphabetPanel(){
     item.appendChild(sound);
     diphGrid.appendChild(item);
   });
-  panel.appendChild(diphGrid);
 
   const classColors = { mid: "var(--accent2)", high: "var(--danger)", low: "#c9a227" };
   THAI_CONSONANT_CLASSES.forEach(cls => {
