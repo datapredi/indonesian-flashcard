@@ -4641,6 +4641,17 @@ document.getElementById("btnViScriptBackfill").onclick = async () => {
   }
 };
 
+// 搜尋用的正規化：轉小寫、拆掉聲調/變音符號（NFD 之後去掉 combining marks）、
+// 越南文的 đ→d。這樣在越南文分頁打 "an" 也找得到 "ăn"、"bạn"，打 "roi" 找得到
+// "rồi"，不用自己去挑聲調符號。中文/日文假名/韓文諺文沒有 combining marks，
+// 正規化後不變，不受影響。
+var COMBINING_MARKS_RE = new RegExp("[\\u0300-\\u036f]", "g");
+function foldForSearch(s){
+  return (s || "").toString().toLowerCase()
+    .normalize("NFD")
+    .replace(COMBINING_MARKS_RE, "")
+    .replace(/đ/g, "d"); // đ
+}
 function getVisibleWords(){
   // 「顯示隱藏的」檢視模式：只列被藏起來的字，方便一次檢視／取消隱藏。
   if(showHiddenOnly){
@@ -4654,7 +4665,7 @@ function getVisibleWords(){
   if(showNewlyImportedOnly){
     return allWords.filter(w => newlyImportedIds.has(w.id) && !hiddenIds.has(w.id));
   }
-  const query = document.getElementById("wordSearch").value.trim().toLowerCase();
+  const query = foldForSearch(document.getElementById("wordSearch").value.trim());
   const diffFilter = document.getElementById("difficultyFilter").value;
   const list = allWords.filter(w => {
     if(hiddenIds.has(w.id)) return false;
@@ -4668,9 +4679,10 @@ function getVisibleWords(){
     }
     if(!query) return true;
     const data = lookup(w.text);
-    // 也比對 📝 筆記跟 AI 補的搜尋關鍵字（近義詞），這樣「待會見」的字用「再見」
-    // 也搜得到——只要在筆記或關鍵字裡有出現。
-    const haystack = `${w.text} ${data ? data.zh : ""} ${data ? data.en : ""} ${data && data.searchKeywords ? data.searchKeywords : ""} ${getWordNote(w.text)}`.toLowerCase();
+    // 也比對背後的原生文字（越南文/泰文等顯示的就是這個）、📝 筆記、AI 補的
+    // 搜尋關鍵字（近義詞），這樣「待會見」用「再見」也搜得到。整串一起用
+    // foldForSearch 拆掉聲調符號再比，打 "an" 找得到 "ăn"。
+    const haystack = foldForSearch(`${w.text} ${data && data.nativeScript ? data.nativeScript : ""} ${data ? data.zh : ""} ${data ? data.en : ""} ${data && data.searchKeywords ? data.searchKeywords : ""} ${getWordNote(w.text)}`);
     return haystack.includes(query);
   });
   if(sortCefr){
