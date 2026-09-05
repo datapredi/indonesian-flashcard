@@ -1280,7 +1280,7 @@ function wordGenerationTier(w){
 }
 // 「補齊缺少的資料」共用邏輯，給 btnGenerate/btnGenerateAll 共用，依上面三種
 // 階段分開處理，避免蓋掉已經確定的原生文字/意思。
-async function completeMissingWordData(missing, btn, labelPrefix){
+async function completeMissingWordData(missing, btn, labelPrefix, skipRender){
   const batches = chunkArr(missing, 8);
   let done = 0;
   for(const batch of batches){
@@ -1316,7 +1316,27 @@ async function completeMissingWordData(missing, btn, labelPrefix){
     }
     saveCustomDB();
     done += batch.length;
-    renderList();
+    // skipRender：從用法面板裡的 ✨ 按鈕呼叫時用，這種情境是在展開中的面板裡
+    // 補少數幾個新字的資料，整個重繪列表會把使用者正在看的面板收合掉——呼叫
+    // 端會自己用 refreshWordRowDisplay() 只更新那幾筆的外觀，不需要整批重繪。
+    if(!skipRender) renderList();
+  }
+}
+// 只更新單一個字的列（外觀：no-data 紅字提示、中文/英文意思那一行），不重繪
+// 整個列表——給「在展開中的面板裡補資料」這種情境用，避免 renderList() 把
+// 使用者正在看的面板收合掉。
+function refreshWordRowDisplay(id){
+  const w = allWords.find(x => x.id === id);
+  if(!w) return;
+  const rowEl = document.querySelector(`#wordList .item[data-word-id="${id}"]`);
+  if(!rowEl) return;
+  const data = lookup(w.text);
+  rowEl.classList.toggle("no-data", needsGeneration(w));
+  const meaningEl = rowEl.querySelector(".meaning");
+  if(meaningEl){
+    meaningEl.innerHTML = data && data.zh
+      ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data))
+      : "尚無翻譯資料，可用上面「AI 自動生成」按鈕";
   }
 }
 
@@ -3396,7 +3416,7 @@ document.getElementById("btnRegenerateAudioById").addEventListener("click", asyn
 function stripEdgePunctuation(s){
   return s.trim().replace(/^[?？!！.。,，;；:："“”'‘’\-]+|[?？!！.。,，;；:："“”'‘’\-]+$/g, "");
 }
-function renderTappableSentence(sentence, sentenceNativeScript){
+function renderTappableSentence(sentence, sentenceNativeScript, onWordAdded){
   const container = document.createElement("span");
   container.style.cssText = "display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap;";
   const wrap = document.createElement("span");
@@ -3473,10 +3493,33 @@ function renderTappableSentence(sentence, sentenceNativeScript){
               jumpToWordByNativeScript(resolved.nativeScript, clean);
               return;
             }
-            // 背後不是同一個字，不能當成重複跳過去——改成新增這個字。位置
-            // 對應算出來的只有 nativeScript（沒有 zh/en，這不用額外呼叫 AI，
-            // 免費換來的資訊本來就有限），問 AI 那條路徑則會順便拿到 zh/en
-            // 一起存進去，兩種情況都跟 convert-import 一樣用碰撞安全編號。
+            // 走到這裡代表「原生文字沒有比對到」，但這不等於「一定是不同的
+            // 字」——這個分支本來就只在 isWordInList(clean) 已經是 true（拼音
+            // 一模一樣已經在單字表裡）才會進來，很可能只是那個既有項目根本
+            // 還沒生成過原生文字（沒按過「AI 自動生成」），isNativeScriptInList
+            // 當然比對不到，不代表真的是撞拼音的不同字。曾經真的發生過：
+            // 單字表裡已經有 beit，點例句裡的 beit 卻因為這個原因又生出一個
+            // beit (2)。真正的「拼音撞在一起的不同字」只會發生在：拼音相同的
+            // 項目已經不只一個、而且每一個都已經有原生文字、卻沒有一個對得
+            // 上——那才代表這次點到的是第三個、真正不同的字。
+            const sameTextWords = allWords.filter(w => w.text.toLowerCase() === clean.toLowerCase());
+            const withoutNative = sameTextWords.find(w => !((lookup(w.text) || {}).nativeScript));
+            const genuineCollision = sameTextWords.length > 0 && sameTextWords.every(w => (lookup(w.text) || {}).nativeScript);
+            if(withoutNative && !genuineCollision){
+              // 補上原生文字（跟 zh/en，如果原本沒有的話），不新增重複項目，
+              // 直接跳過去給既有的那筆補資料。
+              customDB[withoutNative.text] = Object.assign(
+                {},
+                lookup(withoutNative.text),
+                { nativeScript: resolved.nativeScript },
+                (resolved.zh && !(lookup(withoutNative.text) || {}).zh) ? { zh: resolved.zh, en: resolved.en } : {}
+              );
+              saveCustomDB();
+              jumpToWordObj(withoutNative);
+              return;
+            }
+            // 真的是拼音撞在一起、上面已有的項目都已經有各自的原生文字、卻
+            // 沒有一個對得上——才算是真正不同的字，用碰撞安全編號新增一筆。
             let text = clean;
             if(allWords.some(w => w.text.toLowerCase() === text.toLowerCase())){
               let suffix = 2;
@@ -3494,6 +3537,10 @@ function renderTappableSentence(sentence, sentenceNativeScript){
               );
               saveCustomDB();
               wSpan.classList.add("in-list");
+              if(onWordAdded){
+                const added = allWords.find(w => w.text === text);
+                if(added) onWordAdded(added.id);
+              }
             }
             return;
           }
@@ -3501,7 +3548,13 @@ function renderTappableSentence(sentence, sentenceNativeScript){
         jumpToWord(clean);
         return;
       }
-      if(addWordToList(clean)) wSpan.classList.add("in-list");
+      if(addWordToList(clean)){
+        wSpan.classList.add("in-list");
+        if(onWordAdded){
+          const added = allWords.find(w => w.text === clean);
+          if(added) onWordAdded(added.id);
+        }
+      }
     });
     wrap.appendChild(wSpan);
   });
@@ -3546,7 +3599,13 @@ function renderTappableSentence(sentence, sentenceNativeScript){
       jumpToWordObj(existing);
       return;
     }
-    if(addWordToList(text)) exitPhraseMode();
+    if(addWordToList(text)){
+      if(onWordAdded){
+        const added = allWords.find(w => w.text === text);
+        if(added) onWordAdded(added.id);
+      }
+      exitPhraseMode();
+    }
   });
 
   container.appendChild(wrap);
@@ -3563,7 +3622,10 @@ function renderUsagePanel(panel, examples, onRegenerate){
 
     const idLine = document.createElement("div");
     idLine.className = "usage-id";
-    const sentEl = renderTappableSentence(ex.id, ex.nativeScript);
+    // 記錄從這句話（點字、片語、整句加入）新增進單字表的字，讓下面的 ✨
+    // 按鈕知道要補哪幾個字的資料，不用捲到上面按「AI 自動生成」。
+    const newlyAddedIds = [];
+    const sentEl = renderTappableSentence(ex.id, ex.nativeScript, id => newlyAddedIds.push(id));
     idLine.appendChild(sentEl);
     const speakBtn = document.createElement("button");
     speakBtn.type = "button";
@@ -3599,9 +3661,42 @@ function renderUsagePanel(panel, examples, onRegenerate){
         addSentenceBtn.textContent = "✓";
         addSentenceBtn.title = "已加入整句";
         addSentenceBtn.disabled = true;
+        const added = allWords.find(w => w.text === text);
+        if(added) newlyAddedIds.push(added.id);
       }
     });
     idLine.appendChild(addSentenceBtn);
+
+    // 這句話裡點字/整句加進單字表的新單字，常常只有意思、還缺測驗資料，
+    // 原本要捲到最上面按「AI 自動生成缺少的翻譯」才能補齊。這顆按鈕直接在
+    // 句子旁邊，只補這句話新增的這幾個字，不用捲上去、也不會把正在看的
+    // 這個面板收合掉。
+    const genNewBtn = document.createElement("button");
+    genNewBtn.type = "button";
+    genNewBtn.className = "speak-btn";
+    genNewBtn.textContent = "✨";
+    genNewBtn.title = "生成這句新增單字缺少的翻譯資料";
+    genNewBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!getApiKey()){ alert("請先輸入並儲存 API Key。"); return; }
+      const missing = allWords.filter(w => newlyAddedIds.includes(w.id) && needsGeneration(w));
+      if(missing.length === 0){
+        alert("這句話目前沒有新增、還缺資料的單字（可能還沒點字加入，或已經生成過了）。");
+        return;
+      }
+      const original = genNewBtn.textContent;
+      genNewBtn.disabled = true;
+      try{
+        await completeMissingWordData(missing, genNewBtn, "生成中", true);
+        missing.forEach(w => refreshWordRowDisplay(w.id));
+      }catch(err){
+        alert("生成失敗：" + err.message);
+      } finally {
+        genNewBtn.disabled = false;
+        genNewBtn.textContent = original;
+      }
+    });
+    idLine.appendChild(genNewBtn);
 
     // 日文文法解析，只有日文才需要（助詞、動詞變化這些對中文母語者比較難懂，
     // 其他語言語序/文法離中文近很多，用不太到）。
