@@ -2959,7 +2959,6 @@ document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
 // 「字母名」是固定的（跟老師教的一樣，例如 ث 叫 thaa）；「Franco 拼法」「發音」是
 // 這個字母出現在埃及口語單字裡時實際怎麼拼、怎麼唸，兩者常常不一樣。
 const ARABIC_LETTERS = [
-  ["ا", "alif", "a / aa", "長 a；或當 hamza 的座", "ألف"],
   ["ب", "baa", "b", "b", "باء"],
   ["ت", "taa", "t", "t", "تاء"],
   ["ث", "thaa", "s（有些字 t）", "字母名唸 thaa（英文 think 的 th）；但出現在埃及口語單字裡多半唸 s，少數唸 t——這個 app 拼 s", "ثاء"],
@@ -2971,7 +2970,9 @@ const ARABIC_LETTERS = [
   ["د", "daal", "d", "d", "دال"],
   ["ذ", "dhaal", "z（有些字 d）", "字母名唸 dhaal（英文 this 的 th）；出現在埃及口語單字裡多半唸 z，少數唸 d——這個 app 拼 z", "ذال"],
   ["ر", "raa", "r", "彈舌 r", "راء"],
-  ["ز", "zeen", "z", "z", "زاي"],
+  ["ز", "zeen", "z", "英文 zoo 的 z（濁音 /z/）", "زين"],
+  ["و", "waaw", "w / oo", "子音 w；或長 u／長 o", "واو"],
+  ["ا", "alif", "a / aa", "長 a；或當 hamza 的座", "ألف"],
   ["س", "seen", "s", "s", "سين"],
   ["ش", "sheen", "sh", "sh", "شين"],
   ["ص", "Saad", "s", "字母名是重音 s；出現在單字裡拼法一樣寫 s", "صاد"],
@@ -2985,8 +2986,7 @@ const ARABIC_LETTERS = [
   ["ك", "kaaf", "k", "k", "كاف"],
   ["ل", "laam", "l", "l", "لام"],
   ["م", "meem", "m", "m", "ميم"],
-  ["ه", "haa", "h", "輕輕的 h（像英文 house 的 h）", "هاء"],
-  ["و", "waaw", "w / oo", "子音 w；或長 u／長 o", "واو"]
+  ["ه", "haa", "h", "輕輕的 h（像英文 house 的 h）", "هاء"]
 ];
 const ARABIC_EXTRAS = [
   ["ء", "hamza", "2 / '", "喉塞音（像台語「一」前面那個頓）"],
