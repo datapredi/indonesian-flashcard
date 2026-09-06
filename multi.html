@@ -2440,6 +2440,32 @@ const LETTER_NOTES_LS = "flashcard_letter_notes_v1";
 let letterNotes = {};
 try{ letterNotes = JSON.parse(localStorage.getItem(LETTER_NOTES_LS)) || {}; }catch(e){ letterNotes = {}; }
 function saveLetterNotes(){ localStorage.setItem(LETTER_NOTES_LS, JSON.stringify(letterNotes)); }
+
+// 字母卡片換底色（黃／紅／藍／綠），跟筆記一樣用 "目前語言:字母" 當 key。
+const LETTER_COLORS_LS = "flashcard_letter_colors_v1";
+let letterColors = {};
+try{ letterColors = JSON.parse(localStorage.getItem(LETTER_COLORS_LS)) || {}; }catch(e){ letterColors = {}; }
+function saveLetterColors(){ localStorage.setItem(LETTER_COLORS_LS, JSON.stringify(letterColors)); }
+const LETTER_COLOR_HEX = { yellow: "#ffd400", red: "#ff4d4d", blue: "#3b82f6", green: "#34c759" };
+function attachLetterColor(cardEl, key){
+  function apply(){
+    const c = letterColors[key];
+    cardEl.style.background = (c && LETTER_COLOR_HEX[c]) ? `color-mix(in srgb, ${LETTER_COLOR_HEX[c]} 20%, var(--bg))` : "";
+  }
+  const sel = document.createElement("select");
+  sel.style.cssText = "margin-top:4px; font-size:0.72rem; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--fg); padding:1px 3px;";
+  sel.innerHTML = '<option value="">🏳️ 底色</option><option value="yellow">🟨 黃</option><option value="red">🟥 紅</option><option value="blue">🟦 藍</option><option value="green">🟩 綠</option>';
+  sel.value = letterColors[key] || "";
+  sel.addEventListener("click", (e) => e.stopPropagation());
+  sel.addEventListener("change", (e) => {
+    e.stopPropagation();
+    if(sel.value) letterColors[key] = sel.value; else delete letterColors[key];
+    saveLetterColors();
+    apply();
+  });
+  apply();
+  cardEl.appendChild(sel);
+}
 function attachLetterNote(cardEl, key){
   const has = () => !!(letterNotes[key] && String(letterNotes[key]).trim());
   const btn = document.createElement("button");
@@ -2553,6 +2579,7 @@ function renderThaiAlphabetPanel(){
     sound.className = "usage-note";
     sound.textContent = v.sound;
     item.appendChild(sound);
+    attachLetterColor(item, "th:" + v.short);
     vowelGrid.appendChild(item);
   });
   panel.appendChild(vowelGrid);
@@ -2588,6 +2615,7 @@ function renderThaiAlphabetPanel(){
     sound.className = "usage-note";
     sound.textContent = v.sound;
     item.appendChild(sound);
+    attachLetterColor(item, "th:" + v.forms.join("/"));
     diphGrid.appendChild(item);
   });
 
@@ -2609,6 +2637,7 @@ function renderThaiAlphabetPanel(){
       info.className = "usage-note";
       info.innerHTML = `${name}<br>${sound}${extraNote ? `<br><span style="color:${obsolete ? "var(--danger)" : "var(--muted)"};">${extraNote}</span>` : ""}`;
       item.appendChild(info);
+      attachLetterColor(item, "th:" + letter);
       grid.appendChild(item);
     });
     panel.appendChild(grid);
@@ -2665,6 +2694,7 @@ function renderThaiAlphabetPanel(){
       sub.style.fontSize = "0.68rem";
       sub.innerHTML = `${name}<br><span style="color:${classColors[clsKey]};">${clsShort[clsKey]}音</span>${extraNote ? `<br><span style="color:${obsolete ? "var(--danger)" : "var(--muted)"};">${extraNote}</span>` : ""}`;
       chip.appendChild(sub);
+      attachLetterColor(chip, "th:" + letter);
       grp.appendChild(chip);
     });
     panel.appendChild(grp);
@@ -2703,6 +2733,7 @@ function renderThaiAlphabetPanel(){
       sub.style.fontSize = "0.68rem";
       sub.innerHTML = `${info.name}<br>${info.sound}`;
       chip.appendChild(sub);
+      attachLetterColor(chip, "th:" + letter);
       row.appendChild(chip);
     });
     panel.appendChild(row);
@@ -2851,6 +2882,7 @@ function renderViAlphabetPanel(){
     }
     // 只顯示不帶聲調的基本形（就是字母本身＝ngang/M 平聲）；其他 4 個聲調變體不列。
     attachLetterNote(item, "vi:" + v.letter);
+    attachLetterColor(item, "vi:" + v.letter);
     attachLetterRecording(item, v.letter);
     vowelGrid.appendChild(item);
   });
@@ -2890,6 +2922,7 @@ function renderViAlphabetPanel(){
       item.appendChild(art);
     }
     attachLetterNote(item, "vi:" + v.form);
+    attachLetterColor(item, "vi:" + v.form);
     attachLetterRecording(item, v.form.split("/")[0].trim());
     diphGrid.appendChild(item);
   });
@@ -2918,6 +2951,7 @@ function renderViAlphabetPanel(){
         item.appendChild(a);
       }
       attachLetterNote(item, "vi:" + letter);
+      attachLetterColor(item, "vi:" + letter);
       attachLetterRecording(item, letter.split("/")[0].trim());
       g.appendChild(item);
     });
@@ -3037,6 +3071,7 @@ function renderArabicAlphabetPanel(){
       info.innerHTML = `${name} · <b>${franco}</b><br>${sound}`;
       item.appendChild(info);
       if(showForms) item.appendChild(formsRow(letter));
+      attachLetterColor(item, "arz:" + letter);
       g.appendChild(item);
     });
     panel.appendChild(g);
@@ -6780,7 +6815,7 @@ const BACKUP_PER_LANG_BASES = [
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS
 ];
-const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS];
+const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS];
 
 function exportBackup(){
   const data = { version: 1, exportedAt: new Date().toISOString(), keys: {} };
