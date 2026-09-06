@@ -444,6 +444,7 @@
 <div id="autoplayFloat" class="autoplay-float hidden">
   <span class="ap-status" id="autoplayFloatStatus"></span>
   <button type="button" id="autoplayFloatToggle" title="暫停／繼續">⏸️</button>
+  <button type="button" id="autoplayFloatMark" title="把這個字標成待複習（停在原地繼續播）">⚠️</button>
   <button type="button" id="autoplayFloatNext" title="這個字已經會了，跳過去聽下一個（不會標待複習）">⏭️</button>
   <button type="button" id="autoplayFloatClose" title="結束依序播放">✕</button>
 </div>
@@ -6725,7 +6726,7 @@ function renderAutoplayControls(){
     document.getElementById("autoplayFloatStatus").textContent =
       `${Math.min(listAutoplayIndex + 1, total)} / ${total}${listAutoplayPaused ? "（已暫停）" : etaTxt}`;
     document.getElementById("autoplayFloatToggle").textContent = listAutoplayRunning ? "⏸️" : "▶️";
-    float.title = "AirPods／耳機：單按=暫停·繼續；雙按=跳下一個；三按=把這個字標成待複習（停在原地繼續播）（限 GPT 語音）";
+    float.title = "AirPods／耳機：單按=暫停·繼續；雙按=把這個字標成待複習（停在原地繼續播）；三按=跳下一個（限 GPT 語音）";
   }
 }
 // 完整停止（離開畫面、按 ✕）：重設進度、收起浮動控制器。
@@ -6758,10 +6759,11 @@ function setupAutoplayMediaSession(w, total){
     });
     navigator.mediaSession.setActionHandler("play", () => { if(!listAutoplayRunning) runListAutoplay(); });
     navigator.mediaSession.setActionHandler("pause", () => { if(listAutoplayRunning) pauseListAutoplay(); });
-    // AirPods 雙按（nexttrack）＝直接跳下一個字，不標記；三按（previoustrack）
-    // ＝把「現在這個字」標成 ⚠️ 待複習，但停在原地繼續播（不跳）。
-    navigator.mediaSession.setActionHandler("nexttrack", () => autoplaySkipNext());
-    navigator.mediaSession.setActionHandler("previoustrack", () => autoplayMarkCurrent());
+    // AirPods 雙按（nexttrack）＝把「現在這個字」標成 ⚠️ 待複習、停在原地繼續播
+    // （雙按最好按，這是最常用的動作）。三按（previoustrack，AirPods 常常按不準）
+    // ＝跳下一個字，不標記——按不準也沒關係，本來就是次要功能。
+    navigator.mediaSession.setActionHandler("nexttrack", () => autoplayMarkCurrent());
+    navigator.mediaSession.setActionHandler("previoustrack", () => autoplaySkipNext());
     navigator.mediaSession.playbackState = "playing";
   }catch(e){ /* 某些瀏覽器不支援部分 action，忽略 */ }
 }
@@ -6772,8 +6774,8 @@ function clearAutoplayMediaSession(){
     navigator.mediaSession.playbackState = "none";
   }catch(e){}
 }
-// AirPods 三按：把「現在正在播的這個字」標成 ⚠️ 待複習（再按一次取消），
-// 停在原地不跳、也不打斷播放，讓它把剩下的次數唸完。
+// AirPods 雙按（也是浮動控制器的 ⚠️）：把「現在正在播的這個字」標成 ⚠️
+// 待複習（再按一次取消），停在原地不跳、也不打斷播放，讓它把剩下的次數唸完。
 function autoplayMarkCurrent(){
   const w = autoplayCurrentWord;
   if(!w) return;
@@ -6791,8 +6793,8 @@ function autoplayMarkCurrent(){
     if(pfBtn){ pfBtn.classList.toggle("diff-H", on); pfBtn.style.opacity = on ? "1" : "0.35"; }
   }
 }
-// 浮動控制器的 ⏭️（＝AirPods 雙按）：這個字不用再聽，直接跳去下一個，
-// 「不會」把字標成 ⚠️ 待複習（要標待複習用 AirPods 三按）。
+// 浮動控制器的 ⏭️（＝AirPods 三按）：這個字不用再聽，直接跳去下一個，
+// 「不會」把字標成 ⚠️ 待複習（要標待複習用 AirPods 雙按或 ⚠️ 鈕）。
 function autoplaySkipNext(){
   if(!listAutoplayRunning && !listAutoplayPaused) return;
   if(listAutoplayPaused){
@@ -6889,7 +6891,8 @@ async function runListAutoplay(){
       }
     }
     if(!autoplayJump) await delayMs(550);
-    // 決定下一個字：AirPods 三按(previoustrack)＝回上一個，其餘＝下一個
+    // 換下一個字（autoplayJump === -1「回上一個」目前沒有任何手勢會觸發，
+    // 保留分支以防之後再加）。
     if(autoplayJump === -1) listAutoplayIndex = Math.max(0, listAutoplayIndex - 1);
     else listAutoplayIndex++;
     autoplayJump = 0;
@@ -6911,6 +6914,7 @@ function toggleListAutoplay(){
 }
 document.getElementById("btnListAutoplay").addEventListener("click", toggleListAutoplay);
 document.getElementById("autoplayFloatToggle").addEventListener("click", toggleListAutoplay);
+document.getElementById("autoplayFloatMark").addEventListener("click", autoplayMarkCurrent);
 document.getElementById("autoplayFloatNext").addEventListener("click", autoplaySkipNext);
 document.getElementById("autoplayFloatClose").addEventListener("click", stopListAutoplay);
 // 「加唸中文」勾選狀態記起來（全語言通用）
