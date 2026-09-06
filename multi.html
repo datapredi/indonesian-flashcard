@@ -3002,7 +3002,7 @@ const ARABIC_LETTERS = [
   ["ح", "Haa", "7", "喉嚨用力擠出的 h（ħ）", "حاء"],
   ["خ", "khaa", "kh", "喉嚨後部的摩擦音（x）——像德文 Bach、蘇格蘭 loch、注音 ㄏ 但更往喉嚨後面刮。不是 k＋h 兩個音，聽起來像喉音的「ㄏ」，所以老師唸這個字母常聽起來比較像 haa／khokh，不像 kaa", "خاء"],
   ["د", "daal", "d", "d", "دال"],
-  ["ذ", "dhaal", "z（有些字 d）", "字母名唸 dhaal（英文 this 的 th）；出現在埃及口語單字裡多半唸 z，少數唸 d——這個 app 拼 z", "ذال"],
+  ["ذ", "dhaal", "z（有些字 d）", "標準語的音是濁音 th（ð）＝英文 the／this／that 開頭那個音，老師示範時可能就直接寫「the」。但埃及口語單字裡這個字母多半唸成 z（haaza 不是 haadha），少數唸 d——這個 app 一律拼 z", "ذال"],
   ["ر", "raa", "r", "彈舌 r", "راء"],
   ["ز", "zeen", "z", "英文 zoo 的 z（濁音 /z/）", "زين"],
   ["و", "waaw", "w / oo", "子音 w；或長 u／長 o", "واو"],
@@ -3036,18 +3036,28 @@ function renderArabicAlphabetPanel(){
   panel.innerHTML = "";
 
   // 用連接號 tatweel（ـ, U+0640）把字母夾在中間，逼瀏覽器套用該位置的字形——
-  // 這個比 ZWJ 可靠，每個阿拉伯字型都會跟 tatweel 相連。ا د ذ ر ز و 不連後字，
-  // 所以「字首」看起來會跟「單獨」一樣、「字中」跟「字尾」一樣，這是正常的。
+  // 這個比 ZWJ 可靠，每個阿拉伯字型都會跟 tatweel 相連。
+  // ا د ذ ر ز و 這 6 個「只連前、不連後」：右邊（前一個字母那側）會相連，
+  // 左邊（下一個字母那側）不連，所以如果左邊還硬加一條 tatweel，會變成一條
+  // 飄在旁邊、沒接上的橫線（使用者問的「左邊多一個一」）。對這 6 個字母，
+  // 左側就不要加 tatweel，直接顯示它真正的樣子——它們本來也只有兩種字形：
+  // 單獨＝字首、字中＝字尾。
   const T = "ـ";
+  const RIGHT_JOIN_ONLY = "ادذرزو";
   function formsRow(letter){
     const wrap = document.createElement("div");
     wrap.style.cssText = "display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; margin-top:8px; font-size:0.7rem; color:var(--muted);";
-    const forms = [
-      ["單獨", letter],
-      ["字首", letter + T],
-      ["字中", T + letter + T],
-      ["字尾", T + letter]
-    ];
+    const forms = RIGHT_JOIN_ONLY.indexOf(letter) !== -1
+      ? [
+          ["單獨／字首", letter],
+          ["字中／字尾", T + letter]
+        ]
+      : [
+          ["單獨", letter],
+          ["字首", letter + T],
+          ["字中", T + letter + T],
+          ["字尾", T + letter]
+        ];
     forms.forEach(([lbl, glyph]) => {
       const cell = document.createElement("div");
       cell.style.cssText = "text-align:center; min-width:34px;";
@@ -3084,7 +3094,7 @@ function renderArabicAlphabetPanel(){
   const h1b = document.createElement("div");
   h1b.className = "usage-note";
   h1b.style.margin = "2px 0 0";
-  h1b.textContent = "每個字母下面是它在「單獨／字首／字中／字尾」四個位置的字形（旁邊那條橫線是連接號，用來示範相連的樣子）；ا د ذ ر ز و 這 6 個不跟後面的字母相連，所以「字首」會長得跟「單獨」一樣、「字中」跟「字尾」一樣。";
+  h1b.textContent = "每個字母下面是它在「單獨／字首／字中／字尾」四個位置的字形（旁邊那條橫線是連接號 tatweel，只是用來示範跟別的字母相連的樣子，不是字母本身的一部分）；ا د ذ ر ز و 這 6 個只連前面、不連後面，本來就只有兩種字形，所以只列「單獨／字首」跟「字中／字尾」兩欄。";
   panel.appendChild(h1b);
   grid(ARABIC_LETTERS, "1.7rem", true);
 
