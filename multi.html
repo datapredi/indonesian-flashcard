@@ -3138,18 +3138,23 @@ function renderArabicAlphabetPanel(){
         const ex = arabicLetterExamplesCache[letter];
         const exWrap = document.createElement("div");
         exWrap.style.cssText = "margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:0.72rem;";
-        // 例字裡的字母「不能」用 <span> 直接塗色——在阿拉伯文詞中間夾一個
-        // 元素邊界，瀏覽器（Safari 尤其）會把連寫斷開，被塗色的字母就變回
-        // 單獨形。所以例字本身完整、正確連寫地顯示，另外在旁邊放一個紅色的
-        // 「單獨形」提示這一列講的是哪個字母，位置靠 字首/字中/字尾 標籤看。
+        // 阿拉伯文詞裡「不能」用 <span> 直接塗色——夾一個元素邊界，瀏覽器
+        // （Safari 尤其）會把連寫斷開、字母掉回單獨形。所以例字本身完整、正確
+        // 連寫地顯示（不上色），改成把 Franco 拼音裡對應的音標紅（拉丁字母
+        // 沒有連寫問題），當作「看紅色這個音在單字的哪裡」的對照。
+        const francoCore = ((franco || "").match(/[A-Za-z0-9']+/) || [""])[0].toLowerCase();
+        function hlFranco(f){
+          if(!francoCore) return f;
+          const re = new RegExp(francoCore.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig");
+          return String(f).replace(re, m => `<span style="color:var(--danger); font-weight:700;">${m}</span>`);
+        }
         [["字首", ex.initial], ["字中", ex.medial], ["字尾", ex.final]].forEach(([lbl, wd]) => {
           if(!wd || !wd.word) return;
           const line = document.createElement("div");
           line.style.cssText = "margin:2px 0;";
           line.innerHTML = `<span class="usage-note">${lbl}：</span>`
             + `<span style="font-size:1.2rem;" dir="rtl">${wd.word}</span> `
-            + `<span style="color:var(--danger); font-weight:700; font-size:1.05rem;" dir="rtl">${letter}</span> `
-            + `<span class="usage-note">${wd.franco}・${wd.zh}</span>`;
+            + `<span class="usage-note">${hlFranco(wd.franco)}・${wd.zh}</span>`;
           exWrap.appendChild(line);
         });
         item.appendChild(exWrap);
