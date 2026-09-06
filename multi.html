@@ -2044,6 +2044,47 @@ const AR_BREAKDOWN_CACHE_LS = "flashcard_ar_breakdown_cache_v1";
 let arBreakdownCache = {};
 try{ arBreakdownCache = JSON.parse(localStorage.getItem(lsKey(AR_BREAKDOWN_CACHE_LS))) || {}; }catch(e){ arBreakdownCache = {}; }
 function saveArBreakdownCache(){ localStorage.setItem(lsKey(AR_BREAKDOWN_CACHE_LS), JSON.stringify(arBreakdownCache)); }
+
+// 字母表：每個字母在字首／字中／字尾的連接例字（一次全部生成、存起來，預設
+// 收起來讓版面乾淨，按鈕才展開）。
+const ARABIC_EXAMPLES_CACHE_LS = "flashcard_arabic_letter_examples_v1";
+let arabicLetterExamplesCache = {};
+try{ arabicLetterExamplesCache = JSON.parse(localStorage.getItem(ARABIC_EXAMPLES_CACHE_LS)) || {}; }catch(e){ arabicLetterExamplesCache = {}; }
+function saveArabicLetterExamplesCache(){ localStorage.setItem(ARABIC_EXAMPLES_CACHE_LS, JSON.stringify(arabicLetterExamplesCache)); }
+const ARABIC_EXAMPLES_SHOWN_LS = "flashcard_arabic_examples_shown_v1";
+let arabicExamplesShown = false;
+try{ arabicExamplesShown = localStorage.getItem(ARABIC_EXAMPLES_SHOWN_LS) === "1"; }catch(e){}
+async function generateArabicLetterExamples(){
+  const slot = { type: "object", properties: { word: { type: "string" }, franco: { type: "string" }, zh: { type: "string" } }, required: ["word", "franco", "zh"], additionalProperties: false };
+  const schema = {
+    type: "object",
+    properties: {
+      letters: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { letter: { type: "string" }, initial: slot, medial: slot, final: slot },
+          required: ["letter", "initial", "medial", "final"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["letters"],
+    additionalProperties: false
+  };
+  const letterList = ARABIC_LETTERS.map(([l, name]) => `${l}（${name}）`).join("、");
+  const prompt = `你是埃及阿拉伯語老師。針對下面每個阿拉伯字母，各給三個常見的阿拉伯文單字，分別示範這個字母出現在「字首、字中、字尾」時跟前後字母連接的樣子。
+- 優先選開羅口語／日常生活常見的字
+- 如果某個字母幾乎不出現在某個位置（例如某些字母很少在字尾），還是要給一個真的存在、最接近的常見字，不要造假字
+- 每個位置給：word（阿拉伯文，不要加短母音符號）、franco（這個 app 的 Franco/Arabizi 拼法：7=ح、3=ع、2=ء 和開羅口語的 ق、kh=خ、gh=غ、sh=ش、ج=g；重音字母 ص／ض／ط／ظ 一律寫成一般的 s／d／t／z；長母音 aa／ee／oo）、zh（繁體中文意思）
+- letter 欄位就填輸入的那個字母本身
+
+字母：${letterList}`;
+  const parsed = await callClaude(prompt, schema, 4096);
+  const out = {};
+  (parsed.letters || []).forEach(e => { if(e.letter) out[e.letter] = { initial: e.initial, medial: e.medial, final: e.final }; });
+  return out;
+}
 async function getEgyptianLetterBreakdown(nativeScript, romanized, force){
   const key = nativeScript;
   if(!force && arBreakdownCache[key]) return arBreakdownCache[key];
@@ -3081,6 +3122,19 @@ function renderArabicAlphabetPanel(){
       info.innerHTML = `${name} · <b>${franco}</b><br>${sound}`;
       item.appendChild(info);
       if(showForms) item.appendChild(formsRow(letter));
+      if(showForms && arabicExamplesShown && arabicLetterExamplesCache[letter]){
+        const ex = arabicLetterExamplesCache[letter];
+        const exWrap = document.createElement("div");
+        exWrap.style.cssText = "margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:0.72rem;";
+        [["字首", ex.initial], ["字中", ex.medial], ["字尾", ex.final]].forEach(([lbl, wd]) => {
+          if(!wd || !wd.word) return;
+          const line = document.createElement("div");
+          line.style.cssText = "margin:2px 0;";
+          line.innerHTML = `<span class="usage-note">${lbl}：</span><span style="font-size:1.2rem;" dir="rtl">${wd.word}</span> <span class="usage-note">${wd.franco}・${wd.zh}</span>`;
+          exWrap.appendChild(line);
+        });
+        item.appendChild(exWrap);
+      }
       attachLetterColor(item, "arz:" + letter);
       g.appendChild(item);
     });
@@ -3096,6 +3150,56 @@ function renderArabicAlphabetPanel(){
   h1b.style.margin = "2px 0 0";
   h1b.textContent = "每個字母下面是它在「單獨／字首／字中／字尾」四個位置的字形（旁邊那條橫線是連接號 tatweel，只是用來示範跟別的字母相連的樣子，不是字母本身的一部分）；ا د ذ ر ز و 這 6 個只連前面、不連後面，本來就只有兩種字形，所以只列「單獨／字首」跟「字中／字尾」兩欄。";
   panel.appendChild(h1b);
+
+  // 連接例字：每個字母在字首/字中/字尾的真實例字，預設收起來（版面乾淨），
+  // 按鈕才展開。第一次展開時一次生成全部 28 個字母、存進 localStorage。
+  const exBtn = document.createElement("button");
+  exBtn.type = "button";
+  exBtn.className = "speak-btn";
+  exBtn.style.margin = "8px 0";
+  const hasExamples = Object.keys(arabicLetterExamplesCache).length > 0;
+  exBtn.textContent = arabicExamplesShown ? "🔗 隱藏連接例字" : (hasExamples ? "🔗 顯示連接例字（字首/字中/字尾）" : "🔗 生成連接例字（字首/字中/字尾）");
+  exBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!arabicExamplesShown){
+      if(Object.keys(arabicLetterExamplesCache).length === 0){
+        if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+        exBtn.disabled = true;
+        exBtn.textContent = "生成中…（一次做完 28 個字母）";
+        try{
+          arabicLetterExamplesCache = await generateArabicLetterExamples();
+          saveArabicLetterExamplesCache();
+        }catch(err){ alert("生成失敗：" + err.message); exBtn.disabled = false; exBtn.textContent = "🔗 生成連接例字（字首/字中/字尾）"; return; }
+        exBtn.disabled = false;
+      }
+      arabicExamplesShown = true;
+    }else{
+      arabicExamplesShown = false;
+    }
+    try{ localStorage.setItem(ARABIC_EXAMPLES_SHOWN_LS, arabicExamplesShown ? "1" : "0"); }catch(e){}
+    renderArabicAlphabetPanel();
+  });
+  panel.appendChild(exBtn);
+  if(arabicExamplesShown && hasExamples){
+    const regen = document.createElement("button");
+    regen.type = "button";
+    regen.className = "speak-btn";
+    regen.style.margin = "8px 0 8px 8px";
+    regen.textContent = "🔄 重新生成例字";
+    regen.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!getApiKey()){ alert("需要 Anthropic API Key。"); return; }
+      if(!confirm("重新生成所有字母的連接例字？會覆蓋目前這一份。")) return;
+      regen.disabled = true; regen.textContent = "生成中…";
+      try{
+        arabicLetterExamplesCache = await generateArabicLetterExamples();
+        saveArabicLetterExamplesCache();
+        renderArabicAlphabetPanel();
+      }catch(err){ alert("生成失敗：" + err.message); regen.disabled = false; regen.textContent = "🔄 重新生成例字"; }
+    });
+    panel.appendChild(regen);
+  }
+
   grid(ARABIC_LETTERS, "1.7rem", true);
 
   const h2 = document.createElement("div");
@@ -6825,7 +6929,7 @@ const BACKUP_PER_LANG_BASES = [
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS
 ];
-const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS];
+const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS, ARABIC_EXAMPLES_CACHE_LS];
 
 function exportBackup(){
   const data = { version: 1, exportedAt: new Date().toISOString(), keys: {} };
