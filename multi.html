@@ -3087,17 +3087,18 @@ function renderArabicAlphabetPanel(){
   const RIGHT_JOIN_ONLY = "ادذرزو";
   function formsRow(letter){
     const wrap = document.createElement("div");
-    wrap.style.cssText = "display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; margin-top:8px; font-size:0.7rem; color:var(--muted);";
+    // direction:rtl 讓這幾格照阿拉伯文的方向（從右往左）排：字首 → 字中 → 字尾 → 單獨
+    wrap.style.cssText = "display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; margin-top:8px; font-size:0.7rem; color:var(--muted); direction:rtl;";
     const forms = RIGHT_JOIN_ONLY.indexOf(letter) !== -1
       ? [
-          ["單獨／字首", letter],
+          ["字首／單獨", letter],
           ["字中／字尾", T + letter]
         ]
       : [
-          ["單獨", letter],
           ["字首", letter + T],
           ["字中", T + letter + T],
-          ["字尾", T + letter]
+          ["字尾", T + letter],
+          ["單獨", letter]
         ];
     forms.forEach(([lbl, glyph]) => {
       const cell = document.createElement("div");
@@ -3148,7 +3149,7 @@ function renderArabicAlphabetPanel(){
   const h1b = document.createElement("div");
   h1b.className = "usage-note";
   h1b.style.margin = "2px 0 0";
-  h1b.textContent = "每個字母下面是它在「單獨／字首／字中／字尾」四個位置的字形（旁邊那條橫線是連接號 tatweel，只是用來示範跟別的字母相連的樣子，不是字母本身的一部分）；ا د ذ ر ز و 這 6 個只連前面、不連後面，本來就只有兩種字形，所以只列「單獨／字首」跟「字中／字尾」兩欄。";
+  h1b.textContent = "每個字母下面是它在「字首／字中／字尾／單獨」四個位置的字形，照阿拉伯文方向從右往左排（旁邊那條橫線是連接號 tatweel，只是用來示範跟別的字母相連的樣子，不是字母本身的一部分）；ا د ذ ر ز و 這 6 個只連前面、不連後面，本來就只有兩種字形，所以只列「字首／單獨」跟「字中／字尾」兩欄。";
   panel.appendChild(h1b);
 
   // 連接例字：每個字母在字首/字中/字尾的真實例字，預設收起來（版面乾淨），
