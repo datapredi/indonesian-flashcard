@@ -6710,7 +6710,7 @@ function renderAutoplayControls(){
     document.getElementById("autoplayFloatStatus").textContent =
       `${Math.min(listAutoplayIndex + 1, total)} / ${total}${listAutoplayPaused ? "（已暫停）" : etaTxt}`;
     document.getElementById("autoplayFloatToggle").textContent = listAutoplayRunning ? "⏸️" : "▶️";
-    float.title = "AirPods／耳機：單按=暫停·繼續；雙按=標這個字待複習＋跳下一個；三按=回上一個（限 GPT 語音）";
+    float.title = "AirPods／耳機：單按=暫停·繼續；雙按=跳下一個；三按=把這個字標成待複習（停在原地繼續播）（限 GPT 語音）";
   }
 }
 // 完整停止（離開畫面、按 ✕）：重設進度、收起浮動控制器。
@@ -6743,12 +6743,10 @@ function setupAutoplayMediaSession(w, total){
     });
     navigator.mediaSession.setActionHandler("play", () => { if(!listAutoplayRunning) runListAutoplay(); });
     navigator.mediaSession.setActionHandler("pause", () => { if(listAutoplayRunning) pauseListAutoplay(); });
-    navigator.mediaSession.setActionHandler("nexttrack", () => autoplayMarkAndNext());
-    navigator.mediaSession.setActionHandler("previoustrack", () => {
-      autoplayJump = -1;
-      abortCurrentPlayback();
-      if('speechSynthesis' in window) speechSynthesis.cancel();
-    });
+    // AirPods 雙按（nexttrack）＝直接跳下一個字，不標記；三按（previoustrack）
+    // ＝把「現在這個字」標成 ⚠️ 待複習，但停在原地繼續播（不跳）。
+    navigator.mediaSession.setActionHandler("nexttrack", () => autoplaySkipNext());
+    navigator.mediaSession.setActionHandler("previoustrack", () => autoplayMarkCurrent());
     navigator.mediaSession.playbackState = "playing";
   }catch(e){ /* 某些瀏覽器不支援部分 action，忽略 */ }
 }
@@ -6759,28 +6757,27 @@ function clearAutoplayMediaSession(){
     navigator.mediaSession.playbackState = "none";
   }catch(e){}
 }
-function autoplayMarkAndNext(){
+// AirPods 三按：把「現在正在播的這個字」標成 ⚠️ 待複習（再按一次取消），
+// 停在原地不跳、也不打斷播放，讓它把剩下的次數唸完。
+function autoplayMarkCurrent(){
   const w = autoplayCurrentWord;
-  if(w && !pronFlagIds.has(w.id)){
-    pronFlagIds.add(w.id);
-    savePronFlag();
-    if(typeof updatePronFlagToggleLabel === "function") updatePronFlagToggleLabel();
-    const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
-    if(rowEl){
-      rowEl.classList.add("jump-highlight");
-      setTimeout(() => rowEl.classList.remove("jump-highlight"), 1600);
-      // 立刻把這一列的 ⚠️ 標記顯示出來，不用等整個列表重繪
-      const pfBtn = rowEl.querySelector(".row-pron-btn");
-      if(pfBtn){ pfBtn.classList.add("diff-H"); pfBtn.style.opacity = "1"; }
-    }
+  if(!w) return;
+  const on = !pronFlagIds.has(w.id);
+  if(on) pronFlagIds.add(w.id); else pronFlagIds.delete(w.id);
+  savePronFlag();
+  if(typeof updatePronFlagToggleLabel === "function") updatePronFlagToggleLabel();
+  const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
+  if(rowEl){
+    rowEl.classList.remove("jump-highlight");
+    void rowEl.offsetWidth;
+    rowEl.classList.add("jump-highlight");
+    setTimeout(() => { if(rowEl.isConnected) rowEl.classList.remove("jump-highlight"); }, 1600);
+    const pfBtn = rowEl.querySelector(".row-pron-btn");
+    if(pfBtn){ pfBtn.classList.toggle("diff-H", on); pfBtn.style.opacity = on ? "1" : "0.35"; }
   }
-  autoplayJump = 1;
-  abortCurrentPlayback();
-  if('speechSynthesis' in window) speechSynthesis.cancel();
 }
-// 浮動控制器的 ⏭️：這個字已經太簡單、不用再聽三遍，直接跳去下一個。跟
-// AirPods 雙按（autoplayMarkAndNext）不一樣的地方是這個「不會」把字標成
-// ⚠️ 待複習。
+// 浮動控制器的 ⏭️（＝AirPods 雙按）：這個字不用再聽，直接跳去下一個，
+// 「不會」把字標成 ⚠️ 待複習（要標待複習用 AirPods 三按）。
 function autoplaySkipNext(){
   if(!listAutoplayRunning && !listAutoplayPaused) return;
   if(listAutoplayPaused){
