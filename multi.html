@@ -218,10 +218,18 @@
       <input type="text" id="wordSearch" placeholder="搜尋目前語言、中文或英文..." style="flex:1 1 180px;">
     </div>
     <div class="toolbar">
-      <button id="btnListAutoplay">▶️ 依序播放發音（每字 3 次）</button>
+      <button id="btnListAutoplay">▶️ 依序播放發音</button>
+      <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;">
+        每字唸
+        <select id="autoplayReps">
+          <option value="1">1 次</option>
+          <option value="2">2 次</option>
+          <option value="3" selected>3 次</option>
+        </select>
+      </label>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
         <input type="checkbox" id="autoplayIncludeZh">
-        唸完 3 次後加唸一次中文
+        之後加唸一次中文
       </label>
     </div>
 
@@ -1097,6 +1105,28 @@ let listAutoplayIndex = 0;
 let autoplayJump = 0;   // AirPods／鎖定畫面控制：+1 = 跳下一個字，-1 = 回上一個字（0 = 沒有）
 let autoplayCurrentWord = null;   // 目前依序播放到的字（給媒體鍵 handler 用）
 let autoplayOpenedTonePanel = null;   // 依序播放自動展開的那個聲調面板（換字時收起來）
+let autoplayRunStartMs = 0;       // 這一輪（或這次繼續）開始的時間，用來估「還要多久」
+let autoplayRunStartIndex = 0;    // 開始時的 index，配合上面算實際每字花多久
+function autoplayReps(){
+  const el = document.getElementById("autoplayReps");
+  const n = el ? parseInt(el.value, 10) : 3;
+  return (n === 1 || n === 2 || n === 3) ? n : 3;
+}
+// 依序播放時間估計：一個字唸 N 次 + 中間停頓 + 收尾停頓；勾了「加唸中文」再加一段。
+// 這是「還沒開始播、沒有實測資料」時的粗估，實際播起來會用真實速度重算。
+function estimateAutoplaySeconds(count){
+  if(!count) return 0;
+  const reps = autoplayReps();
+  const includeZh = !!(document.getElementById("autoplayIncludeZh") && document.getElementById("autoplayIncludeZh").checked);
+  const perWord = 1.6 * reps + 0.35 * (reps - 1) + 0.55 + (includeZh ? 1.8 + 0.3 : 0);
+  return Math.round(count * perWord);
+}
+function fmtDuration(sec){
+  sec = Math.max(0, Math.round(sec));
+  if(sec < 90) return `約 ${sec} 秒`;
+  const m = Math.round(sec / 60);
+  return `約 ${m} 分`;
+}
 
 // 每個單字自己的自由筆記（使用者手打）。跟 customDB 一樣用 w.text 當 key，換
 // 語言各存一份，也會一起進備份。
@@ -6652,18 +6682,33 @@ function clearAutoplayHighlight(){
 function renderAutoplayControls(){
   const active = listAutoplayRunning || listAutoplayPaused;
   const toolBtn = document.getElementById("btnListAutoplay");
+  const total = getVisibleWords().length;
   if(toolBtn){
     toolBtn.textContent = listAutoplayRunning ? "⏸️ 暫停依序播放"
       : listAutoplayPaused ? "▶️ 繼續依序播放"
-      : "▶️ 依序播放發音（每字 3 次）";
+      : `▶️ 依序播放發音（${total} 個字，${fmtDuration(estimateAutoplaySeconds(total))}）`;
     toolBtn.classList.toggle("primary", active);
   }
   const float = document.getElementById("autoplayFloat");
   if(float){
     float.classList.toggle("hidden", !active);
-    const total = getVisibleWords().length;
+    // 播放中：用「實際已花的時間 ÷ 已完成字數」推剩下要多久，比純估計準；
+    // 還沒完成半個字（剛開始）就先用純估計。
+    const done = Math.max(0, listAutoplayIndex - autoplayRunStartIndex);
+    const left = total - listAutoplayIndex;
+    let etaTxt = "";
+    if(listAutoplayRunning && left > 0){
+      let remainSec;
+      if(done >= 1 && autoplayRunStartMs){
+        const perWord = (Date.now() - autoplayRunStartMs) / 1000 / done;
+        remainSec = perWord * left;
+      }else{
+        remainSec = estimateAutoplaySeconds(left);
+      }
+      etaTxt = ` · 剩 ${fmtDuration(remainSec)}`;
+    }
     document.getElementById("autoplayFloatStatus").textContent =
-      `${Math.min(listAutoplayIndex + 1, total)} / ${total}${listAutoplayPaused ? "（已暫停）" : ""}`;
+      `${Math.min(listAutoplayIndex + 1, total)} / ${total}${listAutoplayPaused ? "（已暫停）" : etaTxt}`;
     document.getElementById("autoplayFloatToggle").textContent = listAutoplayRunning ? "⏸️" : "▶️";
     float.title = "AirPods／耳機：單按=暫停·繼續；雙按=標這個字待複習＋跳下一個；三按=回上一個（限 GPT 語音）";
   }
@@ -6781,6 +6826,8 @@ async function runListAutoplay(){
   if(listAutoplayIndex >= words.length) listAutoplayIndex = 0;
   listAutoplayRunning = true;
   listAutoplayPaused = false;
+  autoplayRunStartMs = Date.now();
+  autoplayRunStartIndex = listAutoplayIndex;
   renderAutoplayControls();
   autoplayJump = 0;
   while(listAutoplayRunning && listAutoplayIndex < words.length){
@@ -6812,10 +6859,11 @@ async function runListAutoplay(){
     setupAutoplayMediaSession(w, words.length);
     const text = getSpeechText(w);
     const recKey = useRecordingIds.has(w.id) ? recKeyFor(w.text) : null;
-    for(let r = 0; r < 3 && listAutoplayRunning && !autoplayJump; r++){
+    const reps = autoplayReps();
+    for(let r = 0; r < reps && listAutoplayRunning && !autoplayJump; r++){
       try{ await speak(text, btn, null, recKey); }catch(e){ /* 播不出來就跳過這次，繼續 */ }
       if(!listAutoplayRunning || autoplayJump) break;
-      if(r < 2) await delayMs(350);
+      if(r < reps - 1) await delayMs(350);
     }
     if(!listAutoplayRunning) break;
     // 勾了「加唸中文」：3 次外語之後停一下、唸一次中文意思。
@@ -6858,6 +6906,17 @@ const AUTOPLAY_ZH_LS = "flashcard_autoplay_include_zh_v1";
 if(localStorage.getItem(AUTOPLAY_ZH_LS) === "1") document.getElementById("autoplayIncludeZh").checked = true;
 document.getElementById("autoplayIncludeZh").addEventListener("change", (e) => {
   localStorage.setItem(AUTOPLAY_ZH_LS, e.target.checked ? "1" : "0");
+  renderAutoplayControls(); // 估計時間會變
+});
+// 「每字唸幾次」記起來（全語言通用），改了也重算估計時間
+const AUTOPLAY_REPS_LS = "flashcard_autoplay_reps_v1";
+{
+  const saved = localStorage.getItem(AUTOPLAY_REPS_LS);
+  if(saved === "1" || saved === "2" || saved === "3") document.getElementById("autoplayReps").value = saved;
+}
+document.getElementById("autoplayReps").addEventListener("change", (e) => {
+  localStorage.setItem(AUTOPLAY_REPS_LS, e.target.value);
+  renderAutoplayControls();
 });
 renderAutoplayControls();
 function updateNewlyImportedToggleLabel(){
