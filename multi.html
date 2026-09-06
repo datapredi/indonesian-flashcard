@@ -6886,7 +6886,10 @@ async function runListAutoplay(){
     renderAutoplayControls();
     setupAutoplayMediaSession(w, words.length);
     const text = getSpeechText(w);
-    const recKey = useRecordingIds.has(w.id) ? recKeyFor(w.text) : null;
+    // 依序播放一律優先播「自己錄的音」（例如老師的發音）——只要這個字有錄音就用，
+    // 不用先去開那個字的「用我的錄音」開關。speak() 收到 recKey 但查不到錄音時
+    // 會自動退回 TTS，所以這裡永遠傳沒關係。
+    const recKey = recKeyFor(w.text);
     const reps = autoplayReps();
     // 背景先把「這個字的中文」跟「下一個字的發音 + 中文」都生成好丟進快取，
     // 免得唸完外語要唸中文時卡在等 OpenAI 現生成（有時 2-3 秒，尤其新字）。
