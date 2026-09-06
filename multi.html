@@ -2073,9 +2073,17 @@ async function generateArabicLetterExamples(){
     additionalProperties: false
   };
   const letterList = ARABIC_LETTERS.map(([l, name]) => `${l}（${name}）`).join("、");
-  const prompt = `你是埃及阿拉伯語老師。針對下面每個阿拉伯字母，各給三個常見的阿拉伯文單字，分別示範這個字母出現在「字首、字中、字尾」時跟前後字母連接的樣子。
-- 優先選開羅口語／日常生活常見的字
-- 如果某個字母幾乎不出現在某個位置（例如某些字母很少在字尾），還是要給一個真的存在、最接近的常見字，不要造假字
+  const prompt = `你是埃及阿拉伯語老師。針對下面每個阿拉伯字母，各給三個常見的阿拉伯文單字，示範這個字母「真的」寫成字首形、字中形、字尾形的樣子。
+
+【最重要的規則——一定要遵守】
+1. 字中形（medial）：這個字母在單字裡，**左右兩邊都要直接連著別的字母**。也就是說，它前面那個字母必須是「會往左連」的字母，它後面也要還有字母。
+2. 字尾形（final）：這個字母在單字**結尾**，而且**前面那個字母會往左連**（所以它是接著連下來、收尾的形狀）。
+3. ا د ذ ر ز و ء 這 7 個字母「不會往左連」。所以**選字中形、字尾形的例字時，目標字母的前一個字母絕對不可以是這 7 個之一**，否則目標字母其實會變成字首形／單獨形，就示範錯了。
+   （反例：ج 的字中例字用「راجل」是錯的，因為 ج 前面是 ا，ج 其實是字首形不是字中形。正確的像「نتيجة」——ج 前面是 ي、後面是 ة，兩邊都連。）
+4. ا د ذ ر ز و 這 6 個字母本身只有兩種形（單獨／字尾）。它們的「字中形」就給一個「前面有字母往左連、它收在中間或結尾」的例字。
+
+其他：
+- 優先選開羅口語／日常生活常見的字，真的存在的字，不要造字
 - 每個位置給：word（阿拉伯文，不要加短母音符號）、franco（這個 app 的 Franco/Arabizi 拼法：7=ح、3=ع、2=ء 和開羅口語的 ق、kh=خ、gh=غ、sh=ش、ج=g；重音字母 ص／ض／ط／ظ 一律寫成一般的 s／d／t／z；長母音 aa／ee／oo）、zh（繁體中文意思）
 - letter 欄位就填輸入的那個字母本身
 
@@ -3075,6 +3083,21 @@ function arShapeWithHighlight(word, target){
   }
   return out.map(o => o.hit ? `<span style="color:var(--danger); font-weight:700;">${o.g}</span>` : o.g).join("");
 }
+// target 這個字母在 word 裡「實際上」是哪一種位置形（initial / medial / final /
+// isolated / absent）。用來檢查 AI 給的例字有沒有真的示範到那個位置——例如
+// ج 的字中例字若用「راجل」，ج 前面是不往左連的 ا，其實是 initial 不是 medial。
+function arTargetForm(word, letter){
+  const chars = [...String(word)].filter(c => !/[ـً-ٰٟ]/.test(c));
+  const i = chars.indexOf(letter);
+  if(i === -1) return "absent";
+  const prev = chars[i - 1], next = chars[i + 1];
+  const joinPrev = prev && arJoinsLeft(prev);
+  const joinNext = arJoinsLeft(letter) && next && arJoinsRight(next);
+  if(joinPrev && joinNext) return "medial";
+  if(joinPrev) return "final";
+  if(joinNext) return "initial";
+  return "isolated";
+}
 
 // ================= 埃及阿拉伯字母表（純靜態參考資料，不是 AI 生成） =================
 // 顯示阿拉伯字母 + 這個 app 用的 Franco/Arabizi 拼法 + 開羅口語實際發音。發音是唸
@@ -3194,14 +3217,20 @@ function renderArabicAlphabetPanel(){
         exWrap.style.cssText = "margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:0.72rem;";
         // arShapeWithHighlight：先自己算好每個字母的位置字形、換成 Unicode 呈現
         // 形式（已定形、不再受前後文影響），這樣就能任意用 <span> 把目標字母
-        // 塗紅、又不會把連寫弄斷。
-        [["字首", ex.initial], ["字中", ex.medial], ["字尾", ex.final]].forEach(([lbl, wd]) => {
+        // 塗紅、又不會把連寫弄斷。arTargetForm 順便檢查 AI 給的例字有沒有真的
+        // 示範到那個位置，沒有就標 ⚠️。
+        const dualJoin = AR_DUAL_JOIN.has(letter);
+        [["字首", "initial", ex.initial], ["字中", "medial", ex.medial], ["字尾", "final", ex.final]].forEach(([lbl, want, wd]) => {
           if(!wd || !wd.word) return;
+          const actual = arTargetForm(wd.word, letter);
+          let warn = "";
+          if(actual === "absent") warn = ` <span style="color:var(--danger);">⚠️ 這個字裡沒有 ${letter}</span>`;
+          else if(dualJoin && actual !== want) warn = ` <span style="color:var(--danger);">⚠️ 這裡的 ${letter} 其實是${{initial:"字首",medial:"字中",final:"字尾",isolated:"單獨"}[actual]}形</span>`;
           const line = document.createElement("div");
           line.style.cssText = "margin:2px 0;";
           line.innerHTML = `<span class="usage-note">${lbl}：</span>`
             + `<span style="font-size:1.2rem;" dir="rtl">${arShapeWithHighlight(wd.word, letter)}</span> `
-            + `<span class="usage-note">${wd.franco}・${wd.zh}</span>`;
+            + `<span class="usage-note">${wd.franco}・${wd.zh}</span>${warn}`;
           exWrap.appendChild(line);
         });
         item.appendChild(exWrap);
