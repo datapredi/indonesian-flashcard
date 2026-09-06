@@ -2458,7 +2458,7 @@ const THAI_CONSONANT_CLASSES = [
 // 例如孤立的單一母音字母 TTS 常常唸不準，改唸一個包著這個母音的常見單字
 // 準確度好很多，但畫面上還是要顯示字母本身，不是顯示那個範例單字。
 // 沒特別給 speakText 就照舊唸 text 本身。
-function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions){
+function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions, forceSys){
   const wrap = document.createElement("span");
   wrap.style.cssText = "display:inline-flex; align-items:center; gap:2px;";
   const label = document.createElement("span");
@@ -2469,8 +2469,11 @@ function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions){
   btn.className = "speak-btn";
   btn.textContent = "🔊";
   btn.style.cssText = "padding:2px 5px; font-size:0.8rem;";
-  // 字母表一律用電腦內建語音（單獨字母 GPT 唸不準，這是使用者實測後決定寫死的）。
-  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang, null, speakInstructions, true); });
+  // 泰文／越南文字母表用電腦內建語音（那些語言系統多半有語音、唸羅馬拼音也準）。
+  // 阿拉伯文字母名（傳 forceSys=false）改走 GPT：系統多半沒有阿拉伯語語音，
+  // 英文語音會把 raa 拼成「R-A-A」、也分不出 daal／dhaal。
+  const useForce = forceSys === undefined ? true : forceSys;
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang, null, speakInstructions, useForce); });
   wrap.appendChild(label);
   wrap.appendChild(btn);
   return wrap;
@@ -3027,6 +3030,52 @@ document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
+// ---- 阿拉伯文「上色其中一個字母又不斷開連寫」的做法：先自己算好每個字母該用
+// 哪個位置字形（單獨/字首/字中/字尾），換成 Unicode 的「呈現形式」碼點——這些
+// 碼點是已經定形的，不再受前後文影響，所以可以任意用 <span> 上色都不會斷。
+const AR_PRES = {
+  "ا":[0xFE8D,0xFE8E], "أ":[0xFE83,0xFE84], "إ":[0xFE87,0xFE88], "آ":[0xFE81,0xFE82],
+  "ب":[0xFE8F,0xFE90,0xFE91,0xFE92], "ت":[0xFE95,0xFE96,0xFE97,0xFE98], "ث":[0xFE99,0xFE9A,0xFE9B,0xFE9C],
+  "ج":[0xFE9D,0xFE9E,0xFE9F,0xFEA0], "ح":[0xFEA1,0xFEA2,0xFEA3,0xFEA4], "خ":[0xFEA5,0xFEA6,0xFEA7,0xFEA8],
+  "د":[0xFEA9,0xFEAA], "ذ":[0xFEAB,0xFEAC], "ر":[0xFEAD,0xFEAE], "ز":[0xFEAF,0xFEB0],
+  "س":[0xFEB1,0xFEB2,0xFEB3,0xFEB4], "ش":[0xFEB5,0xFEB6,0xFEB7,0xFEB8], "ص":[0xFEB9,0xFEBA,0xFEBB,0xFEBC],
+  "ض":[0xFEBD,0xFEBE,0xFEBF,0xFEC0], "ط":[0xFEC1,0xFEC2,0xFEC3,0xFEC4], "ظ":[0xFEC5,0xFEC6,0xFEC7,0xFEC8],
+  "ع":[0xFEC9,0xFECA,0xFECB,0xFECC], "غ":[0xFECD,0xFECE,0xFECF,0xFED0], "ف":[0xFED1,0xFED2,0xFED3,0xFED4],
+  "ق":[0xFED5,0xFED6,0xFED7,0xFED8], "ك":[0xFED9,0xFEDA,0xFEDB,0xFEDC], "ل":[0xFEDD,0xFEDE,0xFEDF,0xFEE0],
+  "م":[0xFEE1,0xFEE2,0xFEE3,0xFEE4], "ن":[0xFEE5,0xFEE6,0xFEE7,0xFEE8], "ه":[0xFEE9,0xFEEA,0xFEEB,0xFEEC],
+  "و":[0xFEED,0xFEEE], "ؤ":[0xFE85,0xFE86], "ى":[0xFEEF,0xFEF0],
+  "ي":[0xFEF1,0xFEF2,0xFEF3,0xFEF4], "ئ":[0xFE89,0xFE8A,0xFE8B,0xFE8C], "ة":[0xFE93,0xFE94], "ء":[0xFE80]
+};
+const AR_DUAL_JOIN = new Set("بتثجحخسشصضطظعغفقكلمنهيئ".split("")); // 兩側都能連
+const AR_RIGHT_JOIN = new Set("ادذرزوؤىةأإآ".split(""));           // 只連前面
+function arJoinsLeft(ch){ return AR_DUAL_JOIN.has(ch); }               // 有左連接（會連到下一個字）
+function arJoinsRight(ch){ return AR_DUAL_JOIN.has(ch) || AR_RIGHT_JOIN.has(ch); } // 有右連接（會連到前一個字）
+// 把一個阿拉伯文詞轉成呈現形式，target 那個字母用紅色 <span> 包起來（不會斷連寫）。
+function arShapeWithHighlight(word, target){
+  const chars = [...String(word)].filter(c => !/[ـً-ٰٟ]/.test(c)); // 去掉 tatweel 跟短母音符號
+  const out = [];
+  for(let i = 0; i < chars.length; i++){
+    const ch = chars[i];
+    const prev = chars[i - 1];
+    if(ch === "ل" && "اأإآ".indexOf(chars[i + 1]) !== -1){ // لا 連字
+      const joinPrev = prev && arJoinsLeft(prev);
+      out.push({ g: joinPrev ? "ﻼ" : "ﻻ", hit: (target === "ل" || target === chars[i + 1]) });
+      i++;
+      continue;
+    }
+    const forms = AR_PRES[ch];
+    if(!forms){ out.push({ g: ch, hit: ch === target }); continue; }
+    const next = chars[i + 1];
+    const joinPrev = prev && arJoinsLeft(prev);
+    const joinNext = arJoinsLeft(ch) && next && arJoinsRight(next);
+    let idx;
+    if(forms.length === 4) idx = joinPrev && joinNext ? 3 : joinPrev ? 1 : joinNext ? 2 : 0;
+    else idx = joinPrev ? 1 : 0;
+    out.push({ g: String.fromCodePoint(forms[idx]), hit: ch === target });
+  }
+  return out.map(o => o.hit ? `<span style="color:var(--danger); font-weight:700;">${o.g}</span>` : o.g).join("");
+}
+
 // ================= 埃及阿拉伯字母表（純靜態參考資料，不是 AI 生成） =================
 // 顯示阿拉伯字母 + 這個 app 用的 Franco/Arabizi 拼法 + 開羅口語實際發音。發音是唸
 // 字母本身，跟它在真正單字裡的唸法會有點不一樣，僅供參考。
@@ -3127,7 +3176,12 @@ function renderArabicAlphabetPanel(){
       const item = document.createElement("div");
       item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:170px; flex:1 1 190px; text-align:center;";
       const top = document.createElement("div");
-      top.appendChild(makeSpeakableLabel(letter, letterFont, "en", letterSpeakName(name)));
+      top.appendChild(makeSpeakableLabel(
+        letter, letterFont, "arz",
+        arName || letterSpeakName(name),
+        "這是一個阿拉伯字母的名稱。請用埃及阿拉伯語清楚、單獨地唸出這個字母的名字，只唸名字本身，不要加其他字。",
+        false
+      ));
       item.appendChild(top);
       const info = document.createElement("div");
       info.className = "usage-note";
@@ -3138,23 +3192,16 @@ function renderArabicAlphabetPanel(){
         const ex = arabicLetterExamplesCache[letter];
         const exWrap = document.createElement("div");
         exWrap.style.cssText = "margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:0.72rem;";
-        // 阿拉伯文詞裡「不能」用 <span> 直接塗色——夾一個元素邊界，瀏覽器
-        // （Safari 尤其）會把連寫斷開、字母掉回單獨形。所以例字本身完整、正確
-        // 連寫地顯示（不上色），改成把 Franco 拼音裡對應的音標紅（拉丁字母
-        // 沒有連寫問題），當作「看紅色這個音在單字的哪裡」的對照。
-        const francoCore = ((franco || "").match(/[A-Za-z0-9']+/) || [""])[0].toLowerCase();
-        function hlFranco(f){
-          if(!francoCore) return f;
-          const re = new RegExp(francoCore.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig");
-          return String(f).replace(re, m => `<span style="color:var(--danger); font-weight:700;">${m}</span>`);
-        }
+        // arShapeWithHighlight：先自己算好每個字母的位置字形、換成 Unicode 呈現
+        // 形式（已定形、不再受前後文影響），這樣就能任意用 <span> 把目標字母
+        // 塗紅、又不會把連寫弄斷。
         [["字首", ex.initial], ["字中", ex.medial], ["字尾", ex.final]].forEach(([lbl, wd]) => {
           if(!wd || !wd.word) return;
           const line = document.createElement("div");
           line.style.cssText = "margin:2px 0;";
           line.innerHTML = `<span class="usage-note">${lbl}：</span>`
-            + `<span style="font-size:1.2rem;" dir="rtl">${wd.word}</span> `
-            + `<span class="usage-note">${hlFranco(wd.franco)}・${wd.zh}</span>`;
+            + `<span style="font-size:1.2rem;" dir="rtl">${arShapeWithHighlight(wd.word, letter)}</span> `
+            + `<span class="usage-note">${wd.franco}・${wd.zh}</span>`;
           exWrap.appendChild(line);
         });
         item.appendChild(exWrap);
