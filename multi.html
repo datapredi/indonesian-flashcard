@@ -2054,8 +2054,18 @@ function saveArabicLetterExamplesCache(){ localStorage.setItem(ARABIC_EXAMPLES_C
 const ARABIC_EXAMPLES_SHOWN_LS = "flashcard_arabic_examples_shown_v1";
 let arabicExamplesShown = false;
 try{ arabicExamplesShown = localStorage.getItem(ARABIC_EXAMPLES_SHOWN_LS) === "1"; }catch(e){}
+const ARABIC_EXAMPLE_RULES = `【最重要的規則——一定要遵守】
+1. 字中形（medial）：這個字母在單字裡，**左右兩邊都要直接連著別的字母**。也就是說，它前面那個字母必須是「會往左連」的字母，它後面也要還有字母。
+2. 字尾形（final）：這個字母在單字**結尾**，而且**前面那個字母會往左連**（所以它是接著連下來、收尾的形狀）。
+3. ا د ذ ر ز و ء 這 7 個字母「不會往左連」。所以**選字中形、字尾形的例字時，目標字母的前一個字母絕對不可以是這 7 個之一**，否則目標字母其實會變成字首形／單獨形，就示範錯了。
+   （反例：ج 的字中例字用「راجل」是錯的，因為 ج 前面是 ا，ج 其實是字首形不是字中形。正確的像「نتيجة」——ج 前面是 ي、後面是 ة，兩邊都連。）
+4. ا د ذ ر ز و 這 6 個字母本身只有兩種形（單獨／字尾）。它們的「字中形」就給一個「前面有字母往左連、它收在中間或結尾」的例字。
+
+其他：
+- 優先選開羅口語／日常生活常見的字，真的存在的字，不要造字
+- 每個位置給：word（阿拉伯文，不要加短母音符號）、franco（這個 app 的 Franco/Arabizi 拼法：7=ح、3=ع、2=ء 和開羅口語的 ق、kh=خ、gh=غ、sh=ش、ج=g；重音字母 ص／ض／ط／ظ 一律寫成一般的 s／d／t／z；長母音 aa／ee／oo）、zh（繁體中文意思）`;
+const ARABIC_EXAMPLE_SLOT = { type: "object", properties: { word: { type: "string" }, franco: { type: "string" }, zh: { type: "string" } }, required: ["word", "franco", "zh"], additionalProperties: false };
 async function generateArabicLetterExamples(){
-  const slot = { type: "object", properties: { word: { type: "string" }, franco: { type: "string" }, zh: { type: "string" } }, required: ["word", "franco", "zh"], additionalProperties: false };
   const schema = {
     type: "object",
     properties: {
@@ -2063,7 +2073,7 @@ async function generateArabicLetterExamples(){
         type: "array",
         items: {
           type: "object",
-          properties: { letter: { type: "string" }, initial: slot, medial: slot, final: slot },
+          properties: { letter: { type: "string" }, initial: ARABIC_EXAMPLE_SLOT, medial: ARABIC_EXAMPLE_SLOT, final: ARABIC_EXAMPLE_SLOT },
           required: ["letter", "initial", "medial", "final"],
           additionalProperties: false
         }
@@ -2073,25 +2083,28 @@ async function generateArabicLetterExamples(){
     additionalProperties: false
   };
   const letterList = ARABIC_LETTERS.map(([l, name]) => `${l}（${name}）`).join("、");
-  const prompt = `你是埃及阿拉伯語老師。針對下面每個阿拉伯字母，各給三個常見的阿拉伯文單字，示範這個字母「真的」寫成字首形、字中形、字尾形的樣子。
+  const prompt = `你是埃及阿拉伯語老師。針對下面每個阿拉伯字母，各給三個常見的阿拉伯文單字，示範這個字母「真的」寫成字首形、字中形、字尾形的樣子。letter 欄位就填輸入的那個字母本身。
 
-【最重要的規則——一定要遵守】
-1. 字中形（medial）：這個字母在單字裡，**左右兩邊都要直接連著別的字母**。也就是說，它前面那個字母必須是「會往左連」的字母，它後面也要還有字母。
-2. 字尾形（final）：這個字母在單字**結尾**，而且**前面那個字母會往左連**（所以它是接著連下來、收尾的形狀）。
-3. ا د ذ ر ز و ء 這 7 個字母「不會往左連」。所以**選字中形、字尾形的例字時，目標字母的前一個字母絕對不可以是這 7 個之一**，否則目標字母其實會變成字首形／單獨形，就示範錯了。
-   （反例：ج 的字中例字用「راجل」是錯的，因為 ج 前面是 ا，ج 其實是字首形不是字中形。正確的像「نتيجة」——ج 前面是 ي、後面是 ة，兩邊都連。）
-4. ا د ذ ر ز و 這 6 個字母本身只有兩種形（單獨／字尾）。它們的「字中形」就給一個「前面有字母往左連、它收在中間或結尾」的例字。
-
-其他：
-- 優先選開羅口語／日常生活常見的字，真的存在的字，不要造字
-- 每個位置給：word（阿拉伯文，不要加短母音符號）、franco（這個 app 的 Franco/Arabizi 拼法：7=ح、3=ع、2=ء 和開羅口語的 ق、kh=خ、gh=غ、sh=ش、ج=g；重音字母 ص／ض／ط／ظ 一律寫成一般的 s／d／t／z；長母音 aa／ee／oo）、zh（繁體中文意思）
-- letter 欄位就填輸入的那個字母本身
+${ARABIC_EXAMPLE_RULES}
 
 字母：${letterList}`;
   const parsed = await callClaude(prompt, schema, 4096);
   const out = {};
   (parsed.letters || []).forEach(e => { if(e.letter) out[e.letter] = { initial: e.initial, medial: e.medial, final: e.final }; });
   return out;
+}
+// 只重生一個字母的例字——用在某個字母的例字被標 ⚠️、只想修那一個的時候。
+async function generateOneArabicLetterExamples(letter, name){
+  const schema = {
+    type: "object",
+    properties: { initial: ARABIC_EXAMPLE_SLOT, medial: ARABIC_EXAMPLE_SLOT, final: ARABIC_EXAMPLE_SLOT },
+    required: ["initial", "medial", "final"],
+    additionalProperties: false
+  };
+  const prompt = `你是埃及阿拉伯語老師。針對阿拉伯字母 ${letter}（${name}），給三個常見的阿拉伯文單字，示範它「真的」寫成字首形、字中形、字尾形的樣子。
+
+${ARABIC_EXAMPLE_RULES}`;
+  return await callClaude(prompt, schema, 1024);
 }
 async function getEgyptianLetterBreakdown(nativeScript, romanized, force){
   const key = nativeScript;
@@ -3233,6 +3246,22 @@ function renderArabicAlphabetPanel(){
             + `<span class="usage-note">${wd.franco}・${wd.zh}</span>${warn}`;
           exWrap.appendChild(line);
         });
+        const oneRegen = document.createElement("button");
+        oneRegen.type = "button";
+        oneRegen.className = "speak-btn";
+        oneRegen.style.cssText = "margin-top:4px; padding:1px 6px; font-size:0.68rem;";
+        oneRegen.textContent = "🔄 只重生這個字母";
+        oneRegen.addEventListener("click", async (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if(!getApiKey()){ alert("需要 Anthropic API Key。"); return; }
+          oneRegen.disabled = true; oneRegen.textContent = "生成中…";
+          try{
+            arabicLetterExamplesCache[letter] = await generateOneArabicLetterExamples(letter, name);
+            saveArabicLetterExamplesCache();
+            renderArabicAlphabetPanel();
+          }catch(err){ alert("生成失敗：" + err.message); oneRegen.disabled = false; oneRegen.textContent = "🔄 只重生這個字母"; }
+        });
+        exWrap.appendChild(oneRegen);
         item.appendChild(exWrap);
       }
       attachLetterColor(item, "arz:" + letter);
@@ -3285,7 +3314,7 @@ function renderArabicAlphabetPanel(){
     regen.type = "button";
     regen.className = "speak-btn";
     regen.style.margin = "8px 0 8px 8px";
-    regen.textContent = "🔄 重新生成例字";
+    regen.textContent = "🔄 全部 28 個重新生成";
     regen.addEventListener("click", async (e) => {
       e.preventDefault(); e.stopPropagation();
       if(!getApiKey()){ alert("需要 Anthropic API Key。"); return; }
@@ -3295,7 +3324,7 @@ function renderArabicAlphabetPanel(){
         arabicLetterExamplesCache = await generateArabicLetterExamples();
         saveArabicLetterExamplesCache();
         renderArabicAlphabetPanel();
-      }catch(err){ alert("生成失敗：" + err.message); regen.disabled = false; regen.textContent = "🔄 重新生成例字"; }
+      }catch(err){ alert("生成失敗：" + err.message); regen.disabled = false; regen.textContent = "🔄 全部 28 個重新生成"; }
     });
     panel.appendChild(regen);
   }
