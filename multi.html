@@ -3138,15 +3138,18 @@ function renderArabicAlphabetPanel(){
         const ex = arabicLetterExamplesCache[letter];
         const exWrap = document.createElement("div");
         exWrap.style.cssText = "margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:0.72rem;";
-        // 把例字裡「這個字母」本身塗紅，方便一眼看到它在字首/字中/字尾的位置。
-        // 直接對同一個基本字母碼點做取代，阿拉伯文的字形連寫是瀏覽器自動處理
-        // 的，中間夾一個沒有空白的 <span> 現代瀏覽器（含 Safari）仍會維持相連。
-        const hl = (w) => String(w).split(letter).join(`<span style="color:var(--danger); font-weight:700;">${letter}</span>`);
+        // 例字裡的字母「不能」用 <span> 直接塗色——在阿拉伯文詞中間夾一個
+        // 元素邊界，瀏覽器（Safari 尤其）會把連寫斷開，被塗色的字母就變回
+        // 單獨形。所以例字本身完整、正確連寫地顯示，另外在旁邊放一個紅色的
+        // 「單獨形」提示這一列講的是哪個字母，位置靠 字首/字中/字尾 標籤看。
         [["字首", ex.initial], ["字中", ex.medial], ["字尾", ex.final]].forEach(([lbl, wd]) => {
           if(!wd || !wd.word) return;
           const line = document.createElement("div");
           line.style.cssText = "margin:2px 0;";
-          line.innerHTML = `<span class="usage-note">${lbl}：</span><span style="font-size:1.2rem;" dir="rtl">${hl(wd.word)}</span> <span class="usage-note">${wd.franco}・${wd.zh}</span>`;
+          line.innerHTML = `<span class="usage-note">${lbl}：</span>`
+            + `<span style="font-size:1.2rem;" dir="rtl">${wd.word}</span> `
+            + `<span style="color:var(--danger); font-weight:700; font-size:1.05rem;" dir="rtl">${letter}</span> `
+            + `<span class="usage-note">${wd.franco}・${wd.zh}</span>`;
           exWrap.appendChild(line);
         });
         item.appendChild(exWrap);
