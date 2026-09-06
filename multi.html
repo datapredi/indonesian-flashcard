@@ -227,6 +227,14 @@
           <option value="3" selected>3 次</option>
         </select>
       </label>
+      <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;">
+        速度
+        <select id="autoplaySpeed">
+          <option value="1" selected>1x</option>
+          <option value="1.2">1.2x</option>
+          <option value="1.5">1.5x</option>
+        </select>
+      </label>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
         <input type="checkbox" id="autoplayIncludeZh">
         之後加唸一次中文
@@ -727,7 +735,7 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = info.speechLang;
-  utter.rate = 0.85;
+  utter.rate = 0.85 * getListenRateMultiplier();
   const prefix = info.speechLang.slice(0, 2).toLowerCase();
   const voice = cachedVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
   if(voice) utter.voice = voice;
@@ -792,7 +800,10 @@ function waitMsOrSkip(ms){
 // 維持 false，不影響單字表、Flash Card 等其他地方原本的播放速度。
 let listenBaseRate = 1;
 let listenFastMode = false;
-function getListenRateMultiplier(){ return listenFastMode ? 2 : listenBaseRate; }
+function getListenRateMultiplier(){
+  if(listAutoplayRunning) return autoplaySpeed;  // 依序播放進行中：用它自己的語速
+  return listenFastMode ? 2 : listenBaseRate;
+}
 // Promise-based speak for sequencing utterances (跑步聽力模式：電腦內建語音)
 function speakAsync(text, lang){
   return new Promise((resolve) => {
@@ -1107,19 +1118,23 @@ let autoplayCurrentWord = null;   // 目前依序播放到的字（給媒體鍵 
 let autoplayOpenedTonePanel = null;   // 依序播放自動展開的那個聲調面板（換字時收起來）
 let autoplayRunStartMs = 0;       // 這一輪（或這次繼續）開始的時間，用來估「還要多久」
 let autoplayRunStartIndex = 0;    // 開始時的 index，配合上面算實際每字花多久
+let autoplaySpeed = 1;            // 依序播放的語速倍率（1 / 1.2 / 1.5）
 function autoplayReps(){
   const el = document.getElementById("autoplayReps");
   const n = el ? parseInt(el.value, 10) : 3;
   return (n === 1 || n === 2 || n === 3) ? n : 3;
 }
 // 依序播放時間估計：一個字唸 N 次 + 中間停頓 + 收尾停頓；勾了「加唸中文」再加一段。
-// 這是「還沒開始播、沒有實測資料」時的粗估，實際播起來會用真實速度重算。
+// 唸的部分會被語速倍率縮短，停頓不變。這是「還沒開始播」時的粗估，實際播起來
+// 會用真實速度重算。
 function estimateAutoplaySeconds(count){
   if(!count) return 0;
   const reps = autoplayReps();
   const includeZh = !!(document.getElementById("autoplayIncludeZh") && document.getElementById("autoplayIncludeZh").checked);
-  const perWord = 1.6 * reps + 0.35 * (reps - 1) + 0.55 + (includeZh ? 1.8 + 0.3 : 0);
-  return Math.round(count * perWord);
+  const speed = autoplaySpeed || 1;
+  const speakingSec = (1.6 * reps + (includeZh ? 1.8 : 0)) / speed;
+  const pauseSec = 0.35 * (reps - 1) + 0.55 + (includeZh ? 0.3 : 0);
+  return Math.round(count * (speakingSec + pauseSec));
 }
 function fmtDuration(sec){
   sec = Math.max(0, Math.round(sec));
@@ -6913,6 +6928,24 @@ const AUTOPLAY_REPS_LS = "flashcard_autoplay_reps_v1";
 }
 document.getElementById("autoplayReps").addEventListener("change", (e) => {
   localStorage.setItem(AUTOPLAY_REPS_LS, e.target.value);
+  renderAutoplayControls();
+});
+// 依序播放語速（1 / 1.2 / 1.5）記起來
+const AUTOPLAY_SPEED_LS = "flashcard_autoplay_speed_v1";
+{
+  const saved = parseFloat(localStorage.getItem(AUTOPLAY_SPEED_LS));
+  if(saved === 1 || saved === 1.2 || saved === 1.5){
+    autoplaySpeed = saved;
+    document.getElementById("autoplaySpeed").value = String(saved);
+  }
+}
+document.getElementById("autoplaySpeed").addEventListener("change", (e) => {
+  autoplaySpeed = parseFloat(e.target.value) || 1;
+  localStorage.setItem(AUTOPLAY_SPEED_LS, String(autoplaySpeed));
+  // 正在播的話，馬上套用到目前這段音檔（GPT 語音）
+  if(listAutoplayRunning){
+    try{ document.getElementById("listenAudio").playbackRate = autoplaySpeed; }catch(e2){}
+  }
   renderAutoplayControls();
 });
 renderAutoplayControls();
