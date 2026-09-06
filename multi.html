@@ -2513,9 +2513,12 @@ try{ letterColors = JSON.parse(localStorage.getItem(LETTER_COLORS_LS)) || {}; }c
 function saveLetterColors(){ localStorage.setItem(LETTER_COLORS_LS, JSON.stringify(letterColors)); }
 const LETTER_COLOR_HEX = { yellow: "#ffd400", red: "#ff4d4d", blue: "#3b82f6", green: "#34c759" };
 function attachLetterColor(cardEl, key){
+  // 記住卡片原本的底色（例如越南文短母音 ă／â 本來就有黃底），沒選顏色時要
+  // 還原成這個，不能一律清成空的、把原本的黃底也一起洗掉。
+  const originalBg = cardEl.style.background || "";
   function apply(){
     const c = letterColors[key];
-    cardEl.style.background = (c && LETTER_COLOR_HEX[c]) ? `color-mix(in srgb, ${LETTER_COLOR_HEX[c]} 20%, var(--bg))` : "";
+    cardEl.style.background = (c && LETTER_COLOR_HEX[c]) ? `color-mix(in srgb, ${LETTER_COLOR_HEX[c]} 20%, var(--bg))` : originalBg;
   }
   const sel = document.createElement("select");
   sel.style.cssText = "margin-top:4px; font-size:0.72rem; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--fg); padding:1px 3px;";
