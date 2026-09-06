@@ -2150,11 +2150,19 @@ async function getIndoMorphology(text, zh, force){
 // 這一步完全交給下面寫死的 applyThaiToneRule()，照使用者那張規則表算，不讓
 // AI 自己憑印象判斷（它以前常常算錯）。子音 class 也直接用 THAI_CONSONANT_
 // CLASSES 那張表查，不靠 AI。用 nativeScript 當快取 key。
-const THAI_CLASS_BY_LETTER = {};
-THAI_CONSONANT_CLASSES.forEach(cls => {
-  const short = { mid: "中", high: "高", low: "低" }[cls.key];
-  cls.letters.forEach(([letter]) => { THAI_CLASS_BY_LETTER[letter] = short; });
-});
+// 惰性建表：THAI_CONSONANT_CLASSES 在檔案後面才宣告（const，有 TDZ），這裡
+// 不能在載入當下就去讀它，要等第一次真的用到（呼叫時）才建。
+let _thaiClassByLetter = null;
+function thaiClassOf(letter){
+  if(!_thaiClassByLetter){
+    _thaiClassByLetter = {};
+    const short = { mid: "中", high: "高", low: "低" };
+    THAI_CONSONANT_CLASSES.forEach(cls => {
+      cls.letters.forEach(([l]) => { _thaiClassByLetter[l] = short[cls.key]; });
+    });
+  }
+  return _thaiClassByLetter[letter];
+}
 // 照規則表把「class + 母音長短 + 活/死尾 + 聲調符號」對應到聲調。純查表，沒有判斷。
 function applyThaiToneRule(cls, vowelLength, endingType, toneMark){
   // toneMark: "無" | "เอก" | "โท" | "ตรี" | "จัตวา"
@@ -2237,8 +2245,8 @@ async function getThaiToneAnalysis(nativeScript, romanized, force){
   const parsed = await callClaude(prompt, schema, 2048);
   // 事實 → 聲調：這一步用寫死的規則表算，不用 AI 給的。
   (parsed.syllables || []).forEach(s => {
-    const cls = s.effectiveClass || THAI_CLASS_BY_LETTER[s.initial] || "低";
-    s.rawClass = THAI_CLASS_BY_LETTER[s.initial] || "?";
+    const cls = s.effectiveClass || thaiClassOf(s.initial) || "低";
+    s.rawClass = thaiClassOf(s.initial) || "?";
     s.tone = applyThaiToneRule(cls, s.vowelLength, s.endingType, s.toneMark);
     s.rule = thaiToneRuleText(cls, s.vowelLength, s.endingType, s.toneMark);
   });
