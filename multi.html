@@ -3085,6 +3085,17 @@ function renderArabicAlphabetPanel(){
   // 單獨＝字首、字中＝字尾。
   const T = "ـ";
   const RIGHT_JOIN_ONLY = "ادذرزو";
+  // 字母表的 🔊 用電腦內建語音唸「字母的名字」。原本是丟阿拉伯文字串（زين…）
+  // 給它唸，但 Mac／iPhone 沒裝阿拉伯語語音時就會亂唸成「zasion」之類。改成
+  // 丟拉丁字母的拼音名字、用英文語音唸，穩定得多（7→h、3→aa、去掉括號註記）。
+  function letterSpeakName(name){
+    return String(name)
+      .replace(/\s*[（(].*?[）)]\s*/g, " ")
+      .replace(/7/g, "h").replace(/3/g, "aa").replace(/2/g, "a")
+      .replace(/\//g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
   function formsRow(letter){
     const wrap = document.createElement("div");
     // direction:rtl 讓這幾格照阿拉伯文的方向（從右往左）排：字首 → 字中 → 字尾 → 單獨
@@ -3116,7 +3127,7 @@ function renderArabicAlphabetPanel(){
       const item = document.createElement("div");
       item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:170px; flex:1 1 190px; text-align:center;";
       const top = document.createElement("div");
-      top.appendChild(makeSpeakableLabel(letter, letterFont, "arz", arName || null));
+      top.appendChild(makeSpeakableLabel(letter, letterFont, "en", letterSpeakName(name)));
       item.appendChild(top);
       const info = document.createElement("div");
       info.className = "usage-note";
