@@ -3127,11 +3127,15 @@ function renderArabicAlphabetPanel(){
         const ex = arabicLetterExamplesCache[letter];
         const exWrap = document.createElement("div");
         exWrap.style.cssText = "margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:0.72rem;";
+        // 把例字裡「這個字母」本身塗紅，方便一眼看到它在字首/字中/字尾的位置。
+        // 直接對同一個基本字母碼點做取代，阿拉伯文的字形連寫是瀏覽器自動處理
+        // 的，中間夾一個沒有空白的 <span> 現代瀏覽器（含 Safari）仍會維持相連。
+        const hl = (w) => String(w).split(letter).join(`<span style="color:var(--danger); font-weight:700;">${letter}</span>`);
         [["字首", ex.initial], ["字中", ex.medial], ["字尾", ex.final]].forEach(([lbl, wd]) => {
           if(!wd || !wd.word) return;
           const line = document.createElement("div");
           line.style.cssText = "margin:2px 0;";
-          line.innerHTML = `<span class="usage-note">${lbl}：</span><span style="font-size:1.2rem;" dir="rtl">${wd.word}</span> <span class="usage-note">${wd.franco}・${wd.zh}</span>`;
+          line.innerHTML = `<span class="usage-note">${lbl}：</span><span style="font-size:1.2rem;" dir="rtl">${hl(wd.word)}</span> <span class="usage-note">${wd.franco}・${wd.zh}</span>`;
           exWrap.appendChild(line);
         });
         item.appendChild(exWrap);
