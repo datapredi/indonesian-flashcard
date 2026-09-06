@@ -905,6 +905,9 @@ async function fetchTTSAudio(text, instructions){
   return await res.blob();
 }
 
+// 同一段文字同時被要求好幾次（例如依序播放一邊播、一邊背景預抓下一個），
+// 共用同一個 fetch，不要打好幾次 OpenAI。
+const _ttsInflight = new Map();
 async function getTTSAudioBlob(text, instructions){
   const cacheKey = ttsCacheKey(text, instructions);
   // IndexedDB can fail outright on some mobile browsers (e.g. Safari Private
@@ -915,10 +918,21 @@ async function getTTSAudioBlob(text, instructions){
   try{ cached = await getCachedAudio(cacheKey); }
   catch(e){ console.warn("TTS cache read failed, skipping cache:", e); }
   if(cached) return cached;
-  const blob = await fetchTTSAudio(text, instructions);
-  try{ await setCachedAudio(cacheKey, blob); }
-  catch(e){ console.warn("TTS cache write failed, skipping cache:", e); }
-  return blob;
+  if(_ttsInflight.has(cacheKey)) return _ttsInflight.get(cacheKey);
+  const p = (async () => {
+    const blob = await fetchTTSAudio(text, instructions);
+    try{ await setCachedAudio(cacheKey, blob); }
+    catch(e){ console.warn("TTS cache write failed, skipping cache:", e); }
+    return blob;
+  })();
+  _ttsInflight.set(cacheKey, p);
+  try{ return await p; }
+  finally{ _ttsInflight.delete(cacheKey); }
+}
+// 背景預抓：不 await、失敗也不吵，只為了讓等一下要用的音檔先進快取。
+function prefetchTTSAudio(text, instructions){
+  if(!text || !getOpenaiKey()) return;
+  try{ getTTSAudioBlob(text, instructions).catch(() => {}); }catch(e){}
 }
 
 // 有些手機瀏覽器（觀察到的案例：iOS Safari）在呼叫 OpenAI API 或存取 IndexedDB 時
@@ -6874,6 +6888,24 @@ async function runListAutoplay(){
     const text = getSpeechText(w);
     const recKey = useRecordingIds.has(w.id) ? recKeyFor(w.text) : null;
     const reps = autoplayReps();
+    // 背景先把「這個字的中文」跟「下一個字的發音 + 中文」都生成好丟進快取，
+    // 免得唸完外語要唸中文時卡在等 OpenAI 現生成（有時 2-3 秒，尤其新字）。
+    // 只在用 GPT 語音時有意義（電腦內建語音是即時的）。
+    if(document.getElementById("voiceSource").value === "gpt"){
+      const wantZh = document.getElementById("autoplayIncludeZh").checked;
+      if(wantZh){
+        const zhNow = (lookup(w.text) || {}).zh;
+        if(zhNow) prefetchTTSAudio(zhForSpeech(zhNow), TTS_INSTRUCTIONS_ZH);
+      }
+      const nextW = words[listAutoplayIndex + 1];
+      if(nextW){
+        prefetchTTSAudio(getSpeechText(nextW), L().ttsInstructions);
+        if(wantZh){
+          const zhNext = (lookup(nextW.text) || {}).zh;
+          if(zhNext) prefetchTTSAudio(zhForSpeech(zhNext), TTS_INSTRUCTIONS_ZH);
+        }
+      }
+    }
     for(let r = 0; r < reps && listAutoplayRunning && !autoplayJump; r++){
       try{ await speak(text, btn, null, recKey); }catch(e){ /* 播不出來就跳過這次，繼續 */ }
       if(!listAutoplayRunning || autoplayJump) break;
