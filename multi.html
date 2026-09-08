@@ -297,6 +297,7 @@
       <button id="btnToggleTeacherOnly">🎓 只顯示老師講過</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
+      <button id="btnToggleWorkOnly">💼 只顯示工作相關</button>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
@@ -1260,6 +1261,19 @@ function isGreetingWord(w){
   if(d.reply && (d.reply.romanized || d.reply.nativeScript)) return true; // 有固定對答＝客套話
   if(d.zh && GREETING_ZH_RE.test(String(d.zh))) return true;
   if(GREETING_TEXT_RE.test(String(w.text))) return true;
+  return false;
+}
+
+let showWorkOnly = false;
+// 「只顯示跟工作有關」篩選（全語言通用）：靠中英文意思判斷是不是職場／工作
+// 相關（上班下班、辦公室、同事老闆、薪水、開會、專案、面試、履歷、職稱…）。
+// 純靠意思比對，概略的。
+const WORK_ZH_RE = /工作|上班|下班|加班|值班|輪班|職業|職務|職位|職稱|職場|辦公室|辦公|公司|企業|工廠|工地|店裡|開店|做生意|生意|業務|營業|同事|同僚|上司|下屬|部下|老闆|老板|主管|經理|總監|董事|員工|職員|人員|團隊|部門|客戶|顧客|廠商|供應商|會議|開會|簡報|報告|文件|合約|合同|專案|項目|任務|截止|期限|進度|薪水|薪資|工資|薪俸|月薪|時薪|年薪|獎金|加薪|升遷|升職|調職|離職|辭職|退休|裁員|解僱|開除|面試|履歷|應徵|求職|徵才|招聘|招募|實習|上工|打卡|請假|出差|通勤|電子郵件|電郵|郵件|信箱|老師|教師|工程師|醫生|醫師|護理師|護士|律師|會計師|設計師|廚師|司機|警察|軍人|農夫|漁夫|工人|技師|技工|木工|水電工|business|worker/;
+const WORK_EN_RE = /\b(work|works|working|job|jobs|office|company|business|corporate|factory|workshop|workplace|colleague|coworker|co-worker|boss|manager|managing|supervisor|director|executive|employee|employer|employ(ment)?|staff|personnel|team|department|client|customer|vendor|supplier|meeting|conference|report|presentation|document|contract|project|task|assignment|deadline|schedule|salary|wage|wages|pay(check|slip|roll)?|bonus|raise|promotion|transfer|resign(ation)?|retire(ment)?|layoff|laid off|fired|dismissal|interview|resume|cv|curriculum vitae|career|profession|occupation|internship|intern|shift|overtime|commute|clock in|email|e-mail|inbox|teacher|engineer|doctor|nurse|lawyer|accountant|designer|chef|driver|farmer|worker|clerk|secretary|assistant)\b/i;
+function isWorkWord(w){
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  if(d.zh && WORK_ZH_RE.test(String(d.zh))) return true;
+  if(d.en && WORK_EN_RE.test(String(d.en))) return true;
   return false;
 }
 
@@ -5358,6 +5372,7 @@ function getVisibleWords(){
     if(showTeacherOnly && !teacherFlagIds.has(w.id)) return false;
     if(showNumbersOnly && !isNumberWord(w)) return false;
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
+    if(showWorkOnly && !isWorkWord(w)) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -6391,6 +6406,7 @@ function updateCount(){
   document.getElementById("selCount").textContent = parts.join("・");
   if(typeof updateNumbersToggleLabel === "function") updateNumbersToggleLabel();
   if(typeof updateGreetingsToggleLabel === "function") updateGreetingsToggleLabel();
+  if(typeof updateWorkToggleLabel === "function") updateWorkToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -6723,6 +6739,19 @@ document.getElementById("btnToggleGreetingsOnly").addEventListener("click", () =
   renderList();
 });
 updateGreetingsToggleLabel();
+function updateWorkToggleLabel(){
+  const btn = document.getElementById("btnToggleWorkOnly");
+  if(!btn) return;
+  const n = allWords.filter(isWorkWord).length;
+  btn.textContent = showWorkOnly ? `顯示全部單字 (工作相關 ${n} 個)` : `💼 只顯示工作相關 (${n})`;
+  btn.classList.toggle("primary", showWorkOnly);
+}
+document.getElementById("btnToggleWorkOnly").addEventListener("click", () => {
+  showWorkOnly = !showWorkOnly;
+  updateWorkToggleLabel();
+  renderList();
+});
+updateWorkToggleLabel();
 function updateHiddenToggleLabel(){
   const btn = document.getElementById("btnToggleHiddenOnly");
   btn.textContent = showHiddenOnly ? `回到正常清單 (隱藏 ${hiddenIds.size} 個)` : `🙈 顯示隱藏的 (${hiddenIds.size})`;
