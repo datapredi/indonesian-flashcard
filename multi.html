@@ -296,6 +296,7 @@
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnToggleTeacherOnly">🎓 只顯示老師講過</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
+      <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
@@ -613,6 +614,7 @@ function updateLangButtons(){
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
   document.getElementById("btnViScriptBackfill").classList.toggle("hidden", currentLang !== "vi");
+  document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -1245,6 +1247,21 @@ function saveCompareSet(){ saveMasteredSet(lsKey(COMPARE_SET_LS), compareSet); }
 let showCompareOnly = false;
 let showPronFlagOnly = false;
 let showNumbersOnly = false;
+let showGreetingsOnly = false;
+
+// 「只顯示問候／客套話」篩選（埃及文專用）：靠中文意思＋原文＋有沒有「固定
+// 對答」（data.reply）判斷這個字是不是打招呼／問候／客套話（早安、晚安、
+// 很高興認識你、你好嗎、歡迎、幸會、謝謝、恭喜…）。沒有另存標籤，純靠比對，
+// 所以是概略的。
+const GREETING_ZH_RE = /早安|午安|晚安|早上好|中午好|下午好|晚上好|你好|您好|哈囉|嗨|歡迎|幸會|久仰|認識你|見到你|認識您|問候|近來|最近好|近況|過得(好|如何)|好久不見|再見|拜拜|回頭見|待會見|晚點見|明天見|下次見|保重|一路平安|慢走|謝謝|多謝|感謝|不客氣|別客氣|不用謝|恭喜|祝(你|您|大家)?|生日快樂|新年快樂|節日快樂|平安|辛苦了|請多指教|打擾了/;
+const GREETING_TEXT_RE = /\b(saba7|sabah|masaa|masa|ahlan|ahlaan|salam|salaam|forsa\s*sa3eeda|forsa\s*saeeda|etsharaft|it?sharaft|el\s*sharaf|ezzay|ezay|ezayak|ezayik|ezayku|akhbarak|akhbarik|3amel\s*eeh|3amla\s*eeh|3amleen\s*eeh|kullo\s*kwayyes|zay\s*el\s*full|el\s*7amdulillah|hamdulillah|ma3a?\s*el?\s*salama|ma3assalama|tesba7|tesbah|sa3eeda|shokran|shukran|el?\s*3afw|3afwan|mabrouk|mabrook|alf\s*mabrouk|na3iman|na3eeman|kol\s*sana|koll\s*sana|sana\s*7elwa)\b/i;
+function isGreetingWord(w){
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  if(d.reply && (d.reply.romanized || d.reply.nativeScript)) return true; // 有固定對答＝客套話
+  if(d.zh && GREETING_ZH_RE.test(String(d.zh))) return true;
+  if(GREETING_TEXT_RE.test(String(w.text))) return true;
+  return false;
+}
 
 // 「只顯示數字」篩選用：靠中英文意思判斷這個字是不是數字/數量詞（1、2…、100、
 // 千、萬、第一、half…）。沒有另存標籤，純靠意思比對，所以是概略的（可能會漏、
@@ -5340,6 +5357,7 @@ function getVisibleWords(){
     if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
     if(showTeacherOnly && !teacherFlagIds.has(w.id)) return false;
     if(showNumbersOnly && !isNumberWord(w)) return false;
+    if(showGreetingsOnly && !isGreetingWord(w)) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -6372,6 +6390,7 @@ function updateCount(){
   if(quizMasteredIds.size) parts.push(`測驗已會 ${quizMasteredIds.size}`);
   document.getElementById("selCount").textContent = parts.join("・");
   if(typeof updateNumbersToggleLabel === "function") updateNumbersToggleLabel();
+  if(typeof updateGreetingsToggleLabel === "function") updateGreetingsToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -6691,6 +6710,19 @@ document.getElementById("btnToggleNumbersOnly").addEventListener("click", () => 
   renderList();
 });
 updateNumbersToggleLabel();
+function updateGreetingsToggleLabel(){
+  const btn = document.getElementById("btnToggleGreetingsOnly");
+  if(!btn) return;
+  const n = allWords.filter(isGreetingWord).length;
+  btn.textContent = showGreetingsOnly ? `顯示全部單字 (問候／客套話 ${n} 個)` : `👋 只顯示問候／客套話 (${n})`;
+  btn.classList.toggle("primary", showGreetingsOnly);
+}
+document.getElementById("btnToggleGreetingsOnly").addEventListener("click", () => {
+  showGreetingsOnly = !showGreetingsOnly;
+  updateGreetingsToggleLabel();
+  renderList();
+});
+updateGreetingsToggleLabel();
 function updateHiddenToggleLabel(){
   const btn = document.getElementById("btnToggleHiddenOnly");
   btn.textContent = showHiddenOnly ? `回到正常清單 (隱藏 ${hiddenIds.size} 個)` : `🙈 顯示隱藏的 (${hiddenIds.size})`;
