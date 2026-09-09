@@ -165,8 +165,10 @@
   <div class="list hidden" id="thaiAlphabetPanel" style="padding:14px;"></div>
   <div class="toolbar hidden" id="viAlphabetBar">
     <button id="btnToggleViAlphabet">📖 越南文母音／子音對照表</button>
+    <button id="btnCheckViVoices">🔎 檢查這台有沒有越南語語音</button>
   </div>
   <div class="list hidden" id="viAlphabetPanel" style="padding:14px;"></div>
+  <div class="list hidden" id="viVoicesPanel" style="padding:14px;"></div>
   <div class="toolbar hidden" id="arabicAlphabetBar">
     <button id="btnToggleArabicAlphabet">📖 埃及阿拉伯字母表（含 Franco 拼法）</button>
   </div>
@@ -3162,6 +3164,61 @@ document.getElementById("btnToggleViAlphabet").addEventListener("click", () => {
     return;
   }
   renderViAlphabetPanel(); // 每次打開都重畫
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("btnCheckViVoices").addEventListener("click", () => {
+  const panel = document.getElementById("viVoicesPanel");
+  if(!panel.classList.contains("hidden")){ panel.classList.add("hidden"); return; }
+  panel.innerHTML = "";
+  const render = () => {
+    const all = (window.speechSynthesis ? speechSynthesis.getVoices() : []) || [];
+    const vi = all.filter(v => v.lang && v.lang.toLowerCase().replace("_", "-").startsWith("vi"));
+    panel.innerHTML = "";
+    const h = document.createElement("div");
+    h.style.fontWeight = "600";
+    h.textContent = vi.length
+      ? `這台有 ${vi.length} 個越南語系統語音：`
+      : "這台沒有安裝任何越南語系統語音。";
+    panel.appendChild(h);
+    if(vi.length){
+      vi.forEach(v => {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex; align-items:center; gap:8px; margin:4px 0;";
+        const label = document.createElement("span");
+        label.textContent = `${v.name}（${v.lang}）${v.localService ? "・裝置內建" : "・線上"}${v.default ? "・預設" : ""}`;
+        const play = document.createElement("button");
+        play.type = "button"; play.className = "speak-btn"; play.textContent = "🔊 試聽";
+        play.addEventListener("click", () => {
+          try{
+            speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance("Xin chào, đây là giọng nói tiếng Việt. Con bò, cái bàn, số hai.");
+            u.voice = v; u.lang = v.lang; u.rate = 0.9;
+            speechSynthesis.speak(u);
+          }catch(e){}
+        });
+        row.appendChild(label); row.appendChild(play);
+        panel.appendChild(row);
+      });
+      const tip = document.createElement("div");
+      tip.className = "usage-note";
+      tip.style.marginTop = "8px";
+      tip.textContent = "有越南語語音的話，把上面「發音來源」切成『電腦內建語音』，短的無聲調字（to、ba…）就會唸對、不用加「đó」載體。缺點是音質通常比 GPT 差、且各裝置版本不一。";
+      panel.appendChild(tip);
+    }else{
+      const how = document.createElement("div");
+      how.className = "usage-note";
+      how.style.marginTop = "8px";
+      how.innerHTML = "安裝方式：<br>・iPhone／iPad：設定 → 輔助使用 → 朗讀內容 → 語音 → 新增「Tiếng Việt」<br>・Mac（Safari）：系統設定 → 輔助使用 → 朗讀內容 → 系統語音 → 管理語音 → 下載越南文<br>・Android（Chrome）：設定 → 文字轉語音 → 安裝越南文語言資料<br>裝好後回這裡再按一次這顆按鈕。";
+      panel.appendChild(how);
+    }
+  };
+  render();
+  // 有些瀏覽器要等 voiceschanged 事件才拿得到完整清單
+  if(window.speechSynthesis){
+    speechSynthesis.onvoiceschanged = render;
+    setTimeout(render, 300);
+  }
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
