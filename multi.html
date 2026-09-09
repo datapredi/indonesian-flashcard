@@ -644,6 +644,9 @@ function arzRomanToSpeakable(s){
 function stripJaFurigana(s){
   return String(s || "").replace(/（[ぁ-んァ-ヶ・ー\s]*）/g, "").replace(/\([ぁ-んァ-ヶ・ー\s]*\)/g, "").trim();
 }
+// 越南文裡「三個字母以上、又沒有變音符號、但實測 TTS 還是會唸成英文」的字，
+// 才需要掛「đó」當載體。發現哪個字唸錯就加進來。
+const VI_TTS_NEED_CARRIER = new Set(["con"]);
 function getSpeechText(w){
   if(!L().hasScript) return w.text;
   const data = lookup(w.text);
@@ -651,10 +654,13 @@ function getSpeechText(w){
   if(currentLang === "ja") return stripJaFurigana((data && data.nativeScript) || "") || (data && data.nativeScript) || w.text;
   if(currentLang === "vi"){
     const ns = ((data && data.nativeScript) || w.text).trim();
-    // 單一個短字、又完全沒有越南文變音符號（例：to、con、ba、me、la、ma…）很容易
-    // 被 TTS 當成英文唸。後面掛一個帶變音符號的越南文口語尾巴「đó」，逼 TTS 進
-    // 越南語模式——會多聽到一個字，但目標字的發音會對（就是你說「放進句子就對」的道理）。
-    if(/^[A-Za-z]{1,4}$/.test(ns)) return ns + " đó";
+    // 一兩個字母、又完全沒有越南文變音符號（例：to、ba、me、la、ma…）很容易被
+    // TTS 當成英文唸。後面掛一個帶變音符號的越南文口語尾巴「đó」，逼 TTS 進
+    // 越南語模式——會多聽到一個「đó」，但目標字的發音會對。三個字母以上的字
+    // （hai、sao、con…）通常不用這招就唸得對，除非列在 VI_TTS_NEED_CARRIER
+    // 這個「已知還是會被唸成英文」的小清單裡。
+    const bare = ns.toLowerCase();
+    if(/^[a-z]{1,2}$/.test(bare) || VI_TTS_NEED_CARRIER.has(bare)) return ns + " đó";
     return ns;
   }
   return (data && data.nativeScript) || w.text;
