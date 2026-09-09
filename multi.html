@@ -223,6 +223,20 @@
     <div class="toolbar hidden" id="compactReadBar">
       <button id="btnCompactRead">📃 精簡閱讀模式（只看越南文＋中文＋🔊）</button>
     </div>
+    <div class="toolbar hidden" id="fptViBar" style="flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
+        <input type="checkbox" id="fptViEnabled">
+        越南文改用 <b>FPT 南部腔</b>
+      </label>
+      <select id="fptVoice" style="flex:0 0 auto;">
+        <option value="lannhi">lannhi（南部女聲）</option>
+        <option value="linhsan">linhsan（南部女聲）</option>
+        <option value="giahuy">giahuy（男聲）</option>
+        <option value="banmai">banmai（北部女聲）</option>
+      </select>
+      <input type="text" id="fptProxyUrl" placeholder="貼上你的 Cloudflare Worker 網址 https://...workers.dev" style="flex:1 1 260px;">
+      <span class="note" style="flex:1 1 100%; margin:2px 0 0;">要先照 <code>fpt-tts-proxy.worker.js</code> 部署一個 Cloudflare Worker（免費），把它的網址貼在上面。音檔一樣會永久快取。</span>
+    </div>
     <div class="toolbar">
       <button id="btnListAutoplay">▶️ 依序播放發音</button>
       <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;">
@@ -624,6 +638,7 @@ function updateLangButtons(){
   document.getElementById("btnViScriptBackfill").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
   document.getElementById("compactReadBar").classList.toggle("hidden", currentLang !== "vi");
+  document.getElementById("fptViBar").classList.toggle("hidden", currentLang !== "vi");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -661,6 +676,8 @@ function getSpeechText(w){
   if(currentLang === "ja") return stripJaFurigana((data && data.nativeScript) || "") || (data && data.nativeScript) || w.text;
   if(currentLang === "vi"){
     const ns = ((data && data.nativeScript) || w.text).trim();
+    // FPT 是專門的越南語引擎，不會把 to／ba 當英文唸，不需要「đó」載體。
+    if(fptViActive("vi")) return ns;
     // 一兩個字母、又完全沒有越南文變音符號（例：to、ba、me、la、ma…）很容易被
     // TTS 當成英文唸。後面掛一個帶變音符號的越南文口語尾巴「đó」，逼 TTS 進
     // 越南語模式——會多聽到一個「đó」，但目標字的發音會對。三個字母以上的字
@@ -728,6 +745,23 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
   // 語言的設定去唸別種語言的文字。
   const info = langOverride ? LANG_INFO[langOverride] : L();
   const voiceSource = document.getElementById("voiceSource").value;
+  // 越南文開了「FPT 南部腔」：不管「發音來源」選什麼，都走 FPT proxy 產的音檔
+  // （字母表的 forceSystemVoice 例外，那個還是走電腦內建語音）。
+  if(!forceSystemVoice && fptViActive(langOverride || currentLang)){
+    const audioEl = document.getElementById("listenAudio");
+    audioEl.src = SILENT_AUDIO_DATA_URI;
+    audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
+    if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
+    try{
+      const blob = await withTimeout(getFptViAudioBlob(text), 30000, "FPT 南部腔語音逾時（30 秒）");
+      if(myGeneration === speakGeneration) await playAudioBlob(blob);
+    }catch(e){
+      if(myGeneration === speakGeneration) alert("FPT 南部腔語音失敗：" + e.message + "\n（可以先在設定裡取消勾選，改回原本語音）");
+    }finally{
+      if(btn){ btn.disabled = false; btn.classList.remove('speaking'); }
+    }
+    return myGeneration === speakGeneration;
+  }
   // 字母表那種「單獨一個字母/音」的播放寫死用電腦內建語音——實測比 GPT 準，GPT
   // 對孤立字母常常亂唸。forceSystemVoice=true 時不管「發音來源」選什麼都走內建語音。
   if(voiceSource === "gpt" && !forceSystemVoice){
@@ -901,6 +935,56 @@ async function deleteCachedAudio(key){
   });
 }
 function ttsCacheKey(text, instructions){ return `${TTS_MODEL}::${instructions || ""}::${text}`; }
+
+// ---- FPT.AI 南部越南語 TTS（透過使用者自架的 Cloudflare Worker proxy）----
+// proxy URL、voice、開關都存在 localStorage（全語言共用一份設定，但只對越南文生效）。
+const FPT_PROXY_URL_LS = "flashcard_fpt_proxy_url_v1";
+const FPT_VOICE_LS = "flashcard_fpt_voice_v1";
+const FPT_VI_ENABLED_LS = "flashcard_fpt_vi_enabled_v1";
+function fptProxyUrl(){ try{ return (localStorage.getItem(FPT_PROXY_URL_LS) || "").trim(); }catch(e){ return ""; } }
+function fptVoice(){ try{ return localStorage.getItem(FPT_VOICE_LS) || "lannhi"; }catch(e){ return "lannhi"; } }
+function fptViActive(lang){
+  if((lang || currentLang) !== "vi") return false;
+  try{ if(localStorage.getItem(FPT_VI_ENABLED_LS) !== "1") return false; }catch(e){ return false; }
+  return !!fptProxyUrl();
+}
+const _fptInflight = new Map();
+async function getFptViAudioBlob(text){
+  const voice = fptVoice();
+  const cacheKey = `fpt-vi::${voice}::${text}`;
+  let cached = null;
+  try{ cached = await getCachedAudio(cacheKey); }catch(e){}
+  if(cached) return cached;
+  if(_fptInflight.has(cacheKey)) return _fptInflight.get(cacheKey);
+  const p = (async () => {
+    const base = fptProxyUrl();
+    if(!base) throw new Error("還沒設定 FPT proxy 網址");
+    const url = base.replace(/\/+$/, "") + "/?text=" + encodeURIComponent(text) + "&voice=" + encodeURIComponent(voice) + "&speed=0";
+    const res = await fetch(url);
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if(!res.ok || ct.includes("application/json")){
+      let msg = `HTTP ${res.status}`;
+      try{ const j = await res.json(); if(j && j.error) msg = j.error; }catch(e){}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    try{ await setCachedAudio(cacheKey, blob); }catch(e){}
+    return blob;
+  })();
+  _fptInflight.set(cacheKey, p);
+  try{ return await p; }
+  finally{ _fptInflight.delete(cacheKey); }
+}
+// 給越南文的字/句子取「該用哪個引擎產出的音檔」——FPT 開著就走 FPT，否則走 OpenAI。
+async function getWordAudioBlobFor(lang, text){
+  if(fptViActive(lang)) return getFptViAudioBlob(text);
+  return getTTSAudioBlob(text, (LANG_INFO[lang] || {}).ttsInstructions);
+}
+function prefetchWordAudio(lang, text){
+  if(!text) return;
+  if(fptViActive(lang)){ try{ getFptViAudioBlob(text).catch(() => {}); }catch(e){} return; }
+  prefetchTTSAudio(text, (LANG_INFO[lang] || {}).ttsInstructions);
+}
 
 async function fetchTTSAudio(text, instructions){
   const key = getOpenaiKey();
@@ -5115,7 +5199,7 @@ document.getElementById("btnGenerateAll").onclick = async () => {
         if(data && data.zh && !usageCache[w.text]) await getUsageExamples(w.text, data.zh);
       }catch(e){ failCount++; }
       try{
-        await getTTSAudioBlob(getSpeechText(w), L().ttsInstructions);
+        await getWordAudioBlobFor(currentLang, getSpeechText(w));
       }catch(e){ failCount++; }
       try{
         if(data && data.zh) await getTTSAudioBlob(zhForSpeech(data.zh), TTS_INSTRUCTIONS_ZH);
@@ -6861,6 +6945,24 @@ document.getElementById("btnCompactRead").addEventListener("click", () => {
   renderList();
 });
 updateCompactReadLabel();
+// FPT 南部腔設定：載入已存的值 + 綁定變更
+try{
+  document.getElementById("fptProxyUrl").value = localStorage.getItem(FPT_PROXY_URL_LS) || "";
+  document.getElementById("fptVoice").value = localStorage.getItem(FPT_VOICE_LS) || "lannhi";
+  document.getElementById("fptViEnabled").checked = localStorage.getItem(FPT_VI_ENABLED_LS) === "1";
+}catch(e){}
+document.getElementById("fptProxyUrl").addEventListener("change", (e) => {
+  try{ localStorage.setItem(FPT_PROXY_URL_LS, e.target.value.trim()); }catch(err){}
+});
+document.getElementById("fptVoice").addEventListener("change", (e) => {
+  try{ localStorage.setItem(FPT_VOICE_LS, e.target.value); }catch(err){}
+});
+document.getElementById("fptViEnabled").addEventListener("change", (e) => {
+  try{ localStorage.setItem(FPT_VI_ENABLED_LS, e.target.checked ? "1" : "0"); }catch(err){}
+  if(e.target.checked && !fptProxyUrl()){
+    alert("要先貼上 Cloudflare Worker 網址，FPT 南部腔才會生效。");
+  }
+});
 document.getElementById("difficultyFilter").addEventListener("change", renderList);
 document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) => {
   showSelectedOnly = !showSelectedOnly;
@@ -7161,9 +7263,9 @@ async function runListAutoplay(){
     const recKey = recKeyFor(w.text);
     const reps = autoplayReps();
     // 背景先把「這個字的中文」跟「下一個字的發音 + 中文」都生成好丟進快取，
-    // 免得唸完外語要唸中文時卡在等 OpenAI 現生成（有時 2-3 秒，尤其新字）。
-    // 只在用 GPT 語音時有意義（電腦內建語音是即時的）。
-    if(document.getElementById("voiceSource").value === "gpt"){
+    // 免得唸完外語要唸中文時卡在等現生成（有時 2-3 秒，尤其新字、或 FPT）。
+    // 用 GPT 語音或 FPT 南部腔時才有意義（電腦內建語音是即時的）。
+    if(document.getElementById("voiceSource").value === "gpt" || fptViActive("vi")){
       const wantZh = document.getElementById("autoplayIncludeZh").checked;
       if(wantZh){
         const zhNow = (lookup(w.text) || {}).zh;
@@ -7171,7 +7273,7 @@ async function runListAutoplay(){
       }
       const nextW = words[listAutoplayIndex + 1];
       if(nextW){
-        prefetchTTSAudio(getSpeechText(nextW), L().ttsInstructions);
+        prefetchWordAudio(currentLang, getSpeechText(nextW));
         if(wantZh){
           const zhNext = (lookup(nextW.text) || {}).zh;
           if(zhNext) prefetchTTSAudio(zhForSpeech(zhNext), TTS_INSTRUCTIONS_ZH);
@@ -8307,9 +8409,9 @@ async function runListenLoop(){
     async function playCurrentWord(){
       const interrupted = () => !listenRunning || listenSkipRequested || listenPaused;
       let idBlob = null, zhBlob = null;
-      if(voiceSource === "gpt"){
+      if(voiceSource === "gpt" || fptViActive(currentLang)){
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（生成語音中...）`;
-        idBlob = await withTimeout(getTTSAudioBlob(getSpeechText(w), L().ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+        idBlob = await withTimeout(getWordAudioBlobFor(currentLang, getSpeechText(w)), 30000, "語音生成逾時，可能是網路或瀏覽器卡住");
         zhBlob = await withTimeout(getTTSAudioBlob(zhForSpeech(data.zh), TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
       }
