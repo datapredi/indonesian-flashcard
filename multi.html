@@ -6194,33 +6194,43 @@ function createWordItem(w){
     if(movedId === w.id){ alert("不能把這個字搬到自己下面。"); return; }
     const moved = allWords.find(x => x.id === movedId);
     if(!moved){ alert(`找不到編號 ${movedId} 的字。`); return; }
-    if(!getVisibleWords().some(x => x.id === movedId)){
-      alert(`編號 ${movedId} 的字目前被篩選/搜尋條件擋住，沒有顯示在畫面上，沒辦法直接搬過來。`);
-      return;
-    }
+
+    // 先更新陣列順序（無排序檢視／持久化用）
     const movedIdx = allWords.indexOf(moved);
     if(movedIdx === -1) return;
     allWords.splice(movedIdx, 1);
     const anchorIdx = allWords.indexOf(w);
     allWords.splice(anchorIdx + 1, 0, moved);
     saveWordList(allWords);
+
+    // 被搬的字現在被搜尋／難度篩選擋住 → 直接幫忙清掉這兩個，讓它出現，
+    // 不用使用者自己先清搜尋、再去找目標字。清掉之後整個列表會重繪，
+    // 原本的 row 參照就失效了，要改用 data-word-id 重新抓。
+    if(!getVisibleWords().some(x => x.id === movedId)){
+      document.getElementById("wordSearch").value = "";
+      document.getElementById("difficultyFilter").value = "";
+      renderList();
+    }
     function collectGroup(rowEl){
       const group = [rowEl];
       let sib = rowEl.nextElementSibling;
       for(let i = 0; i < 8 && sib; i++){ group.push(sib); sib = sib.nextElementSibling; }
       return group;
     }
+    const anchorRowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
     const movedRowEl = document.querySelector(`#wordList .item[data-word-id="${movedId}"]`);
-    const anchorGroup = collectGroup(row);
-    if(movedRowEl){
+    if(anchorRowEl && movedRowEl){
+      const anchorGroup = collectGroup(anchorRowEl);
       const movedGroup = collectGroup(movedRowEl);
       const insertPoint = anchorGroup[anchorGroup.length - 1].nextSibling;
-      const parent = row.parentNode;
+      const parent = anchorRowEl.parentNode;
       movedGroup.forEach(el => parent.insertBefore(el, insertPoint));
       movedRowEl.classList.remove("jump-highlight");
       void movedRowEl.offsetWidth;
       movedRowEl.classList.add("jump-highlight");
       movedRowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }else{
+      alert(`已把編號 ${movedId} 搬到「${w.text}」下面（陣列順序已更新）。但它現在被其他篩選（例如只顯示某類）擋住，看不到；把那個篩選關掉就會出現在「${w.text}」下面。`);
     }
   });
   row.appendChild(moveInput);
