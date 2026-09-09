@@ -215,7 +215,8 @@
     </div>
     <div class="toolbar">
       <button id="btnGenerate">✨ AI 自動生成缺少的翻譯</button>
-      <input type="text" id="wordSearch" placeholder="搜尋目前語言、中文或英文..." style="flex:1 1 180px;">
+      <input type="text" id="wordSearch" placeholder="搜尋目前語言、中文或英文..." style="flex:1 1 140px;">
+      <input type="text" id="wordSearch2" placeholder="＋第二個搜尋（兩批一起顯示）" style="flex:1 1 140px;">
     </div>
     <div class="toolbar">
       <button id="btnListAutoplay">▶️ 依序播放發音</button>
@@ -3874,10 +3875,12 @@ function jumpToWordObj(target){
     // 不然回去之後篩選會被清空、變成顯示全部單字，不是原本選的那個難度。
     jumpBackFilters = {
       search: document.getElementById("wordSearch").value,
+      search2: document.getElementById("wordSearch2").value,
       difficulty: document.getElementById("difficultyFilter").value,
       showSelectedOnly, showCompareOnly, showPronFlagOnly, showNewlyImportedOnly
     };
     document.getElementById("wordSearch").value = "";
+    document.getElementById("wordSearch2").value = "";
     document.getElementById("difficultyFilter").value = "";
     if(showSelectedOnly){
       showSelectedOnly = false;
@@ -3913,6 +3916,7 @@ document.getElementById("btnJumpBack").addEventListener("click", (e) => {
   e.preventDefault();
   if(jumpBackFilters){
     document.getElementById("wordSearch").value = jumpBackFilters.search;
+    document.getElementById("wordSearch2").value = jumpBackFilters.search2 || "";
     document.getElementById("difficultyFilter").value = jumpBackFilters.difficulty;
     if(jumpBackFilters.showSelectedOnly){
       showSelectedOnly = true;
@@ -5364,6 +5368,8 @@ function getVisibleWords(){
     return allWords.filter(w => newlyImportedIds.has(w.id) && !hiddenIds.has(w.id));
   }
   const query = foldForSearch(document.getElementById("wordSearch").value.trim());
+  const q2El = document.getElementById("wordSearch2");
+  const query2 = q2El ? foldForSearch(q2El.value.trim()) : "";
   const diffFilter = document.getElementById("difficultyFilter").value;
   const list = allWords.filter(w => {
     if(hiddenIds.has(w.id)) return false;
@@ -5377,13 +5383,15 @@ function getVisibleWords(){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
     }
-    if(!query) return true;
+    if(!query && !query2) return true;
     const data = lookup(w.text);
     // 也比對背後的原生文字（越南文/泰文等顯示的就是這個）、📝 筆記、AI 補的
     // 搜尋關鍵字（近義詞），這樣「待會見」用「再見」也搜得到。整串一起用
     // foldForSearch 拆掉聲調符號再比，打 "an" 找得到 "ăn"。
     const haystack = foldForSearch(`${w.text} ${data && data.nativeScript ? data.nativeScript : ""} ${data ? data.zh : ""} ${data ? data.en : ""} ${data && data.searchKeywords ? data.searchKeywords : ""} ${getWordNote(w.text)}`);
-    return haystack.includes(query);
+    // 兩個搜尋框：任一個命中就顯示（OR），空的那個忽略——方便同時把兩批字
+    // 擺在一起看/搬。
+    return (query && haystack.includes(query)) || (query2 && haystack.includes(query2));
   });
   if(sortCefr){
     // 沒標過 CEFR 的字永遠排最後面（99），不管正排倒排都一樣，只有已標的
@@ -6208,6 +6216,7 @@ function createWordItem(w){
     // 原本的 row 參照就失效了，要改用 data-word-id 重新抓。
     if(!getVisibleWords().some(x => x.id === movedId)){
       document.getElementById("wordSearch").value = "";
+      document.getElementById("wordSearch2").value = "";
       document.getElementById("difficultyFilter").value = "";
       renderList();
     }
@@ -6675,6 +6684,7 @@ document.getElementById("btnRandomSelect").onclick = () => {
   renderList();
 };
 document.getElementById("wordSearch").addEventListener("input", renderList);
+document.getElementById("wordSearch2").addEventListener("input", renderList);
 document.getElementById("difficultyFilter").addEventListener("change", renderList);
 document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) => {
   showSelectedOnly = !showSelectedOnly;
