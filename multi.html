@@ -1242,6 +1242,23 @@ function distinctGroups(){
   return [...new Set(Object.values(wordGroups).map(s => String(s || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
 }
+// 把一個「分組下拉」填成：無分組 / 每個現有的組 / ＋新群組…，並選回 currentVal。
+function fillGroupSelect(sel, currentVal){
+  currentVal = currentVal || "";
+  const all = distinctGroups();
+  if(currentVal && all.indexOf(currentVal) === -1) all.push(currentVal);
+  sel.innerHTML = '<option value="">📁 無分組</option>'
+    + all.map(g => `<option value="${g.replace(/"/g, "&quot;")}">📁 ${g}</option>`).join("")
+    + '<option value="__new__">＋ 新群組…</option>';
+  sel.value = currentVal;
+}
+// 畫面上每一個分組下拉都重填一次（新增了組之後用），每個照它自己的 data-wid
+// 帶回目前的值，不動到使用者正在展開的面板。
+function refreshAllGroupSelects(){
+  document.querySelectorAll("#wordList .word-group-select").forEach(sel => {
+    fillGroupSelect(sel, wordGroups[sel.dataset.wid] || "");
+  });
+}
 let groupFilter = ""; // getVisibleWords 用：空＝全部；否則只顯示這一組
 
 // 「太難、現在完全不想看到，但也不想刪掉」的字：藏起來——不在單字表顯示，也
@@ -6408,19 +6425,12 @@ function createWordItem(w){
   row.appendChild(colorSelect);
 
   // 自訂分組下拉：無 / 現有的組 / ＋新群組…（選了會 prompt 輸入名字）。
+  // 加了 class 跟 data-wid，新增一個組時 refreshAllGroupSelects() 會把畫面上
+  // 每一個下拉都補上這個新選項，不用整頁重繪、也不用捲下去每個重填。
   const groupSelect = document.createElement("select");
-  groupSelect.className = "color-flag-select";
-  function fillGroupOptions(){
-    const cur = wordGroups[w.id] || "";
-    const opts = ['<option value="">📁 無分組</option>'];
-    const all = distinctGroups();
-    if(cur && all.indexOf(cur) === -1) all.push(cur);
-    all.forEach(g => { opts.push(`<option value="${g.replace(/"/g, "&quot;")}">📁 ${g}</option>`); });
-    opts.push('<option value="__new__">＋ 新群組…</option>');
-    groupSelect.innerHTML = opts.join("");
-    groupSelect.value = cur;
-  }
-  fillGroupOptions();
+  groupSelect.className = "color-flag-select word-group-select";
+  groupSelect.dataset.wid = w.id;
+  fillGroupSelect(groupSelect, wordGroups[w.id] || "");
   groupSelect.addEventListener("click", (e) => e.stopPropagation());
   groupSelect.addEventListener("change", (e) => {
     e.stopPropagation();
@@ -6431,7 +6441,7 @@ function createWordItem(w){
     }
     if(v) wordGroups[w.id] = v; else delete wordGroups[w.id];
     saveWordGroups();
-    fillGroupOptions();
+    refreshAllGroupSelects();
     updateGroupFilterOptions();
     if(groupFilter) renderList();
   });
