@@ -87,7 +87,16 @@ export default {
         body: JSON.stringify({
           text,
           model_id: MODEL_ID,
-          voice_settings: { stability: 0.5, similarity_boost: 0.85 },
+          // 單字卡要「每次都同一個人、同一種唸法」，所以 stability / similarity
+          // 拉高（低 stability 會讓每次生成的音色、語氣飄），style 設 0（不加戲），
+          // 再固定一個 seed 讓生成盡量可重現。
+          voice_settings: {
+            stability: 0.85,
+            similarity_boost: 0.95,
+            style: 0,
+            use_speaker_boost: true,
+          },
+          seed: 42,
         }),
       });
       if (!r.ok) {
