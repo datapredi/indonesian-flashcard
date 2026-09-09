@@ -226,16 +226,11 @@
     <div class="toolbar hidden" id="fptViBar" style="flex-wrap:wrap;">
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
         <input type="checkbox" id="fptViEnabled">
-        越南文改用 <b>FPT 南部腔</b>
+        越南文改用 <b>南部腔 TTS（ElevenLabs）</b>
       </label>
-      <select id="fptVoice" style="flex:0 0 auto;">
-        <option value="lannhi">lannhi（南部女聲）</option>
-        <option value="linhsan">linhsan（南部女聲）</option>
-        <option value="giahuy">giahuy（男聲）</option>
-        <option value="banmai">banmai（北部女聲）</option>
-      </select>
-      <input type="text" id="fptProxyUrl" placeholder="貼上你的 Cloudflare Worker 網址 https://...workers.dev" style="flex:1 1 260px;">
-      <span class="note" style="flex:1 1 100%; margin:2px 0 0;">要先照 <code>fpt-tts-proxy.worker.js</code> 部署一個 Cloudflare Worker（免費），把它的網址貼在上面。音檔一樣會永久快取。</span>
+      <input type="text" id="fptVoice" placeholder="ElevenLabs voice ID（克隆的南部腔）" style="flex:1 1 200px;">
+      <input type="text" id="fptProxyUrl" placeholder="Cloudflare Worker 網址 https://...workers.dev" style="flex:1 1 240px;">
+      <span class="note" style="flex:1 1 100%; margin:2px 0 0;">照 <code>elevenlabs-tts-proxy.worker.js</code> 部署一個 Cloudflare Worker（ElevenLabs key 放 Worker secret，不會外洩），把網址貼在上面、voice ID 那格填你在 ElevenLabs 克隆的南部腔 voice。音檔會永久快取。</span>
     </div>
     <div class="toolbar">
       <button id="btnListAutoplay">▶️ 依序播放發音</button>
@@ -676,7 +671,7 @@ function getSpeechText(w){
   if(currentLang === "ja") return stripJaFurigana((data && data.nativeScript) || "") || (data && data.nativeScript) || w.text;
   if(currentLang === "vi"){
     const ns = ((data && data.nativeScript) || w.text).trim();
-    // FPT 是專門的越南語引擎，不會把 to／ba 當英文唸，不需要「đó」載體。
+    // ElevenLabs 是專門的多語言引擎，不會把 to／ba 當英文唸，不需要「đó」載體。
     if(fptViActive("vi")) return ns;
     // 一兩個字母、又完全沒有越南文變音符號（例：to、ba、me、la、ma…）很容易被
     // TTS 當成英文唸。後面掛一個帶變音符號的越南文口語尾巴「đó」，逼 TTS 進
@@ -745,7 +740,7 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
   // 語言的設定去唸別種語言的文字。
   const info = langOverride ? LANG_INFO[langOverride] : L();
   const voiceSource = document.getElementById("voiceSource").value;
-  // 越南文開了「FPT 南部腔」：不管「發音來源」選什麼，都走 FPT proxy 產的音檔
+  // 越南文開了「南部腔 TTS」：不管「發音來源」選什麼，都走 proxy 產的音檔
   // （字母表的 forceSystemVoice 例外，那個還是走電腦內建語音）。
   if(!forceSystemVoice && fptViActive(langOverride || currentLang)){
     const audioEl = document.getElementById("listenAudio");
@@ -753,10 +748,10 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
     audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
     if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
     try{
-      const blob = await withTimeout(getFptViAudioBlob(text), 30000, "FPT 南部腔語音逾時（30 秒）");
+      const blob = await withTimeout(getFptViAudioBlob(text), 30000, "南部腔語音逾時（30 秒）");
       if(myGeneration === speakGeneration) await playAudioBlob(blob);
     }catch(e){
-      if(myGeneration === speakGeneration) alert("FPT 南部腔語音失敗：" + e.message + "\n（可以先在設定裡取消勾選，改回原本語音）");
+      if(myGeneration === speakGeneration) alert("南部腔語音失敗：" + e.message + "\n（可以先在設定裡取消勾選，改回原本語音）");
     }finally{
       if(btn){ btn.disabled = false; btn.classList.remove('speaking'); }
     }
@@ -936,26 +931,26 @@ async function deleteCachedAudio(key){
 }
 function ttsCacheKey(text, instructions){ return `${TTS_MODEL}::${instructions || ""}::${text}`; }
 
-// ---- FPT.AI 南部越南語 TTS（透過使用者自架的 Cloudflare Worker proxy）----
-// proxy URL、voice、開關都存在 localStorage（全語言共用一份設定，但只對越南文生效）。
-const FPT_PROXY_URL_LS = "flashcard_fpt_proxy_url_v1";
-const FPT_VOICE_LS = "flashcard_fpt_voice_v1";
-const FPT_VI_ENABLED_LS = "flashcard_fpt_vi_enabled_v1";
+// ---- 越南文南部腔 TTS（ElevenLabs，透過使用者自架的 Cloudflare Worker proxy）----
+// proxy URL、voice ID、開關都存在 localStorage（全語言共用一份設定，但只對越南文生效）。
+const FPT_PROXY_URL_LS = "flashcard_vitts_proxy_url_v1";
+const FPT_VOICE_LS = "flashcard_vitts_voice_v1";
+const FPT_VI_ENABLED_LS = "flashcard_vitts_enabled_v1";
 function fptProxyUrl(){ try{ return (localStorage.getItem(FPT_PROXY_URL_LS) || "").trim(); }catch(e){ return ""; } }
-function fptVoice(){ try{ return localStorage.getItem(FPT_VOICE_LS) || "lannhi"; }catch(e){ return "lannhi"; } }
+function fptVoice(){ try{ return (localStorage.getItem(FPT_VOICE_LS) || "").trim(); }catch(e){ return ""; } }
 function fptViActive(lang){
   if((lang || currentLang) !== "vi") return false;
   try{ if(localStorage.getItem(FPT_VI_ENABLED_LS) !== "1") return false; }catch(e){ return false; }
-  return !!fptProxyUrl();
+  return !!fptProxyUrl() && !!fptVoice();
 }
 const _fptInflight = new Map();
-// FPT 免費方案有很兇的 rate limit，所以「一次只發一個請求、每個之間至少隔
-// 2 秒」——用一條 promise 鏈把呼叫排隊。已在快取裡的字不受影響（不排隊）。
+// 一次只發一個請求、每個之間至少隔 300ms，避免瞬間打一堆（依序播放快轉時）。
+// 已在快取裡的字不受影響（不排隊）。
 let _fptChain = Promise.resolve();
 let _fptLastAt = 0;
 function _fptQueued(fn){
   const run = _fptChain.then(async () => {
-    const wait = 2000 - (Date.now() - _fptLastAt);
+    const wait = 300 - (Date.now() - _fptLastAt);
     if(wait > 0) await new Promise(r => setTimeout(r, wait));
     try{ return await fn(); }
     finally{ _fptLastAt = Date.now(); }
@@ -974,8 +969,9 @@ async function getFptViAudioBlob(text){
     // 排到隊了再檢查一次快取——排隊等待期間可能已經被別的呼叫產好了
     try{ const c2 = await getCachedAudio(cacheKey); if(c2) return c2; }catch(e){}
     const base = fptProxyUrl();
-    if(!base) throw new Error("還沒設定 FPT proxy 網址");
-    const url = base.replace(/\/+$/, "") + "/?text=" + encodeURIComponent(text) + "&voice=" + encodeURIComponent(voice) + "&speed=0";
+    if(!base) throw new Error("還沒設定 proxy 網址");
+    if(!voice) throw new Error("還沒填 ElevenLabs voice ID");
+    const url = base.replace(/\/+$/, "") + "/?text=" + encodeURIComponent(text) + "&voice=" + encodeURIComponent(voice);
     const res = await fetch(url);
     const ct = (res.headers.get("content-type") || "").toLowerCase();
     if(!res.ok || ct.includes("application/json")){
@@ -991,14 +987,14 @@ async function getFptViAudioBlob(text){
   try{ return await p; }
   finally{ _fptInflight.delete(cacheKey); }
 }
-// 給越南文的字/句子取「該用哪個引擎產出的音檔」——FPT 開著就走 FPT，否則走 OpenAI。
+// 給越南文的字/句子取「該用哪個引擎產出的音檔」——南部腔開著就走 proxy，否則走 OpenAI。
 async function getWordAudioBlobFor(lang, text){
   if(fptViActive(lang)) return getFptViAudioBlob(text);
   return getTTSAudioBlob(text, (LANG_INFO[lang] || {}).ttsInstructions);
 }
 function prefetchWordAudio(lang, text){
   if(!text) return;
-  // FPT 免費方案 rate limit 很兇，就不預抓了（少一個並發請求），等真的要播時再抓。
+  // 南部腔用 proxy，就不預抓了（省 ElevenLabs 額度），等真的要播時再抓。
   if(fptViActive(lang)) return;
   prefetchTTSAudio(text, (LANG_INFO[lang] || {}).ttsInstructions);
 }
@@ -6962,22 +6958,22 @@ document.getElementById("btnCompactRead").addEventListener("click", () => {
   renderList();
 });
 updateCompactReadLabel();
-// FPT 南部腔設定：載入已存的值 + 綁定變更
+// 南部腔 TTS（ElevenLabs）設定：載入已存的值 + 綁定變更
 try{
   document.getElementById("fptProxyUrl").value = localStorage.getItem(FPT_PROXY_URL_LS) || "";
-  document.getElementById("fptVoice").value = localStorage.getItem(FPT_VOICE_LS) || "lannhi";
+  document.getElementById("fptVoice").value = localStorage.getItem(FPT_VOICE_LS) || "";
   document.getElementById("fptViEnabled").checked = localStorage.getItem(FPT_VI_ENABLED_LS) === "1";
 }catch(e){}
 document.getElementById("fptProxyUrl").addEventListener("change", (e) => {
   try{ localStorage.setItem(FPT_PROXY_URL_LS, e.target.value.trim()); }catch(err){}
 });
 document.getElementById("fptVoice").addEventListener("change", (e) => {
-  try{ localStorage.setItem(FPT_VOICE_LS, e.target.value); }catch(err){}
+  try{ localStorage.setItem(FPT_VOICE_LS, e.target.value.trim()); }catch(err){}
 });
 document.getElementById("fptViEnabled").addEventListener("change", (e) => {
   try{ localStorage.setItem(FPT_VI_ENABLED_LS, e.target.checked ? "1" : "0"); }catch(err){}
-  if(e.target.checked && !fptProxyUrl()){
-    alert("要先貼上 Cloudflare Worker 網址，FPT 南部腔才會生效。");
+  if(e.target.checked && (!fptProxyUrl() || !fptVoice())){
+    alert("要先填「Cloudflare Worker 網址」跟「ElevenLabs voice ID」，南部腔才會生效。");
   }
 });
 document.getElementById("difficultyFilter").addEventListener("change", renderList);
