@@ -2776,6 +2776,24 @@ function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions, 
   btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(speakText || text, btn, lang, null, speakInstructions, useForce); });
   wrap.appendChild(label);
   wrap.appendChild(btn);
+  // 🔄：清掉這個發音的快取再重播。GPT 偶爾會把某個字母名唸成怪聲或幾乎沒聲音，
+  // 而那份壞掉的音檔會被快取住、每次都播同一份。按這個就重新生成一份。
+  if(!useForce){
+    const regen = document.createElement("button");
+    regen.type = "button";
+    regen.className = "speak-btn";
+    regen.textContent = "🔄";
+    regen.title = "這個字母唸得怪／沒聲音？清掉快取重新生成發音";
+    regen.style.cssText = "padding:2px 4px; font-size:0.7rem; opacity:0.6;";
+    regen.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const t = speakText || text;
+      const instr = speakInstructions || ((lang && LANG_INFO[lang]) ? LANG_INFO[lang].ttsInstructions : "");
+      try{ await deleteCachedAudio(ttsCacheKey(t, instr)); }catch(err){}
+      speak(t, regen, lang, null, speakInstructions, useForce);
+    });
+    wrap.appendChild(regen);
+  }
   return wrap;
 }
 
