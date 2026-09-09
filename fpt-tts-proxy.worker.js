@@ -81,9 +81,9 @@ export default {
     if (!text) return jsonErr(400, "缺少 text");
     if (text.length > 5000) text = text.slice(0, 5000);
 
-    // ---- 1) 呼叫 FPT，拿非同步網址 ----
+    // ---- 1) 呼叫 FPT，拿非同步網址（免費方案有 rate limit，撞到就等一下重試）----
     let fptJson;
-    try {
+    const callFpt = async () => {
       const r = await fetch(FPT_ENDPOINT, {
         method: "POST",
         headers: {
@@ -96,11 +96,24 @@ export default {
         body: text,
       });
       const bodyText = await r.text();
-      try { fptJson = JSON.parse(bodyText); }
-      catch { return jsonErr(502, "FPT 回應不是 JSON：" + bodyText.slice(0, 300)); }
-      if (!r.ok || fptJson.error) {
-        return jsonErr(502, "FPT 錯誤：" + (fptJson.message || fptJson.error || r.status));
+      let j;
+      try { j = JSON.parse(bodyText); }
+      catch { return { fatal: "FPT 回應不是 JSON：" + bodyText.slice(0, 300) }; }
+      const msg = String(j.message || j.error || "");
+      const rateLimited = r.status === 429 || /rate limit|too many/i.test(msg);
+      if (r.ok && !j.error) return { ok: j };
+      return { rateLimited, err: "FPT 錯誤：" + (j.message || j.error || r.status) };
+    };
+    try {
+      let res = await callFpt();
+      // rate limit 通常是「每秒/每分鐘幾次」的突發限制，隔幾秒再試多半就過了
+      for (let i = 0; i < 3 && res.rateLimited; i++) {
+        await new Promise((r) => setTimeout(r, 3500));
+        res = await callFpt();
       }
+      if (res.fatal) return jsonErr(502, res.fatal);
+      if (!res.ok) return jsonErr(res.rateLimited ? 429 : 502, res.err);
+      fptJson = res.ok;
     } catch (e) {
       return jsonErr(502, "呼叫 FPT 失敗：" + e.message);
     }
