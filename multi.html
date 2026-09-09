@@ -960,7 +960,7 @@ function _fptQueued(fn){
 }
 async function getFptViAudioBlob(text){
   const voice = fptVoice();
-  const cacheKey = `fpt-vi::${voice}::${text}`;
+  const cacheKey = `fpt-vi2::${voice}::${text}`; // v2：Worker 換了 voice_settings（stability 拉高），舊快取跳過重生
   let cached = null;
   try{ cached = await getCachedAudio(cacheKey); }catch(e){}
   if(cached) return cached;
