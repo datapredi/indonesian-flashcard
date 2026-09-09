@@ -220,6 +220,9 @@
       <input type="text" id="wordSearch" placeholder="搜尋目前語言、中文或英文..." style="flex:1 1 140px;">
       <input type="text" id="wordSearch2" placeholder="＋第二個搜尋（兩批一起顯示）" style="flex:1 1 140px;">
     </div>
+    <div class="toolbar hidden" id="compactReadBar">
+      <button id="btnCompactRead">📃 精簡閱讀模式（只看越南文＋中文＋🔊）</button>
+    </div>
     <div class="toolbar">
       <button id="btnListAutoplay">▶️ 依序播放發音</button>
       <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;">
@@ -299,6 +302,7 @@
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnToggleTeacherOnly">🎓 只顯示老師講過</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
+      <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
       <button id="btnToggleWorkOnly">💼 只顯示工作相關</button>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
@@ -619,6 +623,7 @@ function updateLangButtons(){
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
   document.getElementById("btnViScriptBackfill").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
+  document.getElementById("compactReadBar").classList.toggle("hidden", currentLang !== "vi");
 }
 function writeBtnLabel(){ return `✍️ 中翻${L().label}（AI 出句、AI 批改）`; }
 updateLangButtons();
@@ -1290,6 +1295,52 @@ function isWorkWord(w){
 // 千、萬、第一、half…）。沒有另存標籤，純靠意思比對，所以是概略的（可能會漏、
 // 也可能誤收像「秒 second」這種），但複習數字時夠用。
 const ZH_NUM_RE = /^[0-9０-９零〇一二三四五六七八九十兩俩廿卅卌百千万萬億兆京垓又半\s]+$/;
+let sortNumbersAsc = false;
+// 把中文數字（一、十二、一百二十三、兩萬…）或英文數字（one、twenty-three、
+// one hundred、1st、half…）解析成一個數值，給「數字由小到大排」用。解析不出來
+// 回 Infinity（排最後）。
+function cjkNumToInt(s){
+  s = String(s || "").replace(/[（(][^（）()]*[)）]/g, "").replace(/[第\s]/g, "");
+  if(!s) return null;
+  if(/^[0-9０-９]+$/.test(s)) return parseInt(s.replace(/[０-９]/g, d => "０１２３４５６７８９".indexOf(d)), 10);
+  if(s === "半") return 0.5;
+  const dig = { "零":0,"〇":0,"一":1,"二":2,"兩":2,"俩":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"十":10,"廿":20,"卅":30,"卌":40,"百":100,"千":1000,"万":1e4,"萬":1e4,"億":1e8,"亿":1e8 };
+  if(![...s].every(ch => ch in dig)) return null;
+  let total = 0, section = 0, num = 0;
+  for(const ch of s){
+    const v = dig[ch];
+    if(v < 10){ num = v; }
+    else if(v < 1e4){ section += (num || 1) * v; num = 0; }   // 十 廿 卅 百 千
+    else { total += (section + num || 1) * v; section = 0; num = 0; } // 萬 億
+  }
+  return total + section + num;
+}
+function enNumToNum(s){
+  s = String(s || "").toLowerCase().replace(/[（(][^（）()]*[)）]/g, "").trim();
+  const m = s.match(/^-?\d[\d,]*(\.\d+)?/);
+  if(m) return parseFloat(m[0].replace(/,/g, ""));
+  const ord = s.match(/^(\d+)\s*(st|nd|rd|th)\b/);
+  if(ord) return parseInt(ord[1], 10);
+  const words = { zero:0,one:1,first:1,two:2,second:2,three:3,third:3,four:4,fourth:4,five:5,fifth:5,six:6,sixth:6,seven:7,seventh:7,eight:8,eighth:8,nine:9,ninth:9,ten:10,tenth:10,eleven:11,eleventh:11,twelve:12,twelfth:12,dozen:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,twentieth:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,hundred:100,hundredth:100,thousand:1000,million:1e6,billion:1e9,half:0.5,quarter:0.25,score:20 };
+  const toks = s.replace(/[-\/]/g, " ").replace(/\band\b/g, " ").split(/\s+/).filter(Boolean);
+  let total = 0, cur = 0, matched = false;
+  for(const t of toks){
+    if(t === "a" || t === "an"){ continue; }
+    if(!(t in words)){ if(!matched) return null; else continue; }
+    matched = true;
+    const v = words[t];
+    if(v === 100){ cur = (cur || 1) * 100; }
+    else if(v >= 1000){ total += (cur || 1) * v; cur = 0; }
+    else { cur += v; }
+  }
+  return matched ? total + cur : null;
+}
+function numericValueOf(w){
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  let v = cjkNumToInt(d.zh);
+  if(v == null) v = enNumToNum(d.en);
+  return (v == null || isNaN(v)) ? Infinity : v;
+}
 function isNumberWord(w){
   const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
   const zh = String(d.zh || "").replace(/[（(][^（）()]*[)）]/g, "").replace(/[、,，./／~～\-—－]/g, "").trim();
@@ -5475,6 +5526,13 @@ function getVisibleWords(){
     // id 是新增時「目前最大 id + 1」給的，所以 id 越大代表越晚加進來、越新。
     list.sort((a, b) => b.id - a.id);
   }
+  // 「只顯示數字」時的「由小到大排」：優先權最高，蓋掉上面的排序。
+  if(showNumbersOnly && sortNumbersAsc){
+    list.sort((a, b) => {
+      const d = numericValueOf(a) - numericValueOf(b);
+      return d !== 0 ? d : a.text.localeCompare(b.text);
+    });
+  }
   return list;
 }
 
@@ -6449,12 +6507,54 @@ document.getElementById("btnCopyPending").addEventListener("click", async () => 
   }
 });
 
+// 精簡閱讀模式：一格只有「越南文原文 · 中文 🔊」，密排、多欄，適合一次掃過
+// 很多個字複習閱讀，不用一直滑。目前只給越南文用。
+let compactReadMode = false;
+try{ compactReadMode = localStorage.getItem("flashcard_compact_read_v1") === "1"; }catch(e){}
+function renderCompactList(el, words){
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:2px 14px; padding:8px 4px;";
+  words.forEach(w => {
+    const data = lookup(w.text);
+    const viNative = (data && data.nativeScript) || w.text;
+    const zh = (data && data.zh) || "";
+    const cell = document.createElement("div");
+    cell.style.cssText = "display:flex; align-items:baseline; gap:6px; padding:3px 2px; border-bottom:1px solid var(--border); min-width:0;";
+    const viSpan = document.createElement("span");
+    viSpan.style.cssText = "font-weight:600; color:var(--accent2); white-space:nowrap;";
+    viSpan.textContent = viNative;
+    const zhSpan = document.createElement("span");
+    zhSpan.className = "usage-note";
+    zhSpan.style.cssText = "flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+    zhSpan.textContent = zh;
+    const play = document.createElement("button");
+    play.type = "button"; play.className = "speak-btn";
+    play.style.cssText = "padding:1px 5px; font-size:0.8rem; flex:0 0 auto;";
+    play.textContent = "🔊";
+    play.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      speak(getSpeechText(w), play, "vi", recKeyFor(w.text));
+    });
+    cell.appendChild(viSpan);
+    cell.appendChild(zhSpan);
+    cell.appendChild(play);
+    grid.appendChild(cell);
+  });
+  el.appendChild(grid);
+}
 function renderList(){
   const el = document.getElementById("wordList");
   el.innerHTML = "";
   const visibleWords = getVisibleWords();
   if(visibleWords.length === 0){
     el.innerHTML = `<div class="item empty-msg"><div class="meaning">沒有符合的單字</div></div>`;
+  }
+  if(compactReadMode && currentLang === "vi" && visibleWords.length){
+    renderCompactList(el, visibleWords);
+    updateCount();
+    updatePendingSyncBar();
+    if(typeof renderAutoplayControls === "function") renderAutoplayControls();
+    return;
   }
   visibleWords.forEach(w => {
     const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
@@ -6748,6 +6848,19 @@ document.getElementById("btnRandomSelect").onclick = () => {
 };
 document.getElementById("wordSearch").addEventListener("input", renderList);
 document.getElementById("wordSearch2").addEventListener("input", renderList);
+function updateCompactReadLabel(){
+  const btn = document.getElementById("btnCompactRead");
+  if(!btn) return;
+  btn.textContent = compactReadMode ? "📖 恢復完整清單" : "📃 精簡閱讀模式（只看越南文＋中文＋🔊）";
+  btn.classList.toggle("primary", compactReadMode);
+}
+document.getElementById("btnCompactRead").addEventListener("click", () => {
+  compactReadMode = !compactReadMode;
+  try{ localStorage.setItem("flashcard_compact_read_v1", compactReadMode ? "1" : "0"); }catch(e){}
+  updateCompactReadLabel();
+  renderList();
+});
+updateCompactReadLabel();
 document.getElementById("difficultyFilter").addEventListener("change", renderList);
 document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) => {
   showSelectedOnly = !showSelectedOnly;
@@ -6802,9 +6915,20 @@ function updateNumbersToggleLabel(){
   const n = allWords.filter(isNumberWord).length;
   btn.textContent = showNumbersOnly ? `顯示全部單字 (數字 ${n} 個)` : `🔢 只顯示數字 (${n})`;
   btn.classList.toggle("primary", showNumbersOnly);
+  const sortBtn = document.getElementById("btnSortNumbersAsc");
+  if(sortBtn){
+    sortBtn.classList.toggle("hidden", !showNumbersOnly);
+    sortBtn.textContent = sortNumbersAsc ? "🔢 取消由小到大" : "🔢 數字由小到大排";
+    sortBtn.classList.toggle("primary", sortNumbersAsc);
+  }
 }
 document.getElementById("btnToggleNumbersOnly").addEventListener("click", () => {
   showNumbersOnly = !showNumbersOnly;
+  updateNumbersToggleLabel();
+  renderList();
+});
+document.getElementById("btnSortNumbersAsc").addEventListener("click", () => {
+  sortNumbersAsc = !sortNumbersAsc;
   updateNumbersToggleLabel();
   renderList();
 });
