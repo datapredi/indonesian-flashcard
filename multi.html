@@ -7798,7 +7798,14 @@ async function processConvertImportText(rawText){
         .split(/\s*[,，、]\s*/)
         .map(s => s.replace(/\uE000/g, ","))
         .filter(s => s.trim() !== "");
-      if(parts.length > 1) lines.push(...parts); else lines.push(ln);
+      // 整行看起來是一句「散文/句子」就不切——結尾有句號、或某一段就很長、
+      // 或整行字很多。像 "I'm learning Arabic on italki, and while I'm at it,
+      // I also take some lessons in ..." 這種不該被逗號炸成一堆碎片。
+      const _t = ln.trim();
+      const _totalWords = _t.split(/\s+/).filter(Boolean).length;
+      const _maxSegWords = parts.reduce((m, p) => Math.max(m, p.trim().split(/\s+/).filter(Boolean).length), 0);
+      const _looksLikeProse = (/[.!?。！？]$/.test(_t) && _totalWords > 4) || _maxSegWords > 5 || _totalWords > 15;
+      if(parts.length > 1 && !_looksLikeProse) lines.push(...parts); else lines.push(ln);
     });
     const indoWords = [];
     const seen = new Set();
