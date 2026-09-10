@@ -2987,8 +2987,15 @@ function renderThaiAlphabetPanel(){
   const classColors = { mid: "var(--accent2)", high: "var(--danger)", low: "#c9a227" };
   THAI_CONSONANT_CLASSES.forEach(cls => {
     const header = document.createElement("div");
-    header.style.cssText = `font-weight:600; color:${classColors[cls.key]};`;
-    header.textContent = cls.label;
+    header.style.cssText = `font-weight:600; color:${classColors[cls.key]}; display:flex; align-items:center; gap:8px; flex-wrap:wrap;`;
+    const hlabel = document.createElement("span");
+    hlabel.textContent = cls.label;
+    header.appendChild(hlabel);
+    // 中音／高音的標題旁邊可以打筆記（例如背這個 class 的口訣）。key 用
+    // "th-class:xxx"，跟字母的 "th:ก" 不會撞，也會一起進備份。
+    if(cls.key === "mid" || cls.key === "high"){
+      attachLetterNote(header, "th-class:" + cls.key);
+    }
     panel.appendChild(header);
 
     const grid = document.createElement("div");
