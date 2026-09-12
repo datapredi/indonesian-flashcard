@@ -206,6 +206,7 @@
         <input type="checkbox" id="numberToWords">
         數字轉成該語言的說法（例：100 → 該語言「一百」的唸法）
       </label>
+      <input type="text" id="convertGroupName" placeholder="📁 分組名稱（可留空，例：9/12）" style="flex:0 0 200px;">
     </div>
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
       <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
@@ -7763,6 +7764,18 @@ function showConvertResult(msg){
   try{ alert(msg); }catch(e){}
 }
 
+// 匯入時如果有填「分組名稱」，把這次匯入對應到的字（newlyImportedIds）直接
+// 全部標成那個分組，不用匯入完再自己全選、按「加入分組」兩步。
+function applyGroupToNewlyImported(){
+  const nameEl = document.getElementById("convertGroupName");
+  const g = nameEl ? nameEl.value.trim() : "";
+  if(!g || newlyImportedIds.size === 0) return "";
+  newlyImportedIds.forEach(id => { wordGroups[id] = g; });
+  saveWordGroups();
+  if(typeof updateGroupFilterOptions === "function") updateGroupFilterOptions();
+  if(typeof refreshAllGroupSelects === "function") refreshAllGroupSelects();
+  return g;
+}
 // 匯入並自動生成資料的核心處理邏輯，跟輸入來源（選檔案、還是直接貼上文字）
 // 分開，這樣「匯入檔案」跟「貼上文字」兩個按鈕可以共用同一套轉換/去重/
 // 碰撞處理規則，不用維護兩份幾乎一樣的邏輯。
@@ -7877,9 +7890,10 @@ async function processConvertImportText(rawText){
       if(newlyImportedIds.size > 0){
         showNewlyImportedOnly = true;
         updateNewlyImportedToggleLabel();
-        renderList();
       }
-      showConvertResult(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。`);
+      const groupedName1 = applyGroupToNewlyImported();
+      renderList();
+      showConvertResult(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。${groupedName1 ? `已加入分組「${groupedName1}」。` : ""}`);
       return;
     }
     // 匯入檔案、貼上文字兩個按鈕都可能觸發這個函式，處理中的進度／禁用狀態
@@ -8044,7 +8058,9 @@ async function processConvertImportText(rawText){
     const skipNote = alreadyDoneCount > 0 ? `${alreadyDoneCount} 個之前轉換過已跳過，` : "";
     const updatedNote = updatedCount > 0 ? `，用新結果更新了 ${updatedCount} 個原本就存在的字` : "";
     const unmatchedNote = unmatchedCount > 0 ? `\n\n有 ${unmatchedCount} 個字這次沒有成功對應到結果，還沒被標記為已轉換，重新匯入同一個檔案時會自動再試一次。` : "";
-    showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${updatedNote}${staleNote}。${unmatchedNote}`);
+    const groupedName2 = applyGroupToNewlyImported();
+    const groupNote = groupedName2 ? `，已加入分組「${groupedName2}」` : "";
+    showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${updatedNote}${staleNote}${groupNote}。${unmatchedNote}`);
   }
 }
 
