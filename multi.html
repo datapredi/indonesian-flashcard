@@ -281,6 +281,7 @@
     <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。不含 API Key（安全考量，換裝置要自己重新輸入）、不含你自己的錄音（IndexedDB 音檔太大，錄音本來就是重錄就好）。還原會直接覆蓋目前資料，請小心操作。</div>
     <div class="toolbar" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製所有單字</button>
+      <button id="btnCopyZhForQuiz">📋 複製中文意思（測驗用，照目前篩選）</button>
     </div>
     <div class="toolbar">
       <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
@@ -6736,6 +6737,30 @@ document.getElementById("btnCopyPending").addEventListener("click", async () => 
     alert(`已複製 ${allWords.length} 個${L().label}單字。`);
   }catch(e){
     prompt("自動複製失敗，請手動全選複製以下內容：", text);
+  }
+});
+
+// 複製「目前畫面上看得到的字」的中文意思——照現在的搜尋／篩選（分組、類別、
+// 難易度…）決定範圍，例如先選好 📁 分組＝9/12，再按這個，就只複製那天教
+// 的字。用來貼到別的地方，看著中文自己寫出對應的目標語言，當測驗用（只給
+// 中文、不給答案本身）。
+document.getElementById("btnCopyZhForQuiz").addEventListener("click", async () => {
+  const words = getVisibleWords();
+  if(words.length === 0){ alert("目前篩選/搜尋出來沒有任何字。"); return; }
+  const withZh = [];
+  let skipped = 0;
+  words.forEach(w => {
+    const data = lookup(w.text);
+    if(data && data.zh) withZh.push(data.zh); else skipped++;
+  });
+  if(withZh.length === 0){ alert("這些字都還沒有中文意思（要先按「AI 自動生成」）。"); return; }
+  const text = withZh.join("\n");
+  const skipNote = skipped > 0 ? `（${skipped} 個字還沒有中文意思，沒有列進去）` : "";
+  try{
+    await navigator.clipboard.writeText(text);
+    alert(`已複製 ${withZh.length} 個中文意思${skipNote}，可以貼到別的地方當測驗題目。`);
+  }catch(e){
+    prompt(`自動複製失敗，請手動全選複製以下內容：${skipNote}`, text);
   }
 });
 
