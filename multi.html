@@ -207,6 +207,7 @@
         數字轉成該語言的說法（例：100 → 該語言「一百」的唸法）
       </label>
       <input type="text" id="convertGroupName" placeholder="📁 分組名稱（可留空，例：9/12）" style="flex:0 0 200px;">
+      <input type="text" id="convertCategoryName" placeholder="🏷️ 類別名稱（可留空，例：common expression）" style="flex:0 0 220px;">
     </div>
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
       <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
@@ -315,8 +316,10 @@
       <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
       <button id="btnToggleWorkOnly">💼 只顯示工作相關</button>
-      <select id="groupFilter" title="只顯示某個自訂分組"><option value="">📁 全部分組</option></select>
+      <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
+      <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
+      <button id="btnAssignCategory">🏷️ 把勾選的字加入類別…</button>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
@@ -1261,6 +1264,33 @@ function refreshAllGroupSelects(){
   });
 }
 let groupFilter = ""; // getVisibleWords 用：空＝全部；否則只顯示這一組
+
+// 第二組獨立的自訂標籤——「類別」（例如 common expression／conversation），
+// 跟上面的「分組」（通常拿來標上課日期）完全分開、互不影響，一個字兩個維度
+// 各自能選一個值（例如分組＝9/12、類別＝common expression 同時成立）。
+const WORD_CATEGORY_LS = "flashcard_word_category_v1";
+let wordCategories = {};
+try{ wordCategories = JSON.parse(localStorage.getItem(lsKey(WORD_CATEGORY_LS))) || {}; }catch(e){ wordCategories = {}; }
+function saveWordCategories(){ localStorage.setItem(lsKey(WORD_CATEGORY_LS), JSON.stringify(wordCategories)); }
+function distinctCategories(){
+  return [...new Set(Object.values(wordCategories).map(s => String(s || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+}
+function fillCategorySelect(sel, currentVal){
+  currentVal = currentVal || "";
+  const all = distinctCategories();
+  if(currentVal && all.indexOf(currentVal) === -1) all.push(currentVal);
+  sel.innerHTML = '<option value="">🏷️ 無類別</option>'
+    + all.map(g => `<option value="${g.replace(/"/g, "&quot;")}">🏷️ ${g}</option>`).join("")
+    + '<option value="__new__">＋ 新類別…</option>';
+  sel.value = currentVal;
+}
+function refreshAllCategorySelects(){
+  document.querySelectorAll("#wordList .word-category-select").forEach(sel => {
+    fillCategorySelect(sel, wordCategories[sel.dataset.wid] || "");
+  });
+}
+let categoryFilter = ""; // getVisibleWords 用：空＝全部；否則只顯示這一類
 
 // 「太難、現在完全不想看到，但也不想刪掉」的字：藏起來——不在單字表顯示，也
 // 不進 Flash Card／測驗／跑步模式（藏的時候順便取消勾選）。用「🙈 顯示隱藏的」
@@ -5649,6 +5679,7 @@ function getVisibleWords(){
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
     if(showWorkOnly && !isWorkWord(w)) return false;
     if(groupFilter && (wordGroups[w.id] || "") !== groupFilter) return false;
+    if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -6462,7 +6493,7 @@ function createWordItem(w){
     e.stopPropagation();
     let v = groupSelect.value;
     if(v === "__new__"){
-      v = (prompt("新群組名稱（例如 common expression、conversation）：", "") || "").trim();
+      v = (prompt("新分組名稱（通常拿來標日期／課次，例如 9/12、Lesson 3）：", "") || "").trim();
       if(!v){ groupSelect.value = wordGroups[w.id] || ""; return; }
     }
     if(v) wordGroups[w.id] = v; else delete wordGroups[w.id];
@@ -6472,6 +6503,28 @@ function createWordItem(w){
     if(groupFilter) renderList();
   });
   row.appendChild(groupSelect);
+
+  // 第二個獨立標籤：類別（例如老師分的 common expression／conversation）。
+  // 跟上面的分組完全分開，一個字兩個都能各自設定，互不影響。
+  const categorySelect = document.createElement("select");
+  categorySelect.className = "color-flag-select word-category-select";
+  categorySelect.dataset.wid = w.id;
+  fillCategorySelect(categorySelect, wordCategories[w.id] || "");
+  categorySelect.addEventListener("click", (e) => e.stopPropagation());
+  categorySelect.addEventListener("change", (e) => {
+    e.stopPropagation();
+    let v = categorySelect.value;
+    if(v === "__new__"){
+      v = (prompt("新類別名稱（例如 common expression、conversation）：", "") || "").trim();
+      if(!v){ categorySelect.value = wordCategories[w.id] || ""; return; }
+    }
+    if(v) wordCategories[w.id] = v; else delete wordCategories[w.id];
+    saveWordCategories();
+    refreshAllCategorySelects();
+    updateCategoryFilterOptions();
+    if(categoryFilter) renderList();
+  });
+  row.appendChild(categorySelect);
 
   // 輸入一個編號，把「那個編號的字」搬到「這個字」下面——這個字本身不動，
   // 動的是被輸入的那個字，方便把兩個容易搞混的字擺在一起比較。原本用
@@ -6789,6 +6842,7 @@ function deleteWord(id){
   if(teacherFlagIds.delete(id)) saveTeacherFlag();
   if(colorFlags[id]){ delete colorFlags[id]; saveColorFlags(); }
   if(wordGroups[id]){ delete wordGroups[id]; saveWordGroups(); updateGroupFilterOptions(); }
+  if(wordCategories[id]){ delete wordCategories[id]; saveWordCategories(); updateCategoryFilterOptions(); }
   // 把這個字的 AI 生成資料也一起清掉（你自己打的 📝 筆記保留），這樣之後重新
   // 輸入同一個字會重新生成，不會撈到刪掉前的舊翻譯／舊變化形。
   if(target){
@@ -7001,6 +7055,8 @@ document.getElementById("btnRenumber").onclick = () => {
   saveColorFlags();
   wordGroups = remapIdMap(wordGroups);
   saveWordGroups();
+  wordCategories = remapIdMap(wordCategories);
+  saveWordCategories();
   // 剛匯入清單只是這次瀏覽階段暫時用的標記，編號全部變了之後對應不上，
   // 直接清空比留著錯誤的對應關係安全。
   newlyImportedIds = new Set();
@@ -7187,6 +7243,33 @@ document.getElementById("btnAssignGroup").addEventListener("click", () => {
   renderList();
 });
 updateGroupFilterOptions();
+function updateCategoryFilterOptions(){
+  const sel = document.getElementById("categoryFilter");
+  if(!sel) return;
+  const cats = distinctCategories();
+  const counts = {};
+  Object.entries(wordCategories).forEach(([id, g]) => { g = String(g || "").trim(); if(g) counts[g] = (counts[g] || 0) + 1; });
+  sel.innerHTML = '<option value="">🏷️ 全部類別</option>'
+    + cats.map(g => `<option value="${g.replace(/"/g, "&quot;")}">🏷️ ${g}（${counts[g] || 0}）</option>`).join("");
+  sel.value = categoryFilter;
+  if(sel.value !== categoryFilter){ categoryFilter = ""; sel.value = ""; }
+}
+document.getElementById("categoryFilter").addEventListener("change", (e) => {
+  categoryFilter = e.target.value;
+  renderList();
+});
+document.getElementById("btnAssignCategory").addEventListener("click", () => {
+  const ids = [...selected];
+  if(ids.length === 0){ alert("先勾選要設類別的字（可以先搜尋／篩選出來再按「全選」）。"); return; }
+  const existing = distinctCategories();
+  const hint = existing.length ? `\n\n目前已有的類別：${existing.join("、")}` : "";
+  const g = (prompt(`把勾選的 ${ids.length} 個字設為哪個類別？（輸入空白＝清掉類別）${hint}`, existing[0] || "") || "").trim();
+  ids.forEach(id => { if(g) wordCategories[id] = g; else delete wordCategories[id]; });
+  saveWordCategories();
+  updateCategoryFilterOptions();
+  renderList();
+});
+updateCategoryFilterOptions();
 function updateHiddenToggleLabel(){
   const btn = document.getElementById("btnToggleHiddenOnly");
   btn.textContent = showHiddenOnly ? `回到正常清單 (隱藏 ${hiddenIds.size} 個)` : `🙈 顯示隱藏的 (${hiddenIds.size})`;
@@ -7698,7 +7781,7 @@ const BACKUP_PER_LANG_BASES = [
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
   TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
-  THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS
+  THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS, ARABIC_EXAMPLES_CACHE_LS];
 
@@ -7774,6 +7857,18 @@ function applyGroupToNewlyImported(){
   saveWordGroups();
   if(typeof updateGroupFilterOptions === "function") updateGroupFilterOptions();
   if(typeof refreshAllGroupSelects === "function") refreshAllGroupSelects();
+  return g;
+}
+// 同一批匯入的字，如果也填了「類別名稱」，兩個標籤（分組／類別）獨立套用，
+// 互不影響——例如分組＝9/12、類別＝common expression 可以同時成立。
+function applyCategoryToNewlyImported(){
+  const nameEl = document.getElementById("convertCategoryName");
+  const g = nameEl ? nameEl.value.trim() : "";
+  if(!g || newlyImportedIds.size === 0) return "";
+  newlyImportedIds.forEach(id => { wordCategories[id] = g; });
+  saveWordCategories();
+  if(typeof updateCategoryFilterOptions === "function") updateCategoryFilterOptions();
+  if(typeof refreshAllCategorySelects === "function") refreshAllCategorySelects();
   return g;
 }
 // 匯入並自動生成資料的核心處理邏輯，跟輸入來源（選檔案、還是直接貼上文字）
@@ -7892,8 +7987,9 @@ async function processConvertImportText(rawText){
         updateNewlyImportedToggleLabel();
       }
       const groupedName1 = applyGroupToNewlyImported();
+      const categoryName1 = applyCategoryToNewlyImported();
       renderList();
-      showConvertResult(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。${groupedName1 ? `已加入分組「${groupedName1}」。` : ""}`);
+      showConvertResult(`這 ${indoWords.length} 個字之前都已經轉換過了，沒有新的需要轉換。${groupedName1 ? `已加入分組「${groupedName1}」。` : ""}${categoryName1 ? `已加入類別「${categoryName1}」。` : ""}`);
       return;
     }
     // 匯入檔案、貼上文字兩個按鈕都可能觸發這個函式，處理中的進度／禁用狀態
@@ -8059,8 +8155,10 @@ async function processConvertImportText(rawText){
     const updatedNote = updatedCount > 0 ? `，用新結果更新了 ${updatedCount} 個原本就存在的字` : "";
     const unmatchedNote = unmatchedCount > 0 ? `\n\n有 ${unmatchedCount} 個字這次沒有成功對應到結果，還沒被標記為已轉換，重新匯入同一個檔案時會自動再試一次。` : "";
     const groupedName2 = applyGroupToNewlyImported();
+    const categoryName2 = applyCategoryToNewlyImported();
     const groupNote = groupedName2 ? `，已加入分組「${groupedName2}」` : "";
-    showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${updatedNote}${staleNote}${groupNote}。${unmatchedNote}`);
+    const categoryNote = categoryName2 ? `，已加入類別「${categoryName2}」` : "";
+    showConvertResult(`轉換了 ${wordsToConvert.length} 個新單字，${skipNote}新增了 ${addedCount} 個${L().label}單字${updatedNote}${staleNote}${groupNote}${categoryNote}。${unmatchedNote}`);
   }
 }
 
