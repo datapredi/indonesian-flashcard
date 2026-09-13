@@ -6816,15 +6816,25 @@ function renderEmptyState(el){
     addBtn.type = "button";
     addBtn.className = "speak-btn";
     addBtn.style.marginTop = "8px";
-    addBtn.textContent = `➕ 新增「${q}」這個字`;
-    addBtn.addEventListener("click", () => {
-      if(addWordToList(q)){
-        // 當下如果剛好篩了分組/類別在看，新字也順便標上，符合正在瀏覽的情境。
-        const newWord = allWords.find(w => w.text === q);
-        if(newWord){
-          if(groupFilter){ wordGroups[newWord.id] = groupFilter; saveWordGroups(); }
-          if(categoryFilter){ wordCategories[newWord.id] = categoryFilter; saveWordCategories(); }
-        }
+    addBtn.textContent = `➕ 新增「${q}」並生成翻譯`;
+    addBtn.addEventListener("click", async () => {
+      if(!getApiKey()){ alert("需要 Anthropic API Key 才能自動生成翻譯，請先在上面輸入並儲存。"); return; }
+      if(!addWordToList(q)) return;
+      // 當下如果剛好篩了分組/類別在看，新字也順便標上，符合正在瀏覽的情境。
+      const newWord = allWords.find(w => w.text === q);
+      if(newWord){
+        if(groupFilter){ wordGroups[newWord.id] = groupFilter; saveWordGroups(); }
+        if(categoryFilter){ wordCategories[newWord.id] = categoryFilter; saveWordCategories(); }
+      }
+      // 直接順便生成翻譯，不用加完字再自己去按「AI 自動生成」——這裡是空清單
+      // 畫面，還沒有任何面板展開，直接整批重繪不會有收掉面板的問題。
+      addBtn.disabled = true;
+      addBtn.textContent = "生成中...";
+      try{
+        if(newWord) await completeMissingWordData([newWord], addBtn, "生成中", true);
+      }catch(err){
+        alert("生成失敗：" + err.message + "\n\n字已經加進單字表了，可以之後再按「✨ AI 自動生成缺少的翻譯」補上。");
+      } finally {
         renderList();
       }
     });
