@@ -5655,21 +5655,44 @@ function stripVietToneMarks(s){
     .replace(/đ/g, "d").replace(/Đ/g, "D"); // đ / Đ
 }
 // 南北越南語發音真的會不一樣的幾個地方：聲調 ngã（南部併入 hỏi）、還有幾個
-// 聲母（tr／gi／r／d／v／s，北部跟南部唸法不同）。純規則判斷，不用問 AI，
-// 拿 nativeScript（帶聲調的原文）逐音節（用空白分）檢查開頭字母。
-const VI_REGIONAL_RULES = [
-  { test: s => /[ãẽĩõũỹẵẫễỗỡữ]/.test(s), label: "聲調 ngã（～）：南部併入 hỏi，跟北部唸法不同" },
-  { test: s => s.split(/\s+/).some(syl => /^tr/.test(syl)), label: "聲母 tr：南部捲舌、跟 ch 分得開；北部併入 ch" },
-  { test: s => s.split(/\s+/).some(syl => /^gi/.test(syl)), label: "聲母 gi：北部唸 z，南部唸 y" },
-  { test: s => s.split(/\s+/).some(syl => /^r/.test(syl)), label: "聲母 r：北部唸 z，南部唸捲舌 r" },
-  { test: s => s.split(/\s+/).some(syl => /^d/.test(syl)), label: "聲母 d：北部唸 z，南部唸 y" },
-  { test: s => s.split(/\s+/).some(syl => /^v/.test(syl)), label: "聲母 v：北部唸 v，南部口語常唸 y" },
-  { test: s => s.split(/\s+/).some(syl => /^s/.test(syl)), label: "聲母 s：北部併入 x（都唸 s），南部捲舌、跟 x 分得開" }
+// 聲母（tr／gi／r／d／v／s，北部跟南部唸法不同）。純規則判斷，不用問 AI。
+// 只把「造成不同的那幾個字母」標紅，不是整個字／整句都變色——逐音節（用
+// 空白分）檢查開頭子音，逐字元檢查有沒有 ngã 調號。checkTone=false 用在
+// 拆掉聲調符號的版本（英文拼音那行），這種版本已經沒有調號可以標了。
+const VI_NGA_RE = /[ãẽĩõũỹẵẫễỗỡữÃẼĨÕŨỸẴẪỄỖỠỮ]/;
+const VI_CONSONANT_RULES = [
+  { re: /^tr/, len: 2, label: "聲母 tr：南部捲舌、跟 ch 分得開；北部併入 ch" },
+  { re: /^gi/, len: 2, label: "聲母 gi：北部唸 z，南部唸 y" },
+  { re: /^r/,  len: 1, label: "聲母 r：北部唸 z，南部唸捲舌 r" },
+  { re: /^d/,  len: 1, label: "聲母 d：北部唸 z，南部唸 y" },
+  { re: /^v/,  len: 1, label: "聲母 v：北部唸 v，南部口語常唸 y" },
+  { re: /^s/,  len: 1, label: "聲母 s：北部併入 x（都唸 s），南部捲舌、跟 x 分得開" }
 ];
-function viRegionalDiffers(nativeScript){
-  if(!nativeScript) return [];
-  const s = String(nativeScript).toLowerCase();
-  return VI_REGIONAL_RULES.filter(r => r.test(s)).map(r => r.label);
+function viHighlightRegional(text, checkTone){
+  if(!text) return { html: "", reasons: [] };
+  const toks = String(text).split(/(\s+)/); // 保留空白，重組時原樣接回去
+  const reasons = new Set();
+  const html = toks.map(tok => {
+    if(tok === "" || /^\s+$/.test(tok)) return tok;
+    const low = tok.toLowerCase();
+    const rule = VI_CONSONANT_RULES.find(r => r.re.test(low));
+    const prefixLen = rule ? rule.len : 0;
+    if(rule) reasons.add(rule.label);
+    let hasNga = false;
+    if(checkTone){
+      for(const ch of tok){ if(VI_NGA_RE.test(ch)){ hasNga = true; break; } }
+      if(hasNga) reasons.add("聲調 ngã（～）：南部併入 hỏi，跟北部唸法不同");
+    }
+    if(!prefixLen && !hasNga) return tok;
+    let out = "";
+    for(let i = 0; i < tok.length; i++){
+      const ch = tok[i];
+      const flag = i < prefixLen || (checkTone && VI_NGA_RE.test(ch));
+      out += flag ? `<span style="color:var(--danger); font-weight:700;">${ch}</span>` : ch;
+    }
+    return out;
+  }).join("");
+  return { html, reasons: [...reasons] };
 }
 function getVisibleWords(){
   // 「顯示隱藏的」檢視模式：只列被藏起來的字，方便一次檢視／取消隱藏。
@@ -5763,21 +5786,25 @@ function createWordItem(w){
   // 越南文：主標題顯示英文拼音（拆掉聲調符號的版本），帶聲調的原文放在下面
   // 那一行。就算當初是直接用越南文原文輸入、沒有另外存英文拼音也沒關係——
   // stripVietToneMarks 是純規則轉換，即時算得出來。
-  let viNative = null, viMain = null, viRegionReasons = [];
+  let viNative = null, viMain = null, viRegionReasons = [], viMainHTML = "", viNativeHTML = "";
   if(currentLang === "vi"){
     viNative = (data && data.nativeScript) || w.text;
     viMain = stripVietToneMarks(viNative);
-    viRegionReasons = viRegionalDiffers(viNative);
+    const nativeHi = viHighlightRegional(viNative, true);   // 帶聲調符號，聲母＋ngã 都要標
+    const mainHi = viHighlightRegional(viMain, false);      // 已拆聲調，只剩聲母規則能標
+    viRegionReasons = nativeHi.reasons;
+    viNativeHTML = nativeHi.html;
+    viMainHTML = mainHi.html;
   }
-  const mainText = currentLang === "vi" ? viMain : w.text;
+  const mainText = currentLang === "vi" ? viMainHTML : w.text;
   const viDiffers = viRegionReasons.length > 0;
   const viDiffTitle = viDiffers ? viRegionReasons.join("；").replace(/"/g, "&quot;") : "";
   row.innerHTML = `
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
-      <div class="id-text"${viDiffers ? ` style="color:var(--danger);" title="南北發音不同：${viDiffTitle}"` : ""}>${w.id}. ${mainText}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}${viDiffers ? ` <span style="font-size:0.7rem;">🔀南北不同</span>` : ""}</div>
+      <div class="id-text">${w.id}. ${mainText}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}${viDiffers ? ` <span style="font-size:0.7rem; color:var(--danger);" title="南北發音不同：${viDiffTitle}">🔀南北不同</span>` : ""}</div>
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
-      ${currentLang === "vi" && viNative && viNative !== viMain ? `<div class="native-text" style="color:${viDiffers ? "var(--danger)" : "var(--accent2)"}; font-size:1.08rem; font-weight:600;"${viDiffers ? ` title="南北發音不同：${viDiffTitle}"` : ""}>${viNative}</div>` : ""}
+      ${currentLang === "vi" && viNative && viNative !== viMain ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${viNativeHTML}</div>` : ""}
       <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
       ${currentLang === "arz" && data && data.reply ? `<div class="reply-line" title="${(data.reply.note || "").replace(/"/g, "&quot;")}">↩︎ 對方回：<bdi dir="rtl" class="native-ar">${data.reply.nativeScript || ""}</bdi> ${data.reply.romanized || ""}${data.reply.zh ? " · " + data.reply.zh : ""}</div>` : ""}
     </div>
