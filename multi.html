@@ -3524,10 +3524,12 @@ const AR_PRES = {
 };
 const AR_DUAL_JOIN = new Set("بتثجحخسشصضطظعغفقكلمنهيئ".split("")); // 兩側都能連
 const AR_RIGHT_JOIN = new Set("ادذرزوؤىةأإآ".split(""));           // 只連前面
-// 重音（tafkhim/emphatic）字母，字母表前面標 *。傳統口訣「خُصَّ ضَغْطٍ قِظْ」
-// 共 7 個：ص ض ط ظ 是完全咽化的重音，خ غ ق 是舌根後縮的軟顎/小舌音，
-// 也算重音一類——不是只有前 4 個。
-const AR_HEAVY_LETTERS = new Set(["خ","ص","ض","ط","ظ","غ","ق"]);
+// 重音（emphatic/tafkhim）字母，字母表前面標 *。ص ض ط ظ 是完全咽化的重音，
+// ق 也算（會讓旁邊母音變重），خ 是舌根後縮的軟顎音——這 6 個會讓旁邊母音
+// 聽起來變濁變粗。غ 雖然古典 tajweed 的口訣「خُصَّ ضَغْطٍ قِظْ」也把它算進
+// isti'la（舌根上揚）一類，但它不太會像這幾個一樣把旁邊母音染重，口語
+// 埃及阿拉伯語教材通常只當它是喉音，不算重音，所以不標。
+const AR_HEAVY_LETTERS = new Set(["خ","ص","ض","ط","ظ","ق"]);
 function arJoinsLeft(ch){ return AR_DUAL_JOIN.has(ch); }               // 有左連接（會連到下一個字）
 function arJoinsRight(ch){ return AR_DUAL_JOIN.has(ch) || AR_RIGHT_JOIN.has(ch); } // 有右連接（會連到前一個字）
 // 把一個阿拉伯文詞轉成呈現形式，target 那個字母用紅色 <span> 包起來（不會斷連寫）。
@@ -3795,7 +3797,7 @@ function renderArabicAlphabetPanel(){
   const heavyNote = document.createElement("div");
   heavyNote.className = "usage-note";
   heavyNote.style.marginBottom = "6px";
-  heavyNote.textContent = "＊ 標記的是重音／厚音字母（خ ص ض ط ظ غ ق）——舌根要往後縮、聲音比較粗，跟輕音的 س ت د ذ 是不同的音。";
+  heavyNote.textContent = "＊ 標記的是重音／厚音字母（خ ص ض ط ظ ق）——舌根要往後縮、聲音比較粗，會讓旁邊的母音也跟著變重，跟輕音的 س ت د ذ 是不同的音。";
   panel.appendChild(heavyNote);
 
   grid(ARABIC_LETTERS, "1.7rem", true);
