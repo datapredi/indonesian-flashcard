@@ -407,21 +407,26 @@
       <button type="button" class="listen-btn" id="alphaCardSpeak">🔊 播放發音</button>
       <div class="back hidden" id="alphaCardBack" style="white-space:pre-line;"></div>
     </div>
+    <div class="nav hidden" id="alphaCardAssessRow">
+      <button id="btnAlphaCardWrong">✗ 還要練習</button>
+      <button class="secondary" id="btnAlphaCardRight">✓ 記得了，不再出現</button>
+    </div>
     <div class="nav">
       <button id="btnAlphaPrev">← 上一個</button>
       <button id="btnAlphaShuffle">🔀 洗牌</button>
       <button id="btnAlphaNext">下一個 →</button>
     </div>
     <div class="actions" style="margin-top:16px;">
+      <button id="btnResetAlphaMastered">🔄 重置這組字母的「記得了」</button>
       <button id="btnBackFromAlphaCards">返回</button>
     </div>
   </div>
 
-  <!-- ===== 埃及拼字 Flash Card：給羅馬拼音，回想阿拉伯字母怎麼拼 ===== -->
+  <!-- ===== 埃及拆字練習：給阿拉伯原文，回想是哪些子音字母拼出來的 ===== -->
   <div id="screen-spell-cards" class="hidden">
     <div class="progress" id="spellCardProgress"></div>
     <div class="card-area" id="spellCardArea">
-      <div class="front" id="spellCardFront" style="font-size:2rem;"></div>
+      <div class="front" id="spellCardFront" dir="rtl" style="font-size:2.6rem;"></div>
       <div class="front-pron hidden" id="spellCardMeaning"></div>
       <button type="button" class="listen-btn" id="spellCardSpeak">🔊 播放發音</button>
       <div class="back hidden" id="spellCardBack" style="text-align:right; width:100%;"></div>
@@ -8445,12 +8450,18 @@ document.getElementById("btnCardRight").onclick = () => {
 };
 
 // ================= 字母表 Flash Card（埃及／泰文字母共用一套邏輯）=================
-// 純粹是「翻卡」：正面字母、點一下翻到背面看名稱/拼法/發音，跟單字的 Flash
-// Card 不一樣，這裡不用管「學會了」——字母表本來就是一組固定的小集合，
-// 會一直反覆複習，不需要「記得了就不再出現」那套機制。
+// 跟單字的 Flash Card 一樣有「記得了就不再出現」，用字母本身當 key、跟語言
+//分開存（同一個字母在不同語言表裡是不同東西）。字母表就那幾十個，標記完會
+// 「全部都記得了」，所以另外給一顆「重置」按鈕，把這個語言的記錄清空重來。
+const ALPHA_MASTERED_LS = "flashcard_alpha_mastered_v1";
+let alphaMastered = {};
+try{ alphaMastered = JSON.parse(localStorage.getItem(ALPHA_MASTERED_LS)) || {}; }catch(e){ alphaMastered = {}; }
+function saveAlphaMastered(){ localStorage.setItem(ALPHA_MASTERED_LS, JSON.stringify(alphaMastered)); }
+function alphaMasteredSet(lang){ return new Set(alphaMastered[lang] || []); }
 let alphaCardSession = [];
 let alphaCardIndex = 0;
 let alphaCardIsRtl = false;
+let alphaCardLang = null;
 function buildArabicAlphaDeck(){
   return ARABIC_LETTERS.map(([glyph, name, franco, sound, arName]) => ({
     glyph,
@@ -8480,8 +8491,19 @@ function buildThaiAlphaDeck(){
 }
 function startAlphaCards(lang){
   const deck = lang === "arz" ? buildArabicAlphaDeck() : buildThaiAlphaDeck();
+  const known = alphaMasteredSet(lang);
+  const list = deck.filter(item => !known.has(item.glyph));
+  if(list.length === 0){
+    if(confirm(`這組字母（共 ${deck.length} 個）都已經標記「記得了」！要重置、全部重新開始練嗎？`)){
+      alphaMastered[lang] = [];
+      saveAlphaMastered();
+      startAlphaCards(lang);
+    }
+    return;
+  }
+  alphaCardLang = lang;
   alphaCardIsRtl = lang === "arz";
-  alphaCardSession = shuffleArr(deck.slice());
+  alphaCardSession = shuffleArr(list.slice());
   alphaCardIndex = 0;
   showScreen("alpha-cards");
   renderAlphaCard();
@@ -8494,9 +8516,11 @@ function renderAlphaCard(){
   front.setAttribute("dir", alphaCardIsRtl ? "rtl" : "ltr");
   document.getElementById("alphaCardBack").textContent = item.back;
   document.getElementById("alphaCardBack").classList.add("hidden");
+  document.getElementById("alphaCardAssessRow").classList.add("hidden");
 }
 document.getElementById("alphaCardArea").onclick = () => {
   document.getElementById("alphaCardBack").classList.toggle("hidden");
+  document.getElementById("alphaCardAssessRow").classList.toggle("hidden");
 };
 document.getElementById("alphaCardSpeak").addEventListener("click", (e) => {
   e.stopPropagation();
@@ -8516,14 +8540,41 @@ document.getElementById("btnAlphaShuffle").onclick = () => {
   alphaCardIndex = 0;
   renderAlphaCard();
 };
+document.getElementById("btnAlphaCardWrong").onclick = () => {
+  alphaCardIndex = (alphaCardIndex + 1) % alphaCardSession.length;
+  renderAlphaCard();
+};
+document.getElementById("btnAlphaCardRight").onclick = () => {
+  const item = alphaCardSession[alphaCardIndex];
+  if(!alphaMastered[alphaCardLang]) alphaMastered[alphaCardLang] = [];
+  if(!alphaMastered[alphaCardLang].includes(item.glyph)) alphaMastered[alphaCardLang].push(item.glyph);
+  saveAlphaMastered();
+  alphaCardSession.splice(alphaCardIndex, 1);
+  if(alphaCardSession.length === 0){
+    alert("這組字母都標記記得了！");
+    showScreen("select");
+    return;
+  }
+  alphaCardIndex = alphaCardIndex % alphaCardSession.length;
+  renderAlphaCard();
+};
+document.getElementById("btnResetAlphaMastered").onclick = () => {
+  if(!alphaCardLang) return;
+  if(!confirm("確定要清掉這組字母全部的「記得了」記錄，重新開始練嗎？")) return;
+  alphaMastered[alphaCardLang] = [];
+  saveAlphaMastered();
+  startAlphaCards(alphaCardLang);
+};
 document.getElementById("btnBackFromAlphaCards").onclick = () => showScreen("select");
 document.getElementById("btnStartArabicAlphaCards").addEventListener("click", () => startAlphaCards("arz"));
 document.getElementById("btnStartThaiAlphaCards").addEventListener("click", () => startAlphaCards("th"));
 
-// ================= 埃及拼字 Flash Card =================
-// 正面給羅馬拼音（+ 中文意思當提示），使用者自己回想/寫下這個字是哪些阿拉伯
-// 字母拼出來的，翻面用既有的「字母拆解」功能（跟單字列上 أ⇄a 那顆按鈕共用
-// 同一份快取／同一個 AI 函式，這裡只是換一個地方顯示、當作測驗用）核對答案。
+// ================= 埃及拆字練習 =================
+// 正面顯示阿拉伯原文，使用者自己回想/寫下這個字是哪些「子音字母」拼出來的
+// （母音不用寫）。翻面用既有的「字母拆解」功能核對——跟單字列上 أ⇄a 按鈕
+// 共用同一份快取／同一個 AI 函式，這裡只是換個地方顯示、當測驗用。答案卡
+// 最上面先列出「只有子音」的那一串（過濾掉長母音／短母音那兩種 kind），
+// 對應使用者實際會寫下來的東西；下面才是完整逐字母拆解給對照參考。
 let spellCardSession = [];
 let spellCardIndex = 0;
 document.getElementById("btnStartSpellCards").onclick = () => {
@@ -8541,7 +8592,7 @@ function renderSpellCard(){
   const w = spellCardSession[spellCardIndex];
   const data = lookup(w.text);
   document.getElementById("spellCardProgress").textContent = `第 ${spellCardIndex + 1} / ${spellCardSession.length} 個`;
-  document.getElementById("spellCardFront").textContent = w.text;
+  document.getElementById("spellCardFront").textContent = (data && data.nativeScript) || w.text;
   const meaningEl = document.getElementById("spellCardMeaning");
   meaningEl.textContent = data && data.zh ? data.zh : "";
   meaningEl.classList.add("hidden");
@@ -8568,7 +8619,20 @@ document.getElementById("spellCardArea").addEventListener("click", async () => {
   backEl.textContent = "拆解中...";
   try{
     const r = await getEgyptianLetterBreakdown(data.nativeScript, w.text);
-    renderArBreakdownPanel(backEl, r, w.text, null);
+    backEl.innerHTML = "";
+    // 只列「子音」（過濾掉長母音／短母音）的那一串，對應使用者實際會寫下來
+    // 的答案；「由右到左」的 segments 陣列本來就是照發音先後排的，直接接
+    // 起來就是正確的拼讀順序。
+    const consonantSegs = (r.segments || []).filter(seg => seg.kind !== "長母音" && seg.kind !== "短母音");
+    if(consonantSegs.length){
+      const ansLine = document.createElement("div");
+      ansLine.style.cssText = "font-size:1.3rem; font-weight:700; color:var(--accent2); margin-bottom:10px;";
+      ansLine.textContent = `子音：${consonantSegs.map(seg => seg.roman || seg.ar).join(" - ")}`;
+      backEl.appendChild(ansLine);
+    }
+    const detailPanel = document.createElement("div");
+    backEl.appendChild(detailPanel);
+    renderArBreakdownPanel(detailPanel, r, w.text, null);
     backEl.dataset.loaded = "1";
   }catch(err){
     backEl.textContent = "拆解失敗：" + err.message;
