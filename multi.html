@@ -3524,6 +3524,7 @@ const AR_PRES = {
 };
 const AR_DUAL_JOIN = new Set("بتثجحخسشصضطظعغفقكلمنهيئ".split("")); // 兩側都能連
 const AR_RIGHT_JOIN = new Set("ادذرزوؤىةأإآ".split(""));           // 只連前面
+const AR_HEAVY_LETTERS = new Set(["ص","ض","ط","ظ"]); // 重音（emphatic）字母，字母表前面標 *
 function arJoinsLeft(ch){ return AR_DUAL_JOIN.has(ch); }               // 有左連接（會連到下一個字）
 function arJoinsRight(ch){ return AR_DUAL_JOIN.has(ch) || AR_RIGHT_JOIN.has(ch); } // 有右連接（會連到前一個字）
 // 把一個阿拉伯文詞轉成呈現形式，target 那個字母用紅色 <span> 包起來（不會斷連寫）。
@@ -3667,8 +3668,10 @@ function renderArabicAlphabetPanel(){
       const item = document.createElement("div");
       item.style.cssText = "border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:170px; flex:1 1 190px; text-align:center;";
       const top = document.createElement("div");
+      // "*" 只是顯示用的重音（emphatic）標記，不影響 letter 本身——
+      // 顏色/筆記/錄音的 key、TTS 唸的字、連寫形狀查表都還是用原本的 letter。
       top.appendChild(makeSpeakableLabel(
-        letter, letterFont, "arz",
+        (AR_HEAVY_LETTERS.has(letter) ? "*" : "") + letter, letterFont, "arz",
         arName || letterSpeakName(name),
         "這是一個阿拉伯字母的名稱。請用埃及阿拉伯語清楚、單獨地唸出這個字母的名字，只唸名字本身，不要加其他字。",
         false
@@ -3721,6 +3724,7 @@ function renderArabicAlphabetPanel(){
       }
       attachLetterColor(item, "arz:" + letter);
       attachLetterNote(item, "arz:" + letter);
+      attachLetterRecording(item, letter);
       g.appendChild(item);
     });
     panel.appendChild(g);
@@ -3784,6 +3788,12 @@ function renderArabicAlphabetPanel(){
     });
     panel.appendChild(regen);
   }
+
+  const heavyNote = document.createElement("div");
+  heavyNote.className = "usage-note";
+  heavyNote.style.marginBottom = "6px";
+  heavyNote.textContent = "＊ 標記的是重音／厚音字母（ص ض ط ظ）——舌根要往上抬、聲音比較粗，跟輕音的 س ت د ذ 是不同的音。";
+  panel.appendChild(heavyNote);
 
   grid(ARABIC_LETTERS, "1.7rem", true);
 
