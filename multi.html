@@ -822,7 +822,8 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
     audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
     if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
     try{
-      const blob = await withTimeout(getTTSAudioBlob(text, instructionsOverride || info.ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
+      const ttsText = (langOverride || currentLang) === "vi" ? viRespellForTTS(text) : text;
+      const blob = await withTimeout(getTTSAudioBlob(ttsText, instructionsOverride || info.ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
       if(myGeneration === speakGeneration) await playAudioBlob(blob);
     }catch(e){
       if(myGeneration === speakGeneration) alert("GPT 語音播放失敗：" + e.message);
@@ -1040,16 +1041,26 @@ async function getFptViAudioBlob(text){
   try{ return await p; }
   finally{ _fptInflight.delete(cacheKey); }
 }
+// GPT 語音常常把越南文的 "qu" 照英文直覺唸成 /kw/（例如把 "quan" 唸成英文
+// 名字 Quan），就算 instructions 裡已經寫明越南文 qu = /w/ 也一樣——純文字
+// 指示對「整個拼法剛好撞到英文既有詞」這種情況不太可靠。所以送去 TTS 的字串
+// 直接把 qu 換成 w，從拼字源頭避開錯誤唸法；畫面上顯示的原始羅馬拼音不受影響，
+// 只有送進語音合成的那份文字被轉換。
+function viRespellForTTS(text){
+  if(!text) return text;
+  return text.replace(/qu/gi, (m) => m[0] === m[0].toUpperCase() ? "W" : "w");
+}
 // 給越南文的字/句子取「該用哪個引擎產出的音檔」——南部腔開著就走 proxy，否則走 OpenAI。
 async function getWordAudioBlobFor(lang, text){
   if(fptViActive(lang)) return getFptViAudioBlob(text);
-  return getTTSAudioBlob(text, (LANG_INFO[lang] || {}).ttsInstructions);
+  const ttsText = lang === "vi" ? viRespellForTTS(text) : text;
+  return getTTSAudioBlob(ttsText, (LANG_INFO[lang] || {}).ttsInstructions);
 }
 function prefetchWordAudio(lang, text){
   if(!text) return;
   // 南部腔用 proxy，就不預抓了（省額度），等真的要播時再抓。
   if(fptViActive(lang)) return;
-  prefetchTTSAudio(text, (LANG_INFO[lang] || {}).ttsInstructions);
+  prefetchTTSAudio(lang === "vi" ? viRespellForTTS(text) : text, (LANG_INFO[lang] || {}).ttsInstructions);
 }
 
 async function fetchTTSAudio(text, instructions){
