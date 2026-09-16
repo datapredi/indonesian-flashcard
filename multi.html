@@ -1046,9 +1046,21 @@ async function getFptViAudioBlob(text){
 // 指示對「整個拼法剛好撞到英文既有詞」這種情況不太可靠。所以送去 TTS 的字串
 // 直接把 qu 換成 w，從拼字源頭避開錯誤唸法；畫面上顯示的原始羅馬拼音不受影響，
 // 只有送進語音合成的那份文字被轉換。
+//
+// 南部腔的 gi-/d- 開頭一樣：instructions 已經寫明南部要唸 /j/（類似英文 y），
+// 不是北部的 /z/，但一樣不保證每次都準——所以南部腔也直接在文字上動手：
+// 開頭的 gi/d 換成 y，強迫唸出 y 的音。（đ 是完全不同的字母，不受影響。）
+// r 沒有特別處理，因為 GPT 對單一羅馬字母 r 本來就傾向唸英文的 r 音，剛好
+// 已經比較接近南部的捲舌 r，不像 qu／gi／d 那樣容易被英文既有詞蓋過去。
 function viRespellForTTS(text){
   if(!text) return text;
-  return text.replace(/qu/gi, (m) => m[0] === m[0].toUpperCase() ? "W" : "w");
+  let out = text.replace(/qu/gi, (m) => m[0] === m[0].toUpperCase() ? "W" : "w");
+  if(viDialect === "nam"){
+    out = out
+      .replace(/\bgi/gi, (m) => m[0] === m[0].toUpperCase() ? "Y" : "y")
+      .replace(/\bd/gi, (m) => m[0] === m[0].toUpperCase() ? "Y" : "y");
+  }
+  return out;
 }
 // 給越南文的字/句子取「該用哪個引擎產出的音檔」——南部腔開著就走 proxy，否則走 OpenAI。
 async function getWordAudioBlobFor(lang, text){
