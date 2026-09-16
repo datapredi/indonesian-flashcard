@@ -1058,6 +1058,10 @@ function viRespellForTTS(text){
   if(viDialect === "nam"){
     out = out
       .replace(/\bgi/gi, (m) => m[0] === m[0].toUpperCase() ? "Y" : "y")
+      // "gì" 這種字：韻母就是 i 本身，聲調符號直接標在 i 上（ì í ỉ ĩ ị），
+      // 寫出來只有 g + 帶調的 i 兩個字，不會出現獨立的普通 "i"，所以上面那條
+      // \bgi 規則抓不到，要另外抓「g 後面直接接帶調的 i」這種情況。
+      .replace(/\bg(?=[ìíỉĩị])/gi, (m) => m === m.toUpperCase() ? "Y" : "y")
       .replace(/\bd/gi, (m) => m[0] === m[0].toUpperCase() ? "Y" : "y");
   }
   return out;
