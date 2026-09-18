@@ -822,7 +822,7 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
     audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
     if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
     try{
-      const ttsText = (langOverride || currentLang) === "vi" ? viRespellForTTS(text) : text;
+      const ttsText = respellForTTS(langOverride || currentLang, text);
       const blob = await withTimeout(getTTSAudioBlob(ttsText, instructionsOverride || info.ttsInstructions), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
       if(myGeneration === speakGeneration) await playAudioBlob(blob);
     }catch(e){
@@ -1069,17 +1069,28 @@ function viRespellForTTS(text){
   }
   return out;
 }
+// 印尼文 "keluar" 放在句子裡（例如 "pergi keluar"）GPT TTS 常會吃掉中間的
+// lu 音節唸成 "kewar"，單獨查這個字卻會唸對 "ke-lu-ar"。用連字號強迫模型把
+// 三個音節分開唸，跟 keluar 開頭的字（keluarga 等）保持原樣不受影響。
+function idRespellForTTS(text){
+  if(!text) return text;
+  return text.replace(/\bkeluar\b/gi, (m) => m[0] === m[0].toUpperCase() ? "Ke-lu-ar" : "ke-lu-ar");
+}
+function respellForTTS(lang, text){
+  if(lang === "vi") return viRespellForTTS(text);
+  if(lang === "id") return idRespellForTTS(text);
+  return text;
+}
 // 給越南文的字/句子取「該用哪個引擎產出的音檔」——南部腔開著就走 proxy，否則走 OpenAI。
 async function getWordAudioBlobFor(lang, text){
   if(fptViActive(lang)) return getFptViAudioBlob(text);
-  const ttsText = lang === "vi" ? viRespellForTTS(text) : text;
-  return getTTSAudioBlob(ttsText, (LANG_INFO[lang] || {}).ttsInstructions);
+  return getTTSAudioBlob(respellForTTS(lang, text), (LANG_INFO[lang] || {}).ttsInstructions);
 }
 function prefetchWordAudio(lang, text){
   if(!text) return;
   // 南部腔用 proxy，就不預抓了（省額度），等真的要播時再抓。
   if(fptViActive(lang)) return;
-  prefetchTTSAudio(lang === "vi" ? viRespellForTTS(text) : text, (LANG_INFO[lang] || {}).ttsInstructions);
+  prefetchTTSAudio(respellForTTS(lang, text), (LANG_INFO[lang] || {}).ttsInstructions);
 }
 
 async function fetchTTSAudio(text, instructions){
