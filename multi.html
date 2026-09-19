@@ -109,9 +109,11 @@
   .front-pron{font-size:0.95rem; color:var(--muted); margin-top:4px;}
   .item .pron{color:var(--muted); font-weight:400; font-size:0.85rem;}
   .card-area .back{font-size:1.05rem; color:var(--accent2); margin-top:12px;}
-  /* 日文漢字假名原文：中文母語者看得懂漢字，值得直接顯示（其他 hasScript 語言
-     的原生文字則刻意不給，那些是使用者主動選擇不學的） */
+  /* 日文漢字假名原文：中文母語者看得懂漢字，值得直接顯示。泰文原文是使用者
+     要求加的（放在英文拼音下面，用來核對發音）。其餘 hasScript 語言（韓文、
+     粵語、埃及阿拉伯文）的原生文字則仍刻意不給，那些是使用者主動選擇不學的 */
   .native-jp{font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","YuGothic",-apple-system,"PingFang TC",sans-serif;}
+  .native-th{font-family:"Thonburi","Leelawadee UI","Noto Sans Thai",sans-serif;}
   .item .native-text{font-size:1rem; margin-top:1px;}
   .card-area .card-native{font-size:1.15rem; color:var(--accent2); margin-top:6px;}
   .card-area .card-native:empty{display:none;}
@@ -5967,6 +5969,7 @@ function createWordItem(w){
       <div class="id-text">${w.id}. <span class="main-text-slot">${mainText}</span>${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}${viDiffers ? ` <span style="font-size:0.7rem; color:var(--danger);" title="南北發音不同：${viDiffTitle}">🔀南北不同</span>` : ""}</div>
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
       ${currentLang === "vi" && viNative && viNative !== viMain ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${viNativeHTML}</div>` : ""}
+      ${currentLang === "th" && data && data.nativeScript ? `<div class="native-text native-th">${data.nativeScript}</div>` : ""}
       <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
       ${currentLang === "arz" && data && data.reply ? `<div class="reply-line" title="${(data.reply.note || "").replace(/"/g, "&quot;")}">↩︎ 對方回：<bdi dir="rtl" class="native-ar">${data.reply.nativeScript || ""}</bdi> ${data.reply.romanized || ""}${data.reply.zh ? " · " + data.reply.zh : ""}</div>` : ""}
     </div>
