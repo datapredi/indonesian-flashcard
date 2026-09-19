@@ -1671,6 +1671,10 @@ function needsGeneration(w){
   // 聲調面板都要靠它。例句點字新增的字有時候會卡在「有 quizEn、卻沒有
   // nativeScript」的半成品狀態，要讓「AI 自動生成」抓得到、能補。
   if(L().hasScript && !data.nativeScript) return true;
+  // 測驗選項（correct/distractors）本身補的原生文字是後來才加的欄位，舊資料
+  // 有 quizEn/correct 但沒有 correctNative——這種半成品也要讓「AI 自動生成」
+  // 抓得到，不然測驗選項永遠沒有原生文字可以正確唸出來。
+  if(L().hasScript && data.correct && !data.correctNative) return true;
   return false;
 }
 // 這個字目前處於哪個補資料階段：
@@ -1814,6 +1818,23 @@ function registerCefrPromptLines(label){
 - cefr：這個字/片語對應的 CEFR 難易度等級（A1/A2/B1/B2/C1/C2）。${label}如果沒有官方 CEFR 分級資料，就比照 CEFR 的定義（字彙難度、使用頻率、學習階段）給你自己最佳判斷的等級
 `;
 }
+// correct/distractors（測驗選項）在 hasScript 語言（泰文、越南文…）本來只存
+// 羅馬拼音，沒有對應的原生文字，導致測驗選項沒辦法準確唸出來（沒有原生文字，
+// 唸羅馬拼音常常唸錯，例如越南文整句話會漏掉聲調；之前乾脆不放發音按鈕，
+// 見 renderQuestion）。跟單字本身的 nativeScript 一樣，這裡也幫每個測驗選項
+// 補一份對應的原生文字，純粹給語音朗讀引擎用，測驗畫面上還是顯示羅馬拼音。
+function quizNativeSchemaProps(hasScript){
+  return hasScript ? { correctNative: { type: "string" }, distractorsNative: { type: "array", items: { type: "string" } } } : {};
+}
+function quizNativeRequiredFields(hasScript){
+  return hasScript ? ["correctNative", "distractorsNative"] : [];
+}
+function quizNativePromptLines(label, hasScript){
+  if(!hasScript) return "";
+  return `- correctNative：跟 correct 是同一句話的${label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）
+- distractorsNative：distractors 那 3 句話各自對應的${label}原生文字書寫，順序要跟 distractors 一一對應（第 1 個 distractorsNative 對應第 1 個 distractors，以此類推）
+`;
+}
 
 async function addWordToOtherLang(lang, zhMeaning, enMeaning){
   const info = LANG_INFO[lang];
@@ -1829,18 +1850,20 @@ async function addWordToOtherLang(lang, zhMeaning, enMeaning){
         quizEn: { type: "string" },
         correct: { type: "string" },
         distractors: { type: "array", items: { type: "string" } }
-      }
+      },
+      quizNativeSchemaProps(hasScript)
     ),
     required: ["text"].concat(
       hasScript ? ["nativeScript"] : (isIndo ? ["pron"] : [])
-    ).concat(["register", "cefr", "quizEn", "correct", "distractors"]),
+    ).concat(["register", "cefr", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
     additionalProperties: false
   };
   const prompt = `你是${info.teacher}，正在幫學生把一個已經確定好意思的詞/片語加進${info.label} Flash Card 單字表。這個詞的中文意思是「${zhMeaning || ""}」${enMeaning ? `，英文意思是「${enMeaning}」` : ""}（意思已經確定，不用重新猜，直接照這個意思翻譯成${info.label}）。請提供：
 - text：${hasScript ? `這個詞/片語最自然的${info.label}羅馬拼音寫法（口語、初學者程度、日常生活最常用的說法）` : `這個詞/片語最自然的${info.label}寫法（口語、初學者程度、日常生活最常用的說法）`}
 ${hasScript ? `- nativeScript：跟 text 是同一句話的${info.label}原生文字書寫（給語音朗讀引擎用）\n` : ""}${isIndo ? `- pron：這個詞的發音標注，採用印尼文詞典 KBBI 的標音慣例——e 依照實際發音標成一般 e／é／è，其餘字母照原樣\n` : ""}${registerCefrPromptLines(info.label)}- quizEn：一句能表達這個詞意思的英文例句
 - correct：quizEn 對應的${info.label}翻譯句子${hasScript ? "，用羅馬拼音寫" : ""}，要用到這個目標單字/片語
-- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${info.label}句子選項${hasScript ? "（一樣用羅馬拼音寫）" : ""}，長度和風格接近 correct，但意思不同${genderNoteForLang(lang)}`;
+- distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${info.label}句子選項${hasScript ? "（一樣用羅馬拼音寫）" : ""}，長度和風格接近 correct，但意思不同${genderNoteForLang(lang)}
+${quizNativePromptLines(info.label, hasScript)}`;
 
   const parsed = await callClaude(prompt, schema, 1024);
 
@@ -1866,7 +1889,7 @@ ${hasScript ? `- nativeScript：跟 text 是同一句話的${info.label}原生�
   const nextId = words.length ? Math.max(...words.map(w => w.id)) + 1 : 1;
   words.push({ id: nextId, text });
   const entry = { zh: zhMeaning || "", en: enMeaning || "", register: parsed.register, cefr: parsed.cefr, quizEn: parsed.quizEn, correct: parsed.correct, distractors: parsed.distractors };
-  if(hasScript) entry.nativeScript = parsed.nativeScript;
+  if(hasScript){ entry.nativeScript = parsed.nativeScript; entry.correctNative = parsed.correctNative; entry.distractorsNative = parsed.distractorsNative; }
   if(isIndo) entry.pron = parsed.pron;
   db[text] = entry;
 
@@ -1904,12 +1927,13 @@ async function generateWordData(words){
               quizEn: { type: "string" },
               correct: { type: "string" },
               distractors: { type: "array", items: { type: "string" } }
-            }
+            },
+            quizNativeSchemaProps(hasScript)
           ),
           required: (hasScript
             ? ["zh", "en", "nativeScript"]
             : (isIndo ? ["zh", "en", "pron"] : ["zh", "en"])
-          ).concat(["register", "cefr", "quizEn", "correct", "distractors"]),
+          ).concat(["register", "cefr", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
           additionalProperties: false
         }
       }
@@ -1927,7 +1951,7 @@ async function generateWordData(words){
 ${registerCefrPromptLines(L().label)}- quizEn：一句能表達這個單字/片語意思的英文例句
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語；如果有好幾種同樣正確的說法，選日常生活中最普遍、最多人用的那個，不要選比較少用或比較正式的同義詞）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
-
+${quizNativePromptLines(L().label, hasScript)}
 請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。${genderNoteForLang()}
 
 單字清單（羅馬拼音）：
@@ -1994,9 +2018,10 @@ async function generateQuizDataForKnownWords(items){
               quizEn: { type: "string" },
               correct: { type: "string" },
               distractors: { type: "array", items: { type: "string" } }
-            }
+            },
+            quizNativeSchemaProps(hasScript)
           ),
-          required: ["register", "cefr", "quizEn", "correct", "distractors"],
+          required: ["register", "cefr", "quizEn", "correct", "distractors"].concat(quizNativeRequiredFields(hasScript)),
           additionalProperties: false
         }
       }
@@ -2009,7 +2034,7 @@ async function generateQuizDataForKnownWords(items){
 ${registerCefrPromptLines(L().label)}- quizEn：一句能表達這個字/片語意思的英文例句
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語，意思一定要跟給定的中文意思一致，不要憑拼音本身另外猜一個不同的意思）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
-
+${quizNativePromptLines(L().label, hasScript)}
 請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。${genderNoteForLang()}
 
 單字/片語清單：
@@ -2156,12 +2181,13 @@ async function convertWordsToTargetLang(words, hints){
               quizEn: { type: "string" },
               correct: { type: "string" },
               distractors: { type: "array", items: { type: "string" } }
-            }
+            },
+            quizNativeSchemaProps(hasScript)
           ),
           required: (hasScript
             ? ["source", "romanized", "nativeScript"]
             : ["source", "romanized"]
-          ).concat(["register", "cefr", "zh", "en", "quizEn", "correct", "distractors"]),
+          ).concat(["register", "cefr", "zh", "en", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
           additionalProperties: false
         }
       }
@@ -2184,7 +2210,7 @@ ${registerCefrPromptLines(L().label)}- zh：繁體中文意思，用字典基本
 - quizEn：一句能表達這個單字/片語意思的英文例句
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語，一樣要選最普遍常用的說法）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
-
+${quizNativePromptLines(L().label, hasScript)}
 清單裡每一項都要對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。以下的說話者身分設定只適用在你自己新造句子的地方（correct、distractors），如果來源本身已經是${L().label}、用字已經合理，不要為了套用這個設定而更動學生原文的代名詞或用字。${genderNoteForLang()}${hintLine}
 
 單字清單（來源語言不限）：
@@ -4394,6 +4420,40 @@ document.getElementById("btnRegenerateAudioById").addEventListener("click", asyn
 function stripEdgePunctuation(s){
   return s.trim().replace(/^[?？!！.。,，;；:："“”'‘’\-]+|[?？!！.。,，;；:："“”'‘’\-]+$/g, "");
 }
+// 單字表主標題如果本身是片語/句子，把拆出來、剛好也單獨存在單字表裡的字變成
+// 可以點的連結，點了直接跳過去（不是同一個字才不管，例如整句剛好只有一個字
+// 就不用比對）。跟 renderTappableSentence 不一樣的地方：這裡本來就已經在單字
+// 表裡了，不需要「點了就加入單字表」那一套，單純只做跳轉，找不到對應字的
+// 部分維持原樣的文字，不用特別標記。只有一個字（不是片語/句子）就回傳
+// null，維持呼叫端原本的顯示方式。
+function renderJumpableMainText(w){
+  const tokens = w.text.split(/(\s+)/);
+  const tappableCount = tokens.filter(t => t && !/^\s+$/.test(t) && stripEdgePunctuation(t)).length;
+  if(tappableCount <= 1) return null;
+  const frag = document.createDocumentFragment();
+  tokens.forEach(tok => {
+    if(tok === "" || /^\s+$/.test(tok)){
+      frag.appendChild(document.createTextNode(tok));
+      return;
+    }
+    const clean = stripEdgePunctuation(tok);
+    const target = clean && allWords.find(x => x.id !== w.id && x.text.toLowerCase() === clean.toLowerCase());
+    if(!target){
+      frag.appendChild(document.createTextNode(tok));
+      return;
+    }
+    const span = document.createElement("span");
+    span.className = "usage-word in-list";
+    span.textContent = tok;
+    span.title = "已在單字表裡，點一下跳過去看";
+    span.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      jumpToWordObj(target);
+    });
+    frag.appendChild(span);
+  });
+  return frag;
+}
 function renderTappableSentence(sentence, sentenceNativeScript, onWordAdded){
   const container = document.createElement("span");
   container.style.cssText = "display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap;";
@@ -5904,13 +5964,24 @@ function createWordItem(w){
   row.innerHTML = `
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
-      <div class="id-text">${w.id}. ${mainText}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}${viDiffers ? ` <span style="font-size:0.7rem; color:var(--danger);" title="南北發音不同：${viDiffTitle}">🔀南北不同</span>` : ""}</div>
+      <div class="id-text">${w.id}. <span class="main-text-slot">${mainText}</span>${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}${viDiffers ? ` <span style="font-size:0.7rem; color:var(--danger);" title="南北發音不同：${viDiffTitle}">🔀南北不同</span>` : ""}</div>
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
       ${currentLang === "vi" && viNative && viNative !== viMain ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${viNativeHTML}</div>` : ""}
       <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
       ${currentLang === "arz" && data && data.reply ? `<div class="reply-line" title="${(data.reply.note || "").replace(/"/g, "&quot;")}">↩︎ 對方回：<bdi dir="rtl" class="native-ar">${data.reply.nativeScript || ""}</bdi> ${data.reply.romanized || ""}${data.reply.zh ? " · " + data.reply.zh : ""}</div>` : ""}
     </div>
   `;
+  // 單字表裡有些項目本身是片語/句子（例如「pergi keluar」「di dekat hotel」），
+  // 如果拆開來的某個字剛好單字表裡也有獨立的一筆，讓它可以直接點過去，跟例句
+  // 面板點字跳轉是同一個概念，不用重新去單字表裡搜。越南文主標題已經是帶
+  // 南北發音標色的 HTML（viMainHTML），跟這裡逐字拆開重組會衝突，先跳過。
+  if(currentLang !== "vi"){
+    const slot = row.querySelector(".main-text-slot");
+    if(slot){
+      const frag = renderJumpableMainText(w);
+      if(frag){ slot.innerHTML = ""; slot.appendChild(frag); }
+    }
+  }
   if(currentLang === "arz" && data && data.reply){
     const replyLine = row.querySelector(".reply-line");
     const replySpeakBtn = document.createElement("button");
@@ -8317,7 +8388,8 @@ async function processConvertImportText(rawText){
               if(forceReconvert){
                 customDB[existing.text] = {
                   zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, sameAsSource,
-                  quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
+                  quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors,
+                  correctNative: entry.correctNative, distractorsNative: entry.distractorsNative
                 };
                 convertedMap[sourceKey] = existing.text;
                 updatedCount++;
@@ -8333,7 +8405,8 @@ async function processConvertImportText(rawText){
           allWords.push({ id: nextId, text: finalText });
           customDB[finalText] = {
             zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, sameAsSource,
-            quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
+            quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors,
+            correctNative: entry.correctNative, distractorsNative: entry.distractorsNative
           };
           addedCount++;
         });
@@ -8742,7 +8815,11 @@ function renderQuestion(){
   const data = lookup(w.text);
   document.getElementById("quizProgress").textContent = `第 ${quizIndex+1} / ${quizSession.length} 題`;
   document.getElementById("quizEnText").textContent = data.quizEn;
-  const options = shuffleArr([data.correct, ...data.distractors]);
+  const optionObjs = [
+    { text: data.correct, native: data.correctNative || null },
+    ...data.distractors.map((d, i) => ({ text: d, native: (data.distractorsNative || [])[i] || null }))
+  ];
+  const options = shuffleArr(optionObjs);
   const optEl = document.getElementById("quizOptions");
   optEl.innerHTML = "";
   document.getElementById("btnNextQuestion").classList.add("hidden");
@@ -8752,18 +8829,21 @@ function renderQuestion(){
     row.className = "opt-row";
     const b = document.createElement("button");
     b.className = "opt";
-    b.textContent = opt;
-    b.onclick = () => answerQuestion(b, opt, data.correct, w);
+    b.textContent = opt.text;
+    b.onclick = () => answerQuestion(b, opt.text, data.correct, w);
     row.appendChild(b);
-    // 泰文模式下這些測驗選項只有羅馬拼音、沒有對應的真泰文字，硬要唸羅馬拼音
-    // 容易唸錯誤導學生，乾脆不放發音按鈕，比唸錯還誠實。
-    if(!L().hasScript){
+    // 泰文/越南文…這些測驗選項本來只有羅馬拼音、沒有對應的真原生文字，硬要
+    // 唸羅馬拼音容易唸錯誤導學生。現在 correct/distractors 都會補一份對應的
+    // 原生文字（correctNative/distractorsNative），有補到的話就照原生文字唸；
+    // 舊資料還沒補過的（opt.native 還是 null，要按「AI 自動生成」才會補齊）
+    // 才維持原本「不放發音按鈕」的誠實作法，比唸錯還好。
+    if(!L().hasScript || opt.native){
       const speakBtn = document.createElement("button");
       speakBtn.type = "button";
       speakBtn.className = "opt-speak";
       speakBtn.textContent = "🔊";
-      speakBtn.setAttribute("aria-label", `播放「${opt}」發音`);
-      speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(opt, speakBtn); });
+      speakBtn.setAttribute("aria-label", `播放「${opt.text}」發音`);
+      speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speak(opt.native || opt.text, speakBtn); });
       row.appendChild(speakBtn);
     }
     optEl.appendChild(row);
