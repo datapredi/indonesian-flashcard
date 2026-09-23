@@ -2179,7 +2179,7 @@ ${list}`;
 // 選的語言」。不特別寫死印尼文，是因為以後可能還會加其他語言，來源語言越通用
 // 越好維護——直接讓 AI 判斷來源語言、轉成目標語言就好，不用先繞經中文當中介，
 // 準確度不會比較好，只是多一次沒必要的轉換。
-async function convertWordsToTargetLang(words, hints){
+async function convertWordsToTargetLang(words, hints, enHints){
   const hasScript = L().hasScript;
   const schema = {
     type: "object",
@@ -2212,9 +2212,12 @@ async function convertWordsToTargetLang(words, hints){
     required: ["entries"],
     additionalProperties: false
   };
-  const list = words.map((w, i) => `${i + 1}. ${w}${hints && hints[w] ? `　【學生指定中文意思：「${hints[w]}」】` : ""}`).join("\n");
+  const list = words.map((w, i) => `${i + 1}. ${w}${hints && hints[w] ? `　【學生指定中文意思：「${hints[w]}」】` : ""}${enHints && enHints[w] ? `　【英文意思提示：${enHints[w]}】` : ""}`).join("\n");
   const hintLine = hints && Object.keys(hints).length
     ? `\n\n注意：清單裡標了【學生指定中文意思：「…」】的項目，zh 欄位一定要原封不動照那串輸出（連（對女生）這種括號註記都要保留），不要改寫、不要自己重新翻譯；其他欄位照這個指定的意思去做。**如果那個「指定意思」是一個數字（例如「100」「1000」「一萬」），romanized 要給${L().label}裡「唸這個數字」的數詞說法（例如 100 給該語言「一百」怎麼唸），nativeScript 給該語言數字的正確書寫，zh 就寫那個數字本身。** 沒有標的項目照原本規則自己判斷意思。`
+    : "";
+  const enHintLine = enHints && Object.keys(enHints).length
+    ? `\n\n注意：清單裡標了【英文意思提示：…】的項目，是學生自己在筆記裡寫的英文意思，不是要翻譯的內容——romanized 一樣照原文那一項（不含提示）處理，提示只用來判斷意思：zh／en、例句都要照這個提示的意思去做。提示裡有好幾個意思（例如「street, sugar」）的話，zh／en 就把這幾個意思都列出來（用「；」分隔），例句選第一個意思。`
     : "";
   const scriptLine = hasScript ? `\n- nativeScript：對應的正確${L().label}原生文字書寫（純粹給語音朗讀引擎用，學生不會看到）` : "";
   const prompt = `以下是一份單字/片語清單，來源語言不限（可能是中文、印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼；如果某一項本身就是中文，代表學生要把這個中文意思翻成${L().label}）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
@@ -2228,7 +2231,7 @@ ${registerCefrPromptLines(L().label)}- zh：繁體中文意思，用字典基本
 - correct：quizEn 對應的${L().label}翻譯句子，用羅馬拼音寫（口語、初學者程度、要用到這個目標單字/片語，一樣要選最普遍常用的說法）
 - distractors：3 個文法正確但意思錯誤、容易讓學習者混淆的${L().label}句子選項（一樣用羅馬拼音寫，長度和風格接近 correct，但意思不同）
 ${quizNativePromptLines(L().label, hasScript)}
-清單裡每一項都要對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。以下的說話者身分設定只適用在你自己新造句子的地方（correct、distractors），如果來源本身已經是${L().label}、用字已經合理，不要為了套用這個設定而更動學生原文的代名詞或用字。${genderNoteForLang()}${hintLine}
+清單裡每一項都要對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。以下的說話者身分設定只適用在你自己新造句子的地方（correct、distractors），如果來源本身已經是${L().label}、用字已經合理，不要為了套用這個設定而更動學生原文的代名詞或用字。${genderNoteForLang()}${hintLine}${enHintLine}
 
 單字清單（來源語言不限）：
 ${list}`;
@@ -8283,7 +8286,30 @@ async function processConvertImportText(rawText){
     // 除了換行，也用逗號分隔。例外：數字分位的逗號（1,000）不切；有「原文 = 中文」
     // 分隔符的行不切（中文那半可能有逗號）。全形頓號／逗號一律當分隔。
     const lines = [];
+    // 「原文 - English」這種寫法（例如 Thành phố - city、Đường - street, sugar）：
+    // 後半如果是純英文，就當成英文意思提示，只留前半的原文當單字，英文不另外
+    // 變成一筆（不然 sugar、country 會被逗號切出來、翻成重複的字）。後半有
+    // 非英文字母（例如「…đúng không? - Đúng rồi.」這種問答）就不動它。
+    const enHintBySource = {};
+    function splitEnglishGloss(raw){
+      const s = raw.replace(/\r/g, "").replace(/\*\*/g, "").trim();
+      const m = s.match(/^(.+?)\s+-\s+(.+)$/);
+      if(!m) return null;
+      const en = m[2].trim().replace(/[\s,;]+$/, "");
+      if(!/^[A-Za-z][A-Za-z\s,'’()\/.;!?-]*$/.test(en)) return null;
+      const src = extractConvertSourceLine(m[1]);
+      if(!src) return null;
+      return { src, en: en.replace(/\s*,\s*/g, ", ") };
+    }
     rawText.split(/\r?\n/).forEach(ln => {
+      const gloss = splitEnglishGloss(ln);
+      if(gloss){
+        lines.push(gloss.src);
+        const k = gloss.src.toLowerCase();
+        if(!enHintBySource[k]) enHintBySource[k] = gloss.en;
+        else if(!enHintBySource[k].split("; ").includes(gloss.en)) enHintBySource[k] += `; ${gloss.en}`;
+        return;
+      }
       if(/[=＝]|::|：|→|｜|\||—|–|\/\//.test(ln)){ lines.push(ln); return; }
       const parts = ln
         .replace(/(\d),(\d)/g, "$1\uE000$2")   // 保護 1,000 這種數字分位逗號（緊貼、沒空格）
@@ -8402,7 +8428,8 @@ async function processConvertImportText(rawText){
         const batchHints = (useProvidedZh || numberToWords)
           ? Object.fromEntries(batch.map(w => [w, providedZhBySource[w.toLowerCase()]]).filter(([, v]) => v))
           : null;
-        const entries = await convertWordsToTargetLang(batch, batchHints);
+        const batchEnHints = Object.fromEntries(batch.map(w => [w, enHintBySource[w.toLowerCase()]]).filter(([, v]) => v));
+        const entries = await convertWordsToTargetLang(batch, batchHints, batchEnHints);
         let nextId = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
         // 只有真的有比對到來源字、而且產出有效羅馬拼音的，才記錄為「已轉換」。
         // AI 有時候會少回傳幾筆或漏掉某一項，如果整批照樣全部標記已轉換，
