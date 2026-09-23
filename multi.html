@@ -8383,15 +8383,18 @@ async function processConvertImportText(rawText){
       return !allWords.some(x => x.text.toLowerCase() === mapped.toLowerCase());
     });
     const alreadyDoneCount = indoWords.length - wordsToConvert.length;
+    // 之前轉換過、這次跳過的字，也要標成「剛匯入」，這樣分組／類別才會一起
+    // 套用到它們。以前只有「全部都轉過」時才標，新舊混在一起匯入的話，舊的
+    // 那些字就不會被加進分組。
+    indoWords.forEach(w => {
+      const mapped = convertedMap[w.toLowerCase()];
+      if(!mapped) return;
+      const match = allWords.find(x => x.text.toLowerCase() === mapped.toLowerCase());
+      if(match) newlyImportedIds.add(match.id);
+    });
     if(wordsToConvert.length === 0){
       // 全部都已經轉換過了，但還是把這次匯入對應到的字標成「剛匯入」，
       // 使用者還是能直接跳去看這批字，不用因為沒有新增就找不到。
-      indoWords.forEach(w => {
-        const mapped = convertedMap[w.toLowerCase()];
-        if(!mapped) return;
-        const match = allWords.find(x => x.text.toLowerCase() === mapped.toLowerCase());
-        if(match) newlyImportedIds.add(match.id);
-      });
       if(newlyImportedIds.size > 0){
         showNewlyImportedOnly = true;
         updateNewlyImportedToggleLabel();
