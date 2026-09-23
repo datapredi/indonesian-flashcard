@@ -308,6 +308,7 @@
       <button id="btnJaKanjiBackfill" class="hidden">🈶 幫舊字補上漢字寫法（日文）</button>
       <button id="btnViScriptBackfill" class="hidden">🇻🇳 幫舊字補／修正越南文寫法（帶聲調符號）</button>
       <button id="btnBackfillRegisterCefr">🏷️ 掃描全部單字，補難易度 A1~C2／口語標籤</button>
+      <button id="btnBackfillLoan">🌍 掃描全部單字，標記外來字來源</button>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
@@ -1813,12 +1814,26 @@ function getCrossLangStatus(zhMeaning, enMeaning){
 // 的難易度參考就好，不是真的官方認證等級。
 const REGISTER_CEFR_SCHEMA_PROPS = {
   register: { type: "string", enum: ["口語", "中性", "正式"] },
-  cefr: { type: "string", enum: ["A1", "A2", "B1", "B2", "C1", "C2"] }
+  cefr: { type: "string", enum: ["A1", "A2", "B1", "B2", "C1", "C2"] },
+  loanFrom: { type: "string" },
+  loanWord: { type: "string" }
 };
 function registerCefrPromptLines(label){
   return `- register：這個字/片語的語域，只能是「口語」「中性」「正式」三選一——「口語」是日常對話、朋友間會用的說法；「正式」是書面、正式場合、新聞用語；不確定就選「中性」
 - cefr：這個字/片語對應的 CEFR 難易度等級（A1/A2/B1/B2/C1/C2）。${label}如果沒有官方 CEFR 分級資料，就比照 CEFR 的定義（字彙難度、使用頻率、學習階段）給你自己最佳判斷的等級
+${loanPromptLines(label)}`;
+}
+// 外來字來源（loanFrom/loanWord）：印尼文有大量荷蘭語、阿拉伯語、梵語、葡萄牙語、
+// 閩南語借詞，越南文有大量漢越詞跟法語借詞。不是外來字的 loanFrom 存空字串，
+// 補標籤時用「欄位是不是 undefined」判斷有沒有問過，空字串代表問過了、是本土字。
+function loanPromptLines(label){
+  return `- loanFrom：如果這個字是從其他語言借來的外來字，用繁體中文寫來源語言（例如「荷蘭語」「阿拉伯語」「梵語」「葡萄牙語」「閩南語」「漢語」「法語」「英語」「波斯語」「泰米爾語」）；${label}本土固有的字、或整句話/片語，就填空字串 ""。只標有明確語源根據的，不確定就填空字串，不要硬猜
+- loanWord：loanFrom 有填時，寫出來源語言裡的原字（漢語/閩南語借詞寫繁體漢字，例如越南文 học sinh → 學生、印尼文 teh → 茶；其他語言寫該語言的拼寫，例如印尼文 kantor → kantoor）；loanFrom 是空字串時這裡也填空字串
 `;
+}
+function loanTagHtml(data){
+  if(!data || !data.loanFrom) return "";
+  return ` <span class="reg-cefr-tag" title="外來字：來自${data.loanFrom}">🌍${data.loanFrom}${data.loanWord ? " " + data.loanWord : ""}</span>`;
 }
 // correct/distractors（測驗選項）在 hasScript 語言（泰文、越南文…）本來只存
 // 羅馬拼音，沒有對應的原生文字，導致測驗選項沒辦法準確唸出來（沒有原生文字，
@@ -1857,7 +1872,7 @@ async function addWordToOtherLang(lang, zhMeaning, enMeaning){
     ),
     required: ["text"].concat(
       hasScript ? ["nativeScript"] : (isIndo ? ["pron"] : [])
-    ).concat(["register", "cefr", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
+    ).concat(["register", "cefr", "loanFrom", "loanWord", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
     additionalProperties: false
   };
   const prompt = `你是${info.teacher}，正在幫學生把一個已經確定好意思的詞/片語加進${info.label} Flash Card 單字表。這個詞的中文意思是「${zhMeaning || ""}」${enMeaning ? `，英文意思是「${enMeaning}」` : ""}（意思已經確定，不用重新猜，直接照這個意思翻譯成${info.label}）。請提供：
@@ -1890,7 +1905,7 @@ ${quizNativePromptLines(info.label, hasScript)}`;
 
   const nextId = words.length ? Math.max(...words.map(w => w.id)) + 1 : 1;
   words.push({ id: nextId, text });
-  const entry = { zh: zhMeaning || "", en: enMeaning || "", register: parsed.register, cefr: parsed.cefr, quizEn: parsed.quizEn, correct: parsed.correct, distractors: parsed.distractors };
+  const entry = { zh: zhMeaning || "", en: enMeaning || "", register: parsed.register, cefr: parsed.cefr, loanFrom: parsed.loanFrom, loanWord: parsed.loanWord, quizEn: parsed.quizEn, correct: parsed.correct, distractors: parsed.distractors };
   if(hasScript){ entry.nativeScript = parsed.nativeScript; entry.correctNative = parsed.correctNative; entry.distractorsNative = parsed.distractorsNative; }
   if(isIndo) entry.pron = parsed.pron;
   db[text] = entry;
@@ -1935,7 +1950,7 @@ async function generateWordData(words){
           required: (hasScript
             ? ["zh", "en", "nativeScript"]
             : (isIndo ? ["zh", "en", "pron"] : ["zh", "en"])
-          ).concat(["register", "cefr", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
+          ).concat(["register", "cefr", "loanFrom", "loanWord", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
           additionalProperties: false
         }
       }
@@ -2023,7 +2038,7 @@ async function generateQuizDataForKnownWords(items){
             },
             quizNativeSchemaProps(hasScript)
           ),
-          required: ["register", "cefr", "quizEn", "correct", "distractors"].concat(quizNativeRequiredFields(hasScript)),
+          required: ["register", "cefr", "loanFrom", "loanWord", "quizEn", "correct", "distractors"].concat(quizNativeRequiredFields(hasScript)),
           additionalProperties: false
         }
       }
@@ -2058,7 +2073,7 @@ async function generateRegisterCefrForKnownWords(items){
         items: {
           type: "object",
           properties: REGISTER_CEFR_SCHEMA_PROPS,
-          required: ["register", "cefr"],
+          required: ["register", "cefr", "loanFrom", "loanWord"],
           additionalProperties: false
         }
       }
@@ -2189,7 +2204,7 @@ async function convertWordsToTargetLang(words, hints){
           required: (hasScript
             ? ["source", "romanized", "nativeScript"]
             : ["source", "romanized"]
-          ).concat(["register", "cefr", "zh", "en", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
+          ).concat(["register", "cefr", "loanFrom", "loanWord", "zh", "en", "quizEn", "correct", "distractors"]).concat(quizNativeRequiredFields(hasScript)),
           additionalProperties: false
         }
       }
@@ -5759,7 +5774,9 @@ document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
           if(!entries[i]) return;
           customDB[w.text] = Object.assign({}, lookup(w.text), {
             register: entries[i].register,
-            cefr: entries[i].cefr
+            cefr: entries[i].cefr,
+            loanFrom: entries[i].loanFrom,
+            loanWord: entries[i].loanWord
           });
         });
         saveCustomDB();
@@ -5770,6 +5787,82 @@ document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
       done += batch.length;
     }
     alert(`完成，掃過 ${done} 個字。${failCount > 0 ? `有 ${failCount} 個失敗（可能網路不穩），可以再按一次補齊，已經補好的會自動跳過。` : "全部成功。"}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    releaseWakeLock();
+  }
+};
+
+// 補外來字來源標籤：跟上面補難易度一樣，只問 loanFrom/loanWord，其他資料不動。
+// loanFrom 是 undefined 才算還沒問過（本土字會存成空字串，下次就跳過）。
+async function generateLoanForKnownWords(items){
+  const hasScript = L().hasScript;
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { loanFrom: { type: "string" }, loanWord: { type: "string" } },
+          required: ["loanFrom", "loanWord"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  const list = items.map((it, i) => `${i + 1}. ${L().label}：${(hasScript && it.nativeScript) || it.text}（羅馬拼音：${it.text}${it.zh ? `，中文意思：${it.zh}` : ""}）`).join("\n");
+  const prompt = `你是${L().teacher}，也熟悉${L().label}的詞源。下面每一項的意思都已經確定好了。針對每一項判斷它是不是外來字：
+${loanPromptLines(L().label)}
+請依照輸入的順序，每個項目對應輸出一筆資料，不要合併、不要省略、數量要跟輸入一致。
+
+單字/片語清單：
+${list}`;
+  const parsed = await callClaude(prompt, schema, 2048);
+  return parsed.entries;
+}
+document.getElementById("btnBackfillLoan").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  const list = allWords.filter(w => {
+    const d = lookup(w.text);
+    return d && d.zh && d.loanFrom === undefined;
+  });
+  if(list.length === 0){ alert("每個有翻譯的單字都已經判斷過是不是外來字了，不用補。"); return; }
+  if(!confirm(`會用 AI 掃過 ${list.length} 個還沒判斷過的單字，是外來字的就標上來源語言（例如 🌍荷蘭語 kantoor）。原本的意思、例句、測驗題都不會動。要開始嗎？`)) return;
+  const btn = document.getElementById("btnBackfillLoan");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  await acquireWakeLock();
+  try{
+    const batches = chunkArr(list, 12);
+    let done = 0, failCount = 0, loanCount = 0;
+    for(const batch of batches){
+      btn.textContent = `標記外來字中... (${done}/${list.length})`;
+      try{
+        const items = batch.map(w => {
+          const d = lookup(w.text);
+          return { text: w.text, nativeScript: d.nativeScript, zh: d.zh };
+        });
+        const entries = await generateLoanForKnownWords(items);
+        batch.forEach((w, i) => {
+          if(!entries[i]) return;
+          if(entries[i].loanFrom) loanCount++;
+          customDB[w.text] = Object.assign({}, lookup(w.text), {
+            loanFrom: entries[i].loanFrom || "",
+            loanWord: entries[i].loanFrom ? (entries[i].loanWord || "") : ""
+          });
+        });
+        saveCustomDB();
+        renderList();
+      }catch(e){
+        failCount += batch.length;
+      }
+      done += batch.length;
+    }
+    alert(`完成，掃過 ${done} 個字，其中 ${loanCount} 個是外來字。${failCount > 0 ? `有 ${failCount} 個失敗（可能網路不穩），可以再按一次補齊，已經判斷過的會自動跳過。` : ""}`);
   } finally {
     btn.disabled = false;
     btn.textContent = originalLabel;
@@ -5970,7 +6063,7 @@ function createWordItem(w){
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
       ${currentLang === "vi" && viNative && viNative !== viMain ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${viNativeHTML}</div>` : ""}
       ${currentLang === "th" && data && data.nativeScript ? `<div class="native-text native-th">${data.nativeScript}</div>` : ""}
-      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
+      <div class="meaning">${data && data.zh ? (data.zh + (data.en ? " · " + data.en : "") + regCefrTagHtml(data) + loanTagHtml(data)) : "尚無翻譯資料，可用上面「AI 自動生成」按鈕"}</div>
       ${currentLang === "arz" && data && data.reply ? `<div class="reply-line" title="${(data.reply.note || "").replace(/"/g, "&quot;")}">↩︎ 對方回：<bdi dir="rtl" class="native-ar">${data.reply.nativeScript || ""}</bdi> ${data.reply.romanized || ""}${data.reply.zh ? " · " + data.reply.zh : ""}</div>` : ""}
     </div>
   `;
@@ -8374,7 +8467,7 @@ async function processConvertImportText(rawText){
               // 問題、就是想拿新生成的結果覆蓋掉舊的，不是單純跳過。
               if(forceReconvert){
                 customDB[existing.text] = {
-                  zh: entry.zh, en: entry.en, register: entry.register, cefr: entry.cefr, sameAsSource,
+                  zh: entry.zh, en: entry.en, register: entry.register, cefr: entry.cefr, loanFrom: entry.loanFrom, loanWord: entry.loanWord, sameAsSource,
                   quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors
                 };
                 convertedMap[sourceKey] = existing.text;
@@ -8390,7 +8483,7 @@ async function processConvertImportText(rawText){
               // 用這次新生成的資料覆蓋掉舊的（原地更新，不新增字、不留舊資料）。
               if(forceReconvert){
                 customDB[existing.text] = {
-                  zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, sameAsSource,
+                  zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, loanFrom: entry.loanFrom, loanWord: entry.loanWord, sameAsSource,
                   quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors,
                   correctNative: entry.correctNative, distractorsNative: entry.distractorsNative
                 };
@@ -8407,7 +8500,7 @@ async function processConvertImportText(rawText){
           nextId++;
           allWords.push({ id: nextId, text: finalText });
           customDB[finalText] = {
-            zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, sameAsSource,
+            zh: entry.zh, en: entry.en, nativeScript: entry.nativeScript, register: entry.register, cefr: entry.cefr, loanFrom: entry.loanFrom, loanWord: entry.loanWord, sameAsSource,
             quizEn: entry.quizEn, correct: entry.correct, distractors: entry.distractors,
             correctNative: entry.correctNative, distractorsNative: entry.distractorsNative
           };
