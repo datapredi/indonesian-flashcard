@@ -8328,13 +8328,13 @@ async function processConvertImportText(rawText){
       const pushLine = t => { lines.push(t); if(lineNotes.length) notesByLine.set(t, lineNotes); };
       const gloss = splitEnglishGloss(ln);
       if(gloss){
-        // 英文意思也一起記進筆記（例如「Tối evening, dark」），卡片上只留原文。
+        // 英文意思也一起記進筆記（例如「evening, dark」），卡片上只留原文。
         // 這個字本身已經有行內標註（Quán(g)、Học[p]）的話，接在那個標註後面
         // 變成「Quán(g), casual restaurant, coffee shop」，不重複寫一次字。
         const srcLower = gloss.src.toLowerCase();
         const tagged = lineNotes.findIndex(n => n.toLowerCase().startsWith(srcLower) && /^[\[(]/.test(n.slice(gloss.src.length)));
         if(tagged >= 0) lineNotes[tagged] += `, ${gloss.en}`;
-        else lineNotes.push(`${gloss.src} ${gloss.en}`);
+        else lineNotes.push(gloss.en);
         pushLine(gloss.src);
         const k = gloss.src.toLowerCase();
         if(!enHintBySource[k]) enHintBySource[k] = gloss.en;
