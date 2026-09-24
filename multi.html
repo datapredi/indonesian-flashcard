@@ -2223,7 +2223,7 @@ async function convertWordsToTargetLang(words, hints, enHints){
   const prompt = `以下是一份單字/片語清單，來源語言不限（可能是中文、印尼文、英文或其他語言，請你自己判斷每一項原本是什麼語言、意思是什麼；如果某一項本身就是中文，代表學生要把這個中文意思翻成${L().label}）。學生現在要學${L().label}。請針對清單裡每一項，找出意思對應的${L().label}，並提供：
 - source：原封不動複製清單裡這一項的原文（一字不差），用來對應是哪一個原始項目
 - romanized：對應的${L().label}，用羅馬拼音（英文字母）寫。**先判斷這一項原本是什麼語言，這個判斷結果決定下面走哪一條規則，兩條規則不能混用：**
-  - **情況A／這一項原本就已經是${L().label}（學生自己打的，不是別的語言）**：不用翻譯、不用換句話說、不用「挑一個更常見/更完整/更清楚的說法」，直接把學生打的原文原封不動當作 romanized 輸出，包括代名詞、俚語、非正式縮寫或簡稱（例如「ish」這種口語用法，即使聽起來不是一個「完整」的字，也不要展開/改寫成別的字或片語，例如不能因為「ish」的意思接近「kind of」就換成「kind of」——那是翻譯，不是保留原文）。粗俗、直接、不客氣的用字（髒話、粗話等）也一樣原封不動保留，不要因為比較委婉、禮貌而偷換成別的字。學生很多時候是從電影/影集/歌曲裡聽到某個道地說法特地要背下來，即使是少見、特殊語境的版本也一律照原文保留。唯一可以修正的情況：原文本身文法錯誤、拼字明顯打錯、或意思根本不通，這時候才能修正，而且只能修到「文法/拼字正確」為止，不能進一步換成別的慣用語或別的說法。代名詞也一樣要保留原文本來的用字（例如原文用「tôi」就照樣保留「tôi」，不要因為下面的說話者身分設定換掉——那個設定只用在你自己新造句子的地方，即 correct、distractors，不適用在 romanized/nativeScript 這裡）。句子裡夾雜的外文字（英文單字、地名、人名、品牌，例如「Pyramids đẹp lắm」裡的 Pyramids、Cairo、Frankfurt）也照原文保留、不要翻成${L().label}（例如不能把 Pyramids 換成 Kim tự tháp）——這種夾雜外文的句子整體還是算情況A，夾雜的外文字也不算文法錯誤；nativeScript 裡也一樣照原文拼法保留那個外文字。
+  - **情況A／這一項原本就已經是${L().label}（學生自己打的，不是別的語言）**：不用翻譯、不用換句話說、不用「挑一個更常見/更完整/更清楚的說法」，直接把學生打的原文原封不動當作 romanized 輸出，包括代名詞、俚語、非正式縮寫或簡稱（例如「ish」這種口語用法，即使聽起來不是一個「完整」的字，也不要展開/改寫成別的字或片語，例如不能因為「ish」的意思接近「kind of」就換成「kind of」——那是翻譯，不是保留原文）。粗俗、直接、不客氣的用字（髒話、粗話等）也一樣原封不動保留，不要因為比較委婉、禮貌而偷換成別的字。學生很多時候是從電影/影集/歌曲裡聽到某個道地說法特地要背下來，即使是少見、特殊語境的版本也一律照原文保留。唯一可以修正的情況：原文本身文法錯誤、拼字明顯打錯、或意思根本不通，這時候才能修正，而且只能修到「文法/拼字正確」為止，不能進一步換成別的慣用語或別的說法。代名詞也一樣要保留原文本來的用字（例如原文用「tôi」就照樣保留「tôi」，不要因為下面的說話者身分設定換掉——那個設定只用在你自己新造句子的地方，即 correct、distractors，不適用在 romanized/nativeScript 這裡）。句子裡夾雜的外文字（英文單字、地名、人名、品牌，例如「Pyramids đẹp lắm」裡的 Pyramids、Cairo、Frankfurt）也照原文保留、不要翻成${L().label}（例如不能把 Pyramids 換成 Kim tự tháp）——這種夾雜外文的句子整體還是算情況A，夾雜的外文字也不算文法錯誤；nativeScript 裡也一樣照原文拼法保留那個外文字。但如果是${L().label}句子後面**另外接了一整句英文翻譯或說明**（學生筆記常見，例如「Cho anh cái menu đi! Give me the menu, please!」「Cà rốt cũng được. Carrot is OK」「Làm sao nói cái này? How to say this?」），那段英文是翻譯不是原文：romanized 只保留前面的${L().label}部分，英文拿來判斷 zh／en 的意思。
   - **情況B／這一項原本是別的語言，需要翻譯成${L().label}**：找出意思對應的${L().label}。如果這一項只是單一個字/片語、同一個概念有好幾種同樣正確的說法，選日常生活中「最普遍、大多數母語人士第一個會用」的那個版本，不要選比較少用、比較正式、或語氣比較特殊/侷限的同義詞，拼法要口語、初學者好記，不用正式音標系統。如果這一項本身是一整句話（不只是單一個字或片語），請把整句話完整翻譯出來，不能只挑其中一個字或縮短成關鍵字——「選最普遍常用的說法」只適用在同一個概念有多種同義字可以選的情況，不代表可以把一整句話簡化掉、只保留開頭的一部分${scriptLine}
 ${registerCefrPromptLines(L().label)}- zh：繁體中文意思，用字典基本形式（例如原文如果是某個動詞的過去式/複數/其他變化形，也只寫這個字最基本、查字典會查到的那個意思，不要照抄原文的時態/型態）${currentLang === "arz" ? "。**但埃及口語例外：如果這個詞/片語本身帶了性別或單複數標記——第二人稱陽性/陰性（enta/enty、字尾 -ak/-ik，例如 esmak 是對男生、esmik 是對女生）、第三人稱他/她（-o/-ha、huwwa/heyya）、陰陽性或複數的形容詞/分詞——中文結尾一定要用全形括號註明（對男生）/（對女生）/（男）/（女）/（複數），這比「用字典基本形式」優先。第一人稱、名詞、男女通用的字就不用加。**" : ""}
 - en：英文意思，同樣用字典基本形式（例如原文如果是 "slept"，這裡還是要寫 "sleep"，不要寫成 "slept"）——這個欄位是給之後搜尋、跨語言比對用的，要盡量保持一致、乾淨
@@ -8098,7 +8098,7 @@ function scriptsForConvertImport(){
   return scripts.map(s => `\\p{Script=${s}}`).join("");
 }
 function nonWordCharReConvert(){
-  return new RegExp(`[^${scriptsForConvertImport()}0-9\\s.,!?'"‘’“”-]`, "u");
+  return new RegExp(`[^${scriptsForConvertImport()}0-9\\s.,!?'"‘’“”…-]`, "u");
 }
 function hasWordCharReConvert(){
   return new RegExp(`[${scriptsForConvertImport()}]`, "u");
@@ -8296,21 +8296,40 @@ async function processConvertImportText(rawText){
       const m = s.match(/^(.+?)\s+-\s+(.+)$/);
       if(!m) return null;
       const en = m[2].trim().replace(/[\s,;]+$/, "");
-      if(!/^[A-Za-z][A-Za-z\s,'’()\/.;!?-]*$/.test(en)) return null;
+      if(!/^[A-Za-z…][A-Za-z\s,'’()\/.;!?&…-]*$/.test(en)) return null;
       const src = extractConvertSourceLine(m[1]);
       if(!src) return null;
       return { src, en: en.replace(/\s*,\s*/g, ", ") };
     }
-    rawText.split(/\r?\n/).forEach(ln => {
+    // 老師筆記裡的行內標註：一個字後面緊接的 [p]、[c]、(g)，或跟在後面的
+    // (cup)、(tính - calculate) 這類括號說明。以前會在第一個 [ 或 ( 就把整行
+    // 截斷（「Đây là một[p] khách sạn Nhật[c].」只剩「Đây là một」）。現在把
+    // 標註拿掉、留下乾淨的原文，標註本身收進那張卡的筆記（📝）。
+    const noteBySource = {};
+    const notesByLine = new Map();
+    function extractInlineNotes(raw){
+      const notes = [];
+      let s = raw.replace(/([\p{L}\p{M}]+)\[([^\]\n]{1,20})\]/gu, (m, w, t) => { notes.push(`${w}[${t}]`); return w; });
+      s = s.replace(/([\p{L}\p{M}]+)\(([^()\n]{1,80})\)/gu, (m, w, c) => { notes.push(`${w}(${c.trim()})`); return w; });
+      s = s.replace(/([\p{L}\p{M}]+)?\s+\(([^()\n]{1,80})\)/gu, (m, w, c) => {
+        c = c.trim();
+        notes.push(w && /^[\x00-\x7F’]+$/.test(c) ? `${w} (${c})` : c);
+        return w || "";
+      });
+      return { text: s, notes };
+    }
+    rawText.split(/\r?\n/).forEach(rawLn => {
+      const { text: ln, notes: lineNotes } = extractInlineNotes(rawLn);
+      const pushLine = t => { lines.push(t); if(lineNotes.length) notesByLine.set(t, lineNotes); };
       const gloss = splitEnglishGloss(ln);
       if(gloss){
-        lines.push(gloss.src);
+        pushLine(gloss.src);
         const k = gloss.src.toLowerCase();
         if(!enHintBySource[k]) enHintBySource[k] = gloss.en;
         else if(!enHintBySource[k].split("; ").includes(gloss.en)) enHintBySource[k] += `; ${gloss.en}`;
         return;
       }
-      if(/[=＝]|::|：|→|｜|\||—|–|\/\//.test(ln)){ lines.push(ln); return; }
+      if(/[=＝]|::|：|→|｜|\||—|–|\/\//.test(ln)){ pushLine(ln); return; }
       const parts = ln
         .replace(/(\d),(\d)/g, "$1\uE000$2")   // 保護 1,000 這種數字分位逗號（緊貼、沒空格）
         .split(/\s*[,，、]\s*/)
@@ -8322,8 +8341,9 @@ async function processConvertImportText(rawText){
       const _t = ln.trim();
       const _totalWords = _t.split(/\s+/).filter(Boolean).length;
       const _maxSegWords = parts.reduce((m, p) => Math.max(m, p.trim().split(/\s+/).filter(Boolean).length), 0);
-      const _looksLikeProse = (/[.!?。！？]$/.test(_t) && _totalWords > 4) || _maxSegWords > 5 || _totalWords > 15;
-      if(parts.length > 1 && !_looksLikeProse) lines.push(...parts); else lines.push(ln);
+      // 句尾有標點（One more, please.）、或逗號在引號裡（“menu, please”）也不切。
+      const _looksLikeProse = /[.!?。！？]$/.test(_t) || /[“”"「」]/.test(_t) || _maxSegWords > 5 || _totalWords > 15;
+      if(parts.length > 1 && !_looksLikeProse) parts.forEach(pushLine); else pushLine(ln);
     });
     const indoWords = [];
     const seen = new Set();
@@ -8353,6 +8373,9 @@ async function processConvertImportText(rawText){
       const cleaned = extractConvertSourceLine(line);
       if(cleaned === null) return;
       const key = cleaned.toLowerCase();
+      if(notesByLine.has(line)){
+        noteBySource[key] = [...new Set([...(noteBySource[key] || []), ...notesByLine.get(line)])];
+      }
       if(seen.has(key)) return;
       seen.add(key);
       indoWords.push(cleaned);
@@ -8386,11 +8409,23 @@ async function processConvertImportText(rawText){
     // 之前轉換過、這次跳過的字，也要標成「剛匯入」，這樣分組／類別才會一起
     // 套用到它們。以前只有「全部都轉過」時才標，新舊混在一起匯入的話，舊的
     // 那些字就不會被加進分組。
+    // 行內標註（[p]、(g)…）收進對應那張卡的筆記；已經有的就不重複加。
+    function attachImportNote(w){
+      const notes = noteBySource[w.toLowerCase()];
+      const mapped = convertedMap[w.toLowerCase()];
+      if(!notes || !mapped) return;
+      const match = allWords.find(x => x.text.toLowerCase() === mapped.toLowerCase());
+      if(!match) return;
+      const cur = getWordNote(match.text);
+      const add = notes.filter(n => !cur.includes(n));
+      if(add.length) setWordNote(match.text, cur ? `${cur}\n${add.join("、")}` : add.join("、"));
+    }
     indoWords.forEach(w => {
       const mapped = convertedMap[w.toLowerCase()];
       if(!mapped) return;
       const match = allWords.find(x => x.text.toLowerCase() === mapped.toLowerCase());
       if(match) newlyImportedIds.add(match.id);
+      if(match && !wordsToConvert.includes(w)) attachImportNote(w);
     });
     if(wordsToConvert.length === 0){
       // 全部都已經轉換過了，但還是把這次匯入對應到的字標成「剛匯入」，
@@ -8545,6 +8580,7 @@ async function processConvertImportText(rawText){
           if(!mapped) return;
           const match = allWords.find(x => x.text.toLowerCase() === mapped.toLowerCase());
           if(match) newlyImportedIds.add(match.id);
+          attachImportNote(w);
         });
         if(newlyImportedIds.size > 0){
           showNewlyImportedOnly = true;
