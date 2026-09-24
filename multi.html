@@ -8332,10 +8332,29 @@ async function processConvertImportText(rawText){
     // 通常緊接著就有完整例句，句型本身做成卡片沒意義。黏在字後面的
     // 「Nhưng...」是真的句子，不算。
     const isPatternLine = t => /(^|\s)(…|\.{3})(?=\s|$|[?!.,])/.test(t) || /\s\+\s/.test(t);
+    // 句子後面直接接英文翻譯（「Làm sao nói cái này? How to say this? (point at
+    // the phrase)」）：前面的句子做成卡片，後面整段英文（含括號說明）進筆記。
+    // 前半要有越南文這種帶符號的字母才算，純拉丁字母的語言（印尼文）分不出
+    // 哪半是英文，不處理。後半的括號內容不限語言（「(tính - calculate)」）。
+    function splitTrailingEnglish(raw){
+      const s = raw.replace(/\r/g, "").replace(/\*\*/g, "").trim();
+      const re = /[.!?](?=\s+\S)/g;
+      let m;
+      while((m = re.exec(s))){
+        const left = s.slice(0, m.index + 1);
+        const right = s.slice(m.index + 1).trim();
+        if(!/[\u00C0-\u1EF9]/.test(left.replace(/\([^()]*\)|\[[^\]]*\]/g, ""))) continue;
+        const core = right.replace(/\([^()]*\)/g, "").trim();
+        if(core && /^[A-Za-z][A-Za-z0-9\s,'’“”".!?;:&…\/-]*$/.test(core)) return { left, note: right.replace(/\s+/g, " ") };
+      }
+      return null;
+    }
     rawText.split(/\r?\n/).forEach(rawLn => {
       if(isPatternLine(rawLn)) return;
       const gloss = splitEnglishGloss(rawLn);
-      const { text: ln, notes: lineNotes } = gloss ? { text: "", notes: gloss.leftNotes } : extractInlineNotes(rawLn);
+      const trailing = gloss ? null : splitTrailingEnglish(rawLn);
+      const { text: ln, notes: lineNotes } = gloss ? { text: "", notes: gloss.leftNotes } : extractInlineNotes(trailing ? trailing.left : rawLn);
+      if(trailing) lineNotes.push(trailing.note);
       const pushLine = t => { lines.push(t); if(lineNotes.length) notesByLine.set(t, lineNotes); };
       if(gloss){
         // 英文意思也一起記進筆記（例如「evening, dark」），卡片上只留原文。
