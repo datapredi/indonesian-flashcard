@@ -8291,15 +8291,23 @@ async function processConvertImportText(rawText){
     // 變成一筆（不然 sugar、country 會被逗號切出來、翻成重複的字）。後半有
     // 非英文字母（例如「…đúng không? - Đúng rồi.」這種問答）就不動它。
     const enHintBySource = {};
+    // 吃的是原始行（還沒拿掉標註）：英文後面接的括號說明（「hotel (Khách -
+    // customer, …)」）要整段跟著英文進筆記，所以要在拆標註之前先切。
     function splitEnglishGloss(raw){
       const s = raw.replace(/\r/g, "").replace(/\*\*/g, "").trim();
       const m = s.match(/^(.+?)\s+-\s+(.+)$/);
       if(!m) return null;
-      const en = m[2].trim().replace(/[\s,;]+$/, "");
+      // 「 - 」在括號裡面（「Tính tiền! … (tính - calculate)」）就不是這種寫法
+      if((m[1].match(/\(/g) || []).length !== (m[1].match(/\)/g) || []).length) return null;
+      const right = m[2].trim().replace(/[\s,;]+$/, "");
+      const paren = right.match(/^(.*?)\s*\(([^()]*)\)$/);
+      const en = (paren ? paren[1] : right).trim().replace(/\s*,\s*/g, ", ");
       if(!/^[A-Za-z…][A-Za-z\s,'’()\/.;!?&…-]*$/.test(en)) return null;
-      const src = extractConvertSourceLine(m[1]);
+      const { text: leftText, notes: leftNotes } = extractInlineNotes(m[1]);
+      const src = extractConvertSourceLine(leftText);
       if(!src) return null;
-      return { src, en: en.replace(/\s*,\s*/g, ", ") };
+      const note = paren ? `${en} (${paren[2].trim().replace(/\s+/g, " ")})` : en;
+      return { src, en, note, leftNotes };
     }
     // 老師筆記裡的行內標註：一個字後面緊接的 [p]、[c]、(g)，或跟在後面的
     // (cup)、(tính - calculate) 這類括號說明。以前會在第一個 [ 或 ( 就把整行
@@ -8325,17 +8333,17 @@ async function processConvertImportText(rawText){
     const isPatternLine = t => /(^|\s)(…|\.{3})(?=\s|$|[?!.,])/.test(t);
     rawText.split(/\r?\n/).forEach(rawLn => {
       if(isPatternLine(rawLn)) return;
-      const { text: ln, notes: lineNotes } = extractInlineNotes(rawLn);
+      const gloss = splitEnglishGloss(rawLn);
+      const { text: ln, notes: lineNotes } = gloss ? { text: "", notes: gloss.leftNotes } : extractInlineNotes(rawLn);
       const pushLine = t => { lines.push(t); if(lineNotes.length) notesByLine.set(t, lineNotes); };
-      const gloss = splitEnglishGloss(ln);
       if(gloss){
         // 英文意思也一起記進筆記（例如「evening, dark」），卡片上只留原文。
         // 這個字本身已經有行內標註（Quán(g)、Học[p]）的話，接在那個標註後面
         // 變成「Quán(g), casual restaurant, coffee shop」，不重複寫一次字。
         const srcLower = gloss.src.toLowerCase();
         const tagged = lineNotes.findIndex(n => n.toLowerCase().startsWith(srcLower) && /^[\[(]/.test(n.slice(gloss.src.length)));
-        if(tagged >= 0) lineNotes[tagged] += `, ${gloss.en}`;
-        else lineNotes.push(gloss.en);
+        if(tagged >= 0) lineNotes[tagged] += `, ${gloss.note}`;
+        else lineNotes.push(gloss.note);
         pushLine(gloss.src);
         const k = gloss.src.toLowerCase();
         if(!enHintBySource[k]) enHintBySource[k] = gloss.en;
