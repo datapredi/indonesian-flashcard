@@ -8318,7 +8318,12 @@ async function processConvertImportText(rawText){
       });
       return { text: s, notes };
     }
+    // 帶「…」空格的句型說明（Từ … tới …、Làm sao nói … ?）整行略過：筆記裡
+    // 通常緊接著就有完整例句，句型本身做成卡片沒意義。黏在字後面的
+    // 「Nhưng...」是真的句子，不算。
+    const isPatternLine = t => /(^|\s)(…|\.{3})(?=\s|$|[?!.,])/.test(t);
     rawText.split(/\r?\n/).forEach(rawLn => {
+      if(isPatternLine(rawLn)) return;
       const { text: ln, notes: lineNotes } = extractInlineNotes(rawLn);
       const pushLine = t => { lines.push(t); if(lineNotes.length) notesByLine.set(t, lineNotes); };
       const gloss = splitEnglishGloss(ln);
