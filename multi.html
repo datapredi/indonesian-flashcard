@@ -8350,6 +8350,15 @@ async function processConvertImportText(rawText){
         else if(!enHintBySource[k].split("; ").includes(gloss.en)) enHintBySource[k] += `; ${gloss.en}`;
         return;
       }
+      // 「原文 → 說明」（Cho something đi! → command）：卡片只留箭頭前面，說明進筆記。
+      // 箭頭後面是中文的話是「原文 → 中文意思」那種寫法，照舊交給下面處理。
+      const arrow = ln.match(/^(.+?)\s*→\s*(.+)$/);
+      if(arrow && !/\p{Script=Han}/u.test(arrow[2])){
+        const note = arrow[2].trim().replace(/[\s\/]+$/, "");
+        if(note) lineNotes.push(note);
+        pushLine(arrow[1].trim());
+        return;
+      }
       if(/[=＝]|::|：|→|｜|\||—|–|\/\//.test(ln)){ pushLine(ln); return; }
       const parts = ln
         .replace(/(\d),(\d)/g, "$1\uE000$2")   // 保護 1,000 這種數字分位逗號（緊貼、沒空格）
