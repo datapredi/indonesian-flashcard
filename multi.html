@@ -8316,7 +8316,8 @@ async function processConvertImportText(rawText){
         notes.push(w && /^[\x00-\x7F’]+$/.test(c) ? `${w} (${c})` : c);
         return w || "";
       });
-      return { text: s, notes };
+      // 同一行的幾個標註用空格接成一筆（「một[p] Nhật[c]」），不同行的才用「、」分開。
+      return { text: s, notes: notes.length > 1 ? [notes.join(" ")] : notes };
     }
     // 帶「…」空格的句型說明（Từ … tới …、Làm sao nói … ?）整行略過：筆記裡
     // 通常緊接著就有完整例句，句型本身做成卡片沒意義。黏在字後面的
