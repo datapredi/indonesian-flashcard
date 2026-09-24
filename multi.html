@@ -8327,10 +8327,11 @@ async function processConvertImportText(rawText){
       // 同一行的幾個標註用空格接成一筆（「một[p] Nhật[c]」），不同行的才用「、」分開。
       return { text: s, notes: notes.length > 1 ? [notes.join(" ")] : notes };
     }
-    // 帶「…」空格的句型說明（Từ … tới …、Làm sao nói … ?）整行略過：筆記裡
+    // 句型說明整行略過：帶「…」空位的（Từ … tới …、Làm sao nói … ?），或用
+    // 「 + 」接空位的（Cho + food/drink、Cho thêm + something）。筆記裡
     // 通常緊接著就有完整例句，句型本身做成卡片沒意義。黏在字後面的
     // 「Nhưng...」是真的句子，不算。
-    const isPatternLine = t => /(^|\s)(…|\.{3})(?=\s|$|[?!.,])/.test(t);
+    const isPatternLine = t => /(^|\s)(…|\.{3})(?=\s|$|[?!.,])/.test(t) || /\s\+\s/.test(t);
     rawText.split(/\r?\n/).forEach(rawLn => {
       if(isPatternLine(rawLn)) return;
       const gloss = splitEnglishGloss(rawLn);
