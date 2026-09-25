@@ -322,6 +322,7 @@
       <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
       <button id="btnToggleWorkOnly">💼 只顯示工作相關</button>
+      <button id="btnToggleSentencesOnly">💬 只顯示句子</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
@@ -1529,6 +1530,15 @@ function isGreetingWord(w){
 }
 
 let showWorkOnly = false;
+// 「只顯示句子」篩選（全語言通用）：老師造的完整句子跟單字混在同一份清單裡，
+// 這個只留句子。有句尾標點（. ! ? 。！？）或至少 6 個字就算句子；片語像
+// 「Bia thủ công」「Thành phố tiếp theo」不算（越南文一個音節一個字，門檻要高一點）。
+let showSentencesOnly = false;
+function isSentenceWord(w){
+  const t = w.text.replace(/\s*\(\d+\)$/, "").trim();   // 去掉撞名時加的 (2)
+  if(/[.!?。！？]["”’」]?$/.test(t)) return true;
+  return t.split(/\s+/).filter(Boolean).length >= 6;
+}
 // 「只顯示跟工作有關」篩選（全語言通用）：靠中英文意思判斷是不是職場／工作
 // 相關（上班下班、辦公室、同事老闆、薪水、開會、專案、面試、履歷、職稱…）。
 // 純靠意思比對，概略的。
@@ -5979,6 +5989,7 @@ function getVisibleWords(){
     if(showNumbersOnly && !isNumberWord(w)) return false;
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
     if(showWorkOnly && !isWorkWord(w)) return false;
+    if(showSentencesOnly && !isSentenceWord(w)) return false;
     if(groupFilter && (wordGroups[w.id] || "") !== groupFilter) return false;
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(diffFilter){
@@ -7208,6 +7219,7 @@ function updateCount(){
   if(typeof updateNumbersToggleLabel === "function") updateNumbersToggleLabel();
   if(typeof updateGreetingsToggleLabel === "function") updateGreetingsToggleLabel();
   if(typeof updateWorkToggleLabel === "function") updateWorkToggleLabel();
+  if(typeof updateSentencesToggleLabel === "function") updateSentencesToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -7602,6 +7614,19 @@ document.getElementById("btnToggleWorkOnly").addEventListener("click", () => {
   renderList();
 });
 updateWorkToggleLabel();
+function updateSentencesToggleLabel(){
+  const btn = document.getElementById("btnToggleSentencesOnly");
+  if(!btn) return;
+  const n = allWords.filter(isSentenceWord).length;
+  btn.textContent = showSentencesOnly ? `顯示全部單字 (句子 ${n} 個)` : `💬 只顯示句子 (${n})`;
+  btn.classList.toggle("primary", showSentencesOnly);
+}
+document.getElementById("btnToggleSentencesOnly").addEventListener("click", () => {
+  showSentencesOnly = !showSentencesOnly;
+  updateSentencesToggleLabel();
+  renderList();
+});
+updateSentencesToggleLabel();
 // 自訂分組：篩選下拉選單的選項要跟著現有的組更新
 function updateGroupFilterOptions(){
   const sel = document.getElementById("groupFilter");
