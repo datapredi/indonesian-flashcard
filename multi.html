@@ -2838,7 +2838,7 @@ function thaiToneRuleText(cls, vowelLength, endingType, toneMark){
   }
   return `${cls}音 ＋ ${endingType}尾 → ${applyThaiToneRule(cls, vowelLength, endingType, "無")}調`;
 }
-const THAI_TONE_RULE_CACHE_LS = "flashcard_thai_tone_rule_cache_v3"; // v2：改成 AI 只報事實、聲調由 JS 查表算；v3：拆音節加上 ตัวสะกดออกเสียงซ้ำ（พัทยา = พัท+ทะ+ยา）
+const THAI_TONE_RULE_CACHE_LS = "flashcard_thai_tone_rule_cache_v4"; // v2：改成 AI 只報事實、聲調由 JS 查表算；v3：拆音節加上 ตัวสะกดออกเสียงซ้ำ（พัทยา = พัท+ทะ+ยา）；v4：不發音字母／รร／ฤ，加口語聲調提示
 let thaiToneRuleCache = {};
 try{ thaiToneRuleCache = JSON.parse(localStorage.getItem(lsKey(THAI_TONE_RULE_CACHE_LS))) || {}; }catch(e){ thaiToneRuleCache = {}; }
 function saveThaiToneRuleCache(){ localStorage.setItem(lsKey(THAI_TONE_RULE_CACHE_LS), JSON.stringify(thaiToneRuleCache)); }
@@ -2867,9 +2867,10 @@ async function getThaiToneAnalysis(nativeScript, romanized, force){
           required: ["thai", "roman", "initial", "leadingNote", "effectiveClass", "vowel", "vowelLength", "ending", "endingType", "toneMark"],
           additionalProperties: false
         }
-      }
+      },
+      colloquialNote: { type: "string" }
     },
-    required: ["syllables"],
+    required: ["syllables", "colloquialNote"],
     additionalProperties: false
   };
   const prompt = `你是泰語老師。學生在背的泰文單字：${nativeScript || romanized}${romanized && nativeScript ? `（羅馬拼音：${romanized}）` : ""}。
@@ -2892,6 +2893,9 @@ ${THAI_SYLLABLE_RULE}
 - ending：收什麼尾音，一句話（例如「收 -น 鼻音」「短母音無尾」「收 -ก 塞音」）
 - endingType：活／死（活尾＝長母音結尾或收 -ง -น -ม -ย -ว；死尾＝短母音無尾或收 -ก -ด -บ）
 - toneMark：這個音節有沒有聲調符號，填 無 / เอก / โท / ตรี / จัตวา（่＝เอก，้＝โท，๊＝ตรี，๋＝จัตวา）
+
+另外：
+- colloquialNote：如果這個字（或片語裡的某個字）平常口語的實際聲調跟寫法照規則算出來的不一樣，用一句繁體中文說明，例如「เขา 寫法是升調，口語通常唸成高調 kháo」「ฉัน 寫法是升調，口語通常唸成高調 chán」「ไหม 寫法是升調，口語常唸成高調 mái」。沒有這種情況就填空字串 ""，不要硬湊
 
 泰文字保留原文，其餘一律繁體中文。不要輸出聲調，那個由程式算。`;
   const parsed = await callClaude(prompt, schema, 2048);
@@ -4087,7 +4091,10 @@ function saveToneMarksCache(){ localStorage.setItem(lsKey(TONE_MARKS_CACHE_LS), 
 const THAI_SYLLABLE_RULE = `【拆音節一定要照實際發音，不是照字面】
 - 泰文有「ตัวสะกดออกเสียงซ้ำ」：一個子音同時當前一個音節的尾音、又當下一個音節的開頭（後面帶一個沒寫出來的短 a）。這種要多拆出一個音節，例如 พัทยา = พัท + ทะ + ยา（phát-thá-yaa，三個音節，不是兩個）、ผลไม้ = ผล + ละ + ไม้、คุณภาพ = คุณ + นะ + ภาพ、ราชการ = ราช + ชะ + การ、อุบัติเหตุ = อุ + บัด + ติ + เหตุ
 - 字面上沒寫母音、但要唸出短 a 的前綴音節也要拆出來，例如 สบาย = สะ + บาย、ตลาด = ตะ + หลาด（ล 跟在中/高音字後面，照 ห 前引的規則算）
-- 多拆出來的那個音節，泰文照實際唸的樣子寫（例如 ทะ、ละ），它的聲調照它自己的子音 class、短母音、死尾去算`;
+- 多拆出來的那個音節，泰文照實際唸的樣子寫（例如 ทะ、ละ），它的聲調照它自己的子音 class、短母音、死尾去算
+- 不發音的字母不算進音節：上面有 ์（การันต์）的字母不唸（ศัพท์ = sàp、จันทร์ = jan）；有些字裡的 ร 不唸（สามารถ = sǎa-mâat、จริง 口語常唸 jing）；ทร 在 ทราย、ทราบ、ทรง、ทรัพย์ 這類字唸成 ซ（saai、sâap）
+- รร（ร หัน）：後面沒有尾音時唸 -an（บรรยาย = ban-yaai），後面有尾音時唸 a＋那個尾音（ธรรม = tham、กรรม = kam）
+- ฤ 依字唸 rʉ、ri 或 rəə（ฤดู = rʉ́-duu、อังกฤษ = ang-krìt），照實際發音判斷`;
 
 async function getToneMarks(text, nativeScript){
   if(toneMarksCache[text]) return toneMarksCache[text];
@@ -5214,6 +5221,15 @@ function renderThaiTonePanel(panel, r, aiTones, onRegenerate){
     warn.style.cssText = "margin-bottom:6px; font-weight:600; color:var(--danger);";
     warn.textContent = "⚠️ 有音節的規則推導結果跟 🎵 聲調標記面板不一致，下面標 ⚠️ 的要再確認（可能是規則的例外、也可能是某一邊判斷錯了）。";
     panel.appendChild(warn);
+  }
+  // 口語聲調跟寫法不一樣的字（เขา、ฉัน、ไหม…）：規則表算的是寫法的聲調，這裡
+  // 另外提醒平常實際怎麼唸，兩種都看得到。
+  if(r.colloquialNote){
+    const colloq = document.createElement("div");
+    colloq.className = "usage-note";
+    colloq.style.cssText = "margin-bottom:6px; font-weight:600;";
+    colloq.textContent = `🗣️ 口語：${r.colloquialNote}`;
+    panel.appendChild(colloq);
   }
 
   syls.forEach((s, idx) => {
