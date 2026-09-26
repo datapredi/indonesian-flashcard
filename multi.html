@@ -2838,7 +2838,7 @@ function thaiToneRuleText(cls, vowelLength, endingType, toneMark){
   }
   return `${cls}音 ＋ ${endingType}尾 → ${applyThaiToneRule(cls, vowelLength, endingType, "無")}調`;
 }
-const THAI_TONE_RULE_CACHE_LS = "flashcard_thai_tone_rule_cache_v2"; // v2：改成 AI 只報事實、聲調由 JS 查表算
+const THAI_TONE_RULE_CACHE_LS = "flashcard_thai_tone_rule_cache_v3"; // v2：改成 AI 只報事實、聲調由 JS 查表算；v3：拆音節加上 ตัวสะกดออกเสียงซ้ำ（พัทยา = พัท+ทะ+ยา）
 let thaiToneRuleCache = {};
 try{ thaiToneRuleCache = JSON.parse(localStorage.getItem(lsKey(THAI_TONE_RULE_CACHE_LS))) || {}; }catch(e){ thaiToneRuleCache = {}; }
 function saveThaiToneRuleCache(){ localStorage.setItem(lsKey(THAI_TONE_RULE_CACHE_LS), JSON.stringify(thaiToneRuleCache)); }
@@ -2874,6 +2874,8 @@ async function getThaiToneAnalysis(nativeScript, romanized, force){
   };
   const prompt = `你是泰語老師。學生在背的泰文單字：${nativeScript || romanized}${romanized && nativeScript ? `（羅馬拼音：${romanized}）` : ""}。
 請把它逐音節拆開，然後**只報下面這些「看得到的事實」**，不要自己判斷聲調——聲調會由程式照規則表算。
+
+${THAI_SYLLABLE_RULE}
 
 每個音節：
 - thai：這個音節的泰文
@@ -4078,6 +4080,15 @@ let toneMarksCache = {};
 try{ toneMarksCache = JSON.parse(localStorage.getItem(lsKey(TONE_MARKS_CACHE_LS))) || {}; }catch(e){ toneMarksCache = {}; }
 function saveToneMarksCache(){ localStorage.setItem(lsKey(TONE_MARKS_CACHE_LS), JSON.stringify(toneMarksCache)); }
 
+// 泰文拆音節要照實際發音。AI 最常錯的是「ตัวสะกดออกเสียงซ้ำ」：一個子音同時
+// 當前一個音節的尾音、又當下一個音節的開頭（พัทยา 唸 phát-thá-yaa，不是
+// พัท + ยา），還有字面上沒寫母音的前綴音節（สบาย 的 สะ）。三個會拆音節的
+// 地方（📐 聲調規則、🎵 羅馬拼音聲調、泰文字母聲調）共用這段說明。
+const THAI_SYLLABLE_RULE = `【拆音節一定要照實際發音，不是照字面】
+- 泰文有「ตัวสะกดออกเสียงซ้ำ」：一個子音同時當前一個音節的尾音、又當下一個音節的開頭（後面帶一個沒寫出來的短 a）。這種要多拆出一個音節，例如 พัทยา = พัท + ทะ + ยา（phát-thá-yaa，三個音節，不是兩個）、ผลไม้ = ผล + ละ + ไม้、คุณภาพ = คุณ + นะ + ภาพ、ราชการ = ราช + ชะ + การ、อุบัติเหตุ = อุ + บัด + ติ + เหตุ
+- 字面上沒寫母音、但要唸出短 a 的前綴音節也要拆出來，例如 สบาย = สะ + บาย、ตลาด = ตะ + หลาด（ล 跟在中/高音字後面，照 ห 前引的規則算）
+- 多拆出來的那個音節，泰文照實際唸的樣子寫（例如 ทะ、ละ），它的聲調照它自己的子音 class、短母音、死尾去算`;
+
 async function getToneMarks(text, nativeScript){
   if(toneMarksCache[text]) return toneMarksCache[text];
   const schema = {
@@ -4093,7 +4104,9 @@ async function getToneMarks(text, nativeScript){
 
 請用這個格式：每個音節後面加上上標括號＋聲調字母，聲調字母只用 H（高音 high）、L（低音 low）、M（中音 mid）、R（上升音 rising）、F（下降音 falling）這五種。上標括號請用 Unicode 上標括號字元 ⁽ ⁾（不是普通括號）。
 
-範例：มีไลน์ไหมครับ/ค่ะ 要標成 mii⁽M⁾ laai⁽M⁾ mǎi⁽R⁾ khráp⁽H⁾/khâ⁽F⁾
+範例：มีไลน์ไหมครับ/ค่ะ 要標成 mii⁽M⁾ laai⁽M⁾ mǎi⁽R⁾ khráp⁽H⁾/khâ⁽F⁾；พัทยา 要標成 phát⁽H⁾ thá⁽H⁾ yaa⁽M⁾
+
+${THAI_SYLLABLE_RULE}
 
 請直接根據泰文原生文字的實際聲調來標，音節切分跟拼寫盡量貼近原本給的羅馬拼音，只是每個音節後面加上聲調標記。如果原羅馬拼音有 / 分隔的多個選項（例如男女生說法），每個都要標。
 
@@ -4162,7 +4175,9 @@ async function getNativeToneMarks(text, nativeScript){
 
 請用這個格式：把泰文原生文字依照音節切開，每個音節後面加上上標括號＋聲調字母，聲調字母只用 H（高音 high）、L（低音 low）、M（中音 mid）、R（上升音 rising）、F（下降音 falling）這五種。上標括號請用 Unicode 上標括號字元 ⁽ ⁾（不是普通括號）。輸出裡的文字本身一律用泰文原生字母，絕對不要出現羅馬拼音。
 
-範例：มีไลน์ไหมครับ/ค่ะ 要標成 มี⁽M⁾ไลน์⁽M⁾ไหม⁽R⁾ครับ⁽H⁾/ค่ะ⁽F⁾
+範例：มีไลน์ไหมครับ/ค่ะ 要標成 มี⁽M⁾ไลน์⁽M⁾ไหม⁽R⁾ครับ⁽H⁾/ค่ะ⁽F⁾；พัทยา 要標成 พัท⁽H⁾ทะ⁽H⁾ยา⁽M⁾
+
+${THAI_SYLLABLE_RULE}
 
 如果原文有 / 分隔的多個選項（例如男女生說法），每個都要標。
 
@@ -6824,6 +6839,9 @@ function createWordItem(w){
       if(!ns){ toneRulePanel.textContent = "這個字還沒有泰文原生文字資料，先按「✨ AI 自動生成」補起來。"; return; }
       toneRulePanel.textContent = "推導中...";
       try{
+        // 重新推導時，拿來對照的 🎵 聲調標記也一起重拿，不然舊的（例如 พัทยา
+        // 拆成兩個音節）會跟新的對不上，每個音節都被標 ⚠️。
+        if(force || !thaiToneRuleCache[ns]){ delete toneMarksCache[w.text]; delete nativeToneMarksCache[w.text]; saveToneMarksCache(); saveNativeToneMarksCache(); }
         const r = await getThaiToneAnalysis(ns, w.text, force);
         let aiTones = null;
         try{ aiTones = parseThaiToneLetters(await getToneMarks(w.text, ns)); }catch(e){ /* 對照用，拿不到就算了 */ }
