@@ -309,6 +309,8 @@
       <button id="btnViScriptBackfill" class="hidden">🇻🇳 幫舊字補／修正越南文寫法（帶聲調符號）</button>
       <button id="btnBackfillRegisterCefr">🏷️ 掃描全部單字，補難易度 A1~C2／口語標籤</button>
       <button id="btnBackfillLoan">🌍 掃描全部單字，標記外來字來源</button>
+      <button id="btnScanChunks">🧩 掃描單字，建議常用字塊</button>
+      <div id="chunkReview" class="hidden"></div>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
@@ -2659,6 +2661,138 @@ async function getIndoMorphology(text, zh, force){
   idMorphCache[text] = parsed;
   saveIdMorphCache();
   return parsed;
+}
+
+// 常用字塊（語塊）：單背一個字（quán）不如背平常真的會講的搭配（quán cà phê、
+// quán ăn）。AI 針對單一個字建議幾個口語常用的字塊，使用者自己挑要不要加成
+// 新卡——不改動原本的字（熟練度、錄音、分組都是跟著原字存的），新卡的筆記
+// 記「來自：原字」。快取 key＝原字，每個語言各一份。
+const CHUNKS_CACHE_LS = "flashcard_chunks_cache_v1";
+let chunksCache = {};
+try{ chunksCache = JSON.parse(localStorage.getItem(lsKey(CHUNKS_CACHE_LS))) || {}; }catch(e){ chunksCache = {}; }
+function saveChunksCache(){ localStorage.setItem(lsKey(CHUNKS_CACHE_LS), JSON.stringify(chunksCache)); }
+function chunkItemSchema(){
+  const hasScript = L().hasScript;
+  return {
+    type: "object",
+    properties: Object.assign({ text: { type: "string" } }, hasScript ? { nativeScript: { type: "string" } } : {}, { zh: { type: "string" }, en: { type: "string" } }),
+    required: ["text"].concat(hasScript ? ["nativeScript"] : []).concat(["zh", "en"]),
+    additionalProperties: false
+  };
+}
+function chunkPromptRules(){
+  const hasScript = L().hasScript;
+  return `針對每個字，給 2~4 個包含這個字、${L().label}母語人士日常口語真的很常講的「字塊」（固定搭配／常用短語，通常 2~4 個字，例如越南文 quán → quán cà phê、quán ăn；印尼文 pakai → pakai kartu），依常用程度排序：
+- 要是平常生活對話會直接用到的，不要冷僻、書面、或只有特定領域才用的
+- 是短語不是完整句子，不要造句
+- 不要只是原字本身，也不要只是把原字換個詞性
+- text：字塊的寫法，照學生清單裡這個字的書寫方式（原字有帶聲調符號就帶，是羅馬拼音就用羅馬拼音）
+${hasScript ? `- nativeScript：字塊的${L().label}原生文字正確寫法\n` : ""}- zh：繁體中文意思
+- en：英文意思`;
+}
+function chunkWordLine(it){
+  const d = lookup(it.text) || {};
+  return `${it.text}${d.nativeScript && d.nativeScript !== it.text ? `（原生文字：${d.nativeScript}）` : ""}${d.zh ? `（中文意思：${d.zh}）` : ""}`;
+}
+async function getWordChunks(w, force){
+  if(!force && chunksCache[w.text]) return chunksCache[w.text];
+  const schema = { type: "object", properties: { chunks: { type: "array", items: chunkItemSchema() } }, required: ["chunks"], additionalProperties: false };
+  const prompt = `你是${L().teacher}。學生在背這個${L().label}單字：${chunkWordLine(w)}
+
+${chunkPromptRules()}`;
+  const parsed = await callClaude(prompt, schema, 1024);
+  chunksCache[w.text] = parsed.chunks;
+  saveChunksCache();
+  return parsed.chunks;
+}
+async function getWordChunksBatch(words){
+  const schema = {
+    type: "object",
+    properties: { entries: { type: "array", items: { type: "object", properties: { chunks: { type: "array", items: chunkItemSchema() } }, required: ["chunks"], additionalProperties: false } } },
+    required: ["entries"], additionalProperties: false
+  };
+  const prompt = `你是${L().teacher}。下面是學生在背的${L().label}單字：
+${words.map((w, i) => `${i + 1}. ${chunkWordLine(w)}`).join("\n")}
+
+${chunkPromptRules()}
+
+請依照輸入的順序，每個單字對應輸出一筆（entries 裡每筆是那個字的 chunks），數量要跟輸入一致。`;
+  const parsed = await callClaude(prompt, schema, 4096);
+  words.forEach((w, i) => { if(parsed.entries[i]) chunksCache[w.text] = parsed.entries[i].chunks; });
+  saveChunksCache();
+  return parsed.entries.map(e => e.chunks);
+}
+// 適合建議字塊的字：單獨一個字（越南文這種一個音節一個字的，兩個音節像
+// khách sạn 也還算一個詞），不是句子、已經有中文意思。
+function isChunkCandidate(w){
+  const d = lookup(w.text);
+  if(!d || !d.zh || isSentenceWord(w)) return false;
+  return w.text.replace(/\s*\(\d+\)$/, "").trim().split(/\s+/).length <= 2;
+}
+// 把一個字塊加成新卡：意思、原生文字已經有了，先存進 customDB（之後補測驗
+// 資料時會走「known」那條，不會重新猜意思），筆記記「來自：原字」，也跟著
+// 原字的分組／類別。已經在清單裡就回傳那個字、不重複加。
+function addChunkAsWord(chunk, baseWord){
+  const text = (chunk.text || "").trim();
+  if(!text) return null;
+  const existing = allWords.find(x => x.text.toLowerCase() === text.toLowerCase());
+  if(existing) return { word: existing, added: false };
+  if(!addWordToList(text)) return null;
+  const word = allWords.find(x => x.text === text);
+  customDB[text] = Object.assign({}, customDB[text] || {}, { zh: chunk.zh || "", en: chunk.en || "" }, chunk.nativeScript ? { nativeScript: chunk.nativeScript } : {});
+  saveCustomDB();
+  setWordNote(text, `來自：${baseWord.text}`);
+  if(wordGroups[baseWord.id]){ wordGroups[word.id] = wordGroups[baseWord.id]; saveWordGroups(); }
+  if(wordCategories[baseWord.id]){ wordCategories[word.id] = wordCategories[baseWord.id]; saveWordCategories(); }
+  return { word, added: true };
+}
+function renderChunksPanel(panel, chunks, baseWord, onRegenerate){
+  panel.innerHTML = "";
+  const intro = document.createElement("div");
+  intro.className = "usage-note";
+  intro.style.marginBottom = "6px";
+  intro.textContent = "平常口語常用的字塊，覺得有用就按 ➕ 加成新卡（原本這個字不會動）：";
+  panel.appendChild(intro);
+  (chunks || []).forEach(c => {
+    const line = document.createElement("div");
+    line.style.cssText = "display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:4px 0;";
+    const label = document.createElement("span");
+    label.innerHTML = `<b>${c.nativeScript && L().hasScript ? c.nativeScript : c.text}</b> <span class="usage-note">${c.zh}${c.en ? " · " + c.en : ""}</span>`;
+    const speakBtn = document.createElement("button");
+    speakBtn.type = "button";
+    speakBtn.className = "speak-btn";
+    speakBtn.textContent = "🔊";
+    speakBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); speak(c.nativeScript || c.text, speakBtn); });
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "speak-btn";
+    const inList = isWordInList(c.text);
+    addBtn.textContent = inList ? "已在清單" : "➕";
+    addBtn.disabled = inList;
+    addBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const r = addChunkAsWord(c, baseWord);
+      if(!r) return;
+      addBtn.textContent = "已加入";
+      addBtn.disabled = true;
+      if(!r.added || !getApiKey()) return;
+      try{
+        await completeMissingWordData([r.word], addBtn, "生成中", true);
+        refreshWordRowDisplay(r.word.id);
+      }catch(err){ alert("補資料失敗：" + err.message); }
+      addBtn.textContent = "已加入";
+    });
+    line.appendChild(label);
+    line.appendChild(speakBtn);
+    line.appendChild(addBtn);
+    panel.appendChild(line);
+  });
+  const regen = document.createElement("button");
+  regen.type = "button";
+  regen.className = "speak-btn";
+  regen.textContent = "🔄 換一批";
+  regen.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); onRegenerate(); });
+  panel.appendChild(regen);
 }
 
 // 泰文：逐音節推導聲調。分工很重要——AI 只負責「看泰文字、報事實」（哪個
@@ -5807,6 +5941,116 @@ document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
   }
 };
 
+// 🧩 批次建議字塊：掃過所有「單獨一個字」，列出建議讓使用者勾選，勾到的才加
+// 成新卡。已經有快取的字直接用快取，不重複花 API。
+document.getElementById("btnScanChunks").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  const candidates = allWords.filter(w => !hiddenIds.has(w.id) && isChunkCandidate(w));
+  if(candidates.length === 0){ alert("目前沒有單獨一個字、而且已經有翻譯的單字可以建議字塊。"); return; }
+  const uncached = candidates.filter(w => !chunksCache[w.text]);
+  if(uncached.length > 0 && !confirm(`會用 AI 幫 ${uncached.length} 個單字建議常用字塊（另外 ${candidates.length - uncached.length} 個之前建議過，直接沿用）。建議出來之後由你勾選要加哪些，不會自動加、也不會改動原本的字。要開始嗎？`)) return;
+  const btn = document.getElementById("btnScanChunks");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  await acquireWakeLock();
+  let failCount = 0;
+  try{
+    const batches = chunkArr(uncached, 8);
+    let done = 0;
+    for(const batch of batches){
+      btn.textContent = `建議字塊中... (${done}/${uncached.length})`;
+      try{ await getWordChunksBatch(batch); }catch(e){ failCount += batch.length; }
+      done += batch.length;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    releaseWakeLock();
+  }
+  renderChunkReview(candidates.filter(w => chunksCache[w.text]), failCount);
+};
+function renderChunkReview(words, failCount){
+  const box = document.getElementById("chunkReview");
+  box.innerHTML = "";
+  box.classList.remove("hidden");
+  box.style.cssText = "flex-basis:100%; border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-top:6px;";
+  const head = document.createElement("div");
+  head.className = "usage-note";
+  head.style.marginBottom = "6px";
+  head.textContent = `勾選想加成新卡的字塊（新卡筆記會寫「來自：原字」，並沿用原字的分組／類別）。${failCount ? `有 ${failCount} 個字這次沒建議成功，可以再按一次掃描。` : ""}`;
+  box.appendChild(head);
+  const picks = [];
+  words.forEach(w => {
+    const chunks = (chunksCache[w.text] || []).filter(c => c.text && !isWordInList(c.text));
+    if(chunks.length === 0) return;
+    const group = document.createElement("div");
+    group.style.margin = "6px 0";
+    const title = document.createElement("div");
+    const d = lookup(w.text) || {};
+    title.innerHTML = `<b>${L().hasScript && d.nativeScript ? d.nativeScript : w.text}</b> <span class="usage-note">${d.zh || ""}</span>`;
+    group.appendChild(title);
+    chunks.forEach(c => {
+      const label = document.createElement("label");
+      label.style.cssText = "display:block; margin:2px 0 2px 14px; cursor:pointer;";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.addEventListener("change", updateAddLabel);
+      picks.push({ cb, chunk: c, base: w });
+      label.appendChild(cb);
+      label.append(` ${L().hasScript && c.nativeScript ? c.nativeScript : c.text}　`);
+      const zh = document.createElement("span");
+      zh.className = "usage-note";
+      zh.textContent = c.zh;
+      label.appendChild(zh);
+      group.appendChild(label);
+    });
+    box.appendChild(group);
+  });
+  if(picks.length === 0){
+    head.textContent = "建議的字塊都已經在你的清單裡了，沒有新的可以加。";
+  }
+  const actions = document.createElement("div");
+  actions.style.cssText = "display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;";
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.textContent = "關閉";
+  closeBtn.onclick = () => { box.classList.add("hidden"); box.innerHTML = ""; };
+  function updateAddLabel(){
+    const n = picks.filter(p => p.cb.checked).length;
+    addBtn.textContent = `➕ 加入勾選的字塊 (${n})`;
+    addBtn.disabled = n === 0;
+  }
+  updateAddLabel();
+  addBtn.onclick = async () => {
+    const chosen = picks.filter(p => p.cb.checked);
+    const newWords = [];
+    chosen.forEach(p => { const r = addChunkAsWord(p.chunk, p.base); if(r && r.added) newWords.push(r.word); });
+    addBtn.disabled = true;
+    closeBtn.disabled = true;
+    await acquireWakeLock();
+    try{
+      if(newWords.length) await completeMissingWordData(newWords, addBtn, "補資料中");
+      newlyImportedIds = new Set(newWords.map(w => w.id));
+      if(newlyImportedIds.size > 0){ showNewlyImportedOnly = true; updateNewlyImportedToggleLabel(); }
+      renderList();
+      box.classList.add("hidden");
+      box.innerHTML = "";
+      alert(`已加入 ${newWords.length} 個字塊，清單現在只顯示剛加入的這些（按「顯示全部單字」回到全部）。`);
+    }catch(err){
+      alert(`補資料到一半失敗：${err.message}\n字塊已經加進清單了，可以之後按「AI 自動生成」補齊。`);
+      renderList();
+    } finally {
+      releaseWakeLock();
+      closeBtn.disabled = false;
+    }
+  };
+  actions.appendChild(addBtn);
+  actions.appendChild(closeBtn);
+  box.appendChild(actions);
+}
+
 // 補外來字來源標籤：跟上面補難易度一樣，只問 loanFrom/loanWord，其他資料不動。
 // loanFrom 是 undefined 才算還沒問過（本土字會存成空字串，下次就跳過）。
 async function generateLoanForKnownWords(items){
@@ -6528,6 +6772,37 @@ function createWordItem(w){
       await loadMorphPanel(false);
     });
     row.appendChild(morphBtn);
+  }
+
+  // 🧩 常用字塊：只給單獨一個字（句子、長片語本身就是完整說法，不用）。
+  if(isChunkCandidate(w)){
+    const chunksPanel = document.createElement("div");
+    chunksPanel.className = "usage-panel hidden";
+    row.querySelector("div").appendChild(chunksPanel);
+    const chunksBtn = document.createElement("button");
+    chunksBtn.type = "button";
+    chunksBtn.className = "usage-btn";
+    chunksBtn.textContent = "🧩字塊";
+    chunksBtn.title = "AI 建議這個字平常口語常用的搭配（例如 quán → quán cà phê），可以加成新卡來背";
+    chunksBtn.setAttribute("aria-label", `建議 ${w.text} 的常用字塊`);
+    async function loadChunksPanel(force){
+      if(!force && chunksPanel.dataset.loaded === "1") return;
+      if(!getApiKey()){ chunksPanel.textContent = "請先在上面輸入並儲存 Anthropic API Key"; return; }
+      chunksPanel.textContent = "產生中...";
+      try{
+        const chunks = await getWordChunks(w, force);
+        renderChunksPanel(chunksPanel, chunks, w, () => loadChunksPanel(true));
+        chunksPanel.dataset.loaded = "1";
+      }catch(err){ chunksPanel.textContent = "產生失敗：" + err.message; }
+    }
+    chunksBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!chunksPanel.classList.contains("hidden")){ chunksPanel.classList.add("hidden"); chunksBtn.classList.remove("primary"); return; }
+      chunksPanel.classList.remove("hidden");
+      chunksBtn.classList.add("primary");
+      await loadChunksPanel(false);
+    });
+    row.appendChild(chunksBtn);
   }
 
   // 泰文：照「聲調規則表」逐音節推導聲調（AI 只報事實，聲調由 JS 查表算），
