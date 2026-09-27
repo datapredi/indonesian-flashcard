@@ -3246,7 +3246,7 @@ const THAI_ALPHA_TAB_LS = "flashcard_thai_alpha_tab_v1";
 function renderThaiAlphabetPanel(){
   const root = document.getElementById("thaiAlphabetPanel");
   root.innerHTML = "";
-  const tabDefs = [["vowel", "母音"], ["class", "子音：中／高／低"], ["az", "子音：A–Z 發音"], ["tone", "聲調規則"]];
+  const tabDefs = [["vowel", "母音"], ["class", "子音：中／高／低"], ["az", "子音：A–Z 發音"], ["shape", "子音：字形"], ["tone", "聲調規則"]];
   const tabBar = document.createElement("div");
   tabBar.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;";
   root.appendChild(tabBar);
@@ -3421,8 +3421,9 @@ function renderThaiAlphabetPanel(){
     { title: "有「ด」形（圓圈／捲彎，像 dor dek；不管圈圈朝哪邊）", letters: ["ค", "ฅ", "ด", "ต", "ล", "ส"] },
     { title: "有「捲＋駝峰」形（像 m／nor nu／thor montho／thor thahaan）", letters: ["ม", "น", "ฑ", "ท"] }
   ];
+  panel = bodies.shape;
   const h3 = document.createElement("div");
-  h3.style.cssText = "font-weight:600; margin-top:18px;";
+  h3.style.cssText = "font-weight:600;";
   h3.textContent = "按字形分組（看字裡有沒有出現這個基本形狀）";
   panel.appendChild(h3);
   shapeGroups.forEach(g => {
