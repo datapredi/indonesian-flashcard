@@ -9707,9 +9707,13 @@ async function runListenLoop(){
     async function playCurrentWord(){
       const interrupted = () => !listenRunning || listenSkipRequested || listenPaused;
       let idBlob = null, zhBlob = null;
+      // 跟「依序播放發音」一樣：這個字有自己錄的音（例如老師的發音）就優先播錄音，
+      // 不用先開「用我的錄音」開關，也就不用幫它生成 AI 語音。
+      let recBlob = null;
+      try{ recBlob = await getUserRecording(recKeyFor(w.text)); }catch(e){ /* 讀不到就照舊用 AI 語音 */ }
       if(voiceSource === "gpt" || fptViActive(currentLang)){
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（生成語音中...）`;
-        idBlob = await withTimeout(getWordAudioBlobFor(currentLang, getSpeechText(w)), 30000, "語音生成逾時，可能是網路或瀏覽器卡住");
+        if(!recBlob) idBlob = await withTimeout(getWordAudioBlobFor(currentLang, getSpeechText(w)), 30000, "語音生成逾時，可能是網路或瀏覽器卡住");
         zhBlob = await withTimeout(getTTSAudioBlob(zhForSpeech(data.zh), TTS_INSTRUCTIONS_ZH), 20000, "語音生成逾時（20 秒），可能是網路或瀏覽器卡住");
         document.getElementById("listenProgress").textContent = `第 ${listenIndex + 1} / ${listenSession.length} 個（一直循環）`;
       }
@@ -9730,7 +9734,8 @@ async function runListenLoop(){
       async function playWordPart(){
         document.getElementById("listenWord").textContent = displayWord;
         for(let i = 0; i < 3 && !interrupted(); i++){
-          if(voiceSource === "gpt") await playBlobEnsured(idBlob);
+          if(recBlob) await playBlobEnsured(recBlob);
+          else if(voiceSource === "gpt") await playBlobEnsured(idBlob);
           else await speakAsync(getSpeechText(w), L().speechLang);
           if(interrupted()) return;
           await waitMs(400);
