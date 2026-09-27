@@ -3241,9 +3241,40 @@ function attachLetterRecording(cardEl, letter){
   cardEl.appendChild(recBtn);
   cardEl.appendChild(playBtn);
 }
+// 對照表分成幾個分頁標籤，一次只看一種，不用整頁往下捲找。上次看的分頁記起來。
+const THAI_ALPHA_TAB_LS = "flashcard_thai_alpha_tab_v1";
 function renderThaiAlphabetPanel(){
-  const panel = document.getElementById("thaiAlphabetPanel");
-  panel.innerHTML = "";
+  const root = document.getElementById("thaiAlphabetPanel");
+  root.innerHTML = "";
+  const tabDefs = [["vowel", "母音"], ["class", "子音：中／高／低"], ["az", "子音：A–Z 發音"], ["tone", "聲調規則"]];
+  const tabBar = document.createElement("div");
+  tabBar.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;";
+  root.appendChild(tabBar);
+  const bodies = {};
+  const tabBtns = {};
+  let savedTab = "class";
+  try{ savedTab = localStorage.getItem(THAI_ALPHA_TAB_LS) || "class"; }catch(e){}
+  if(!tabDefs.some(([k]) => k === savedTab)) savedTab = "class";
+  function showTab(key){
+    tabDefs.forEach(([k]) => {
+      bodies[k].classList.toggle("hidden", k !== key);
+      tabBtns[k].classList.toggle("primary", k === key);
+    });
+    try{ localStorage.setItem(THAI_ALPHA_TAB_LS, key); }catch(e){}
+  }
+  tabDefs.forEach(([key, label]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); showTab(key); });
+    tabBar.appendChild(b);
+    tabBtns[key] = b;
+    const body = document.createElement("div");
+    root.appendChild(body);
+    bodies[key] = body;
+  });
+  // 下面各段照原本順序畫，只是依段落換到對應分頁的容器裡。
+  let panel = bodies.vowel;
 
   const vowelHeader = document.createElement("div");
   vowelHeader.style.fontWeight = "600";
@@ -3305,6 +3336,7 @@ function renderThaiAlphabetPanel(){
   });
 
   const classColors = { mid: "var(--accent2)", high: "var(--danger)", low: "#c9a227" };
+  panel = bodies.class;
   THAI_CONSONANT_CLASSES.forEach(cls => {
     const header = document.createElement("div");
     header.style.cssText = `font-weight:600; color:${classColors[cls.key]}; display:flex; align-items:center; gap:8px; flex-wrap:wrap;`;
@@ -3342,8 +3374,9 @@ function renderThaiAlphabetPanel(){
 
 
   // 第二張表：不分 class，按「發音代號」的英文字母順序排，同一個音的字母排在一起。
+  panel = bodies.az;
   const h2 = document.createElement("div");
-  h2.style.cssText = "font-weight:600; margin-top:18px;";
+  h2.style.cssText = "font-weight:600;";
   h2.textContent = "按發音分組（不分中／高／低，同音的排一起）";
   panel.appendChild(h2);
 
@@ -3421,12 +3454,8 @@ function renderThaiAlphabetPanel(){
   shapeNote.textContent = "泰文字母是由幾個基本筆畫組合的。ก／ถ／ภ 共用「ก」那個尖鉤；ค／ฅ／ด／ต／ล／ส 共用「ด」那種圓捲的彎，彼此差在多一撇、多一個小圈或圈的方向不同——初學最容易互相看錯的就是這幾組。";
   panel.appendChild(shapeNote);
 
-  // 聲調規則表（照使用者的手邊圖）——預設收起來，按鈕才展開。
-  const trBtn = document.createElement("button");
-  trBtn.type = "button";
-  trBtn.className = "speak-btn";
-  trBtn.style.cssText = "margin-top:18px;";
-  trBtn.textContent = "📐 顯示聲調規則表";
+  // 聲調規則表（照使用者的手邊圖）——自己一個分頁，直接顯示。
+  panel = bodies.tone;
   const trBox = document.createElement("div");
   trBox.className = "hidden";
   trBox.style.marginTop = "8px";
@@ -3440,13 +3469,10 @@ function renderThaiAlphabetPanel(){
   trNote.style.marginTop = "6px";
   trNote.innerHTML = "活尾（live）＝以長母音結束，或收 -ง -น -ม -ย -ว；死尾（dead）＝以短母音結束（無尾），或收 -ก -ด -บ。<br>無聲調符號：低音＋短＋死尾/無尾 → 高調　·　低音＋長＋死尾 → 降調　·　低音＋活尾 → 中調　·　中音＋活尾 → 中調　·　中音＋死尾 → 低調　·　高音＋活尾 → 升調　·　高音＋死尾 → 低調。<br>有聲調符號（優先，直接看符號）：ไม้เอก ่ → 低音字唸降調、中/高音字唸低調；ไม้โท ้ → 低音字唸高調、中/高音字唸降調；ไม้ตรี ๊ → 中音字唸高調；ไม้จัตวา ๋ → 中音字唸升調。<br>每個泰文單字列上的「📐 聲調規則」按鈕會照這張表逐音節幫你推導一遍。";
   trBox.appendChild(trNote);
-  trBtn.addEventListener("click", (e) => {
-    e.preventDefault(); e.stopPropagation();
-    const hidden = trBox.classList.toggle("hidden");
-    trBtn.textContent = hidden ? "📐 顯示聲調規則表" : "📐 收起聲調規則表";
-  });
-  panel.appendChild(trBtn);
+  trBox.classList.remove("hidden");
+  trBox.style.marginTop = "0";
   panel.appendChild(trBox);
+  showTab(savedTab);
 }
 document.getElementById("btnToggleThaiAlphabet").addEventListener("click", () => {
   const panel = document.getElementById("thaiAlphabetPanel");
