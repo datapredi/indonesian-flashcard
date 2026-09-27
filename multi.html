@@ -240,6 +240,11 @@
     </div>
     <div class="toolbar">
       <button id="btnListAutoplay">▶️ 依序播放發音</button>
+      <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;" title="下次從第幾個開始播。每播到一個字會自動記住，停下來、關掉網頁再回來都會從這裡接著播；播完一整輪會回到第 1 個">
+        從第
+        <input type="number" id="autoplayStartAt" min="1" value="1" style="width:4.5em;">
+        <span id="autoplayStartTotal"></span>個開始
+      </label>
       <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;">
         每字唸
         <select id="autoplayReps">
@@ -7521,6 +7526,7 @@ function renderList(){
   }
 }
 function updateCount(){
+  if(typeof syncAutoplayStartField === "function") syncAutoplayStartField();
   const parts = [`已選 ${selected.size} / ${allWords.length} 個單字`];
   if(cardMasteredIds.size) parts.push(`卡片已會 ${cardMasteredIds.size}`);
   if(quizMasteredIds.size) parts.push(`測驗已會 ${quizMasteredIds.size}`);
@@ -8162,6 +8168,9 @@ async function runListAutoplay(){
   while(listAutoplayRunning && listAutoplayIndex < words.length){
     const w = words[listAutoplayIndex];
     autoplayCurrentWord = w;
+    saveAutoplayResumeId(w.id);
+    const startAtEl = document.getElementById("autoplayStartAt");
+    if(startAtEl && document.activeElement !== startAtEl) startAtEl.value = String(listAutoplayIndex + 1);
     const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
     const btn = rowEl ? rowEl.querySelector(".row-speak") : null;
     if(rowEl){
@@ -8236,6 +8245,7 @@ async function runListAutoplay(){
   autoplayCurrentWord = null;
   if(listAutoplayPaused){ renderList(); return; }   // 被暫停：保留 index/highlight，但把這次標的 ⚠️ 刷出來
   clearAutoplayHighlight();        // 正常播完一輪
+  saveAutoplayResumeId(null);      // 下次從第 1 個開始
   clearAutoplayMediaSession();
   renderList();                    // 把這輪用 AirPods 標的 ⚠️ 待複習全部刷新顯示
   if(autoplayOpenedTonePanel && autoplayOpenedTonePanel.isConnected) autoplayOpenedTonePanel.classList.add("hidden");
@@ -8244,9 +8254,44 @@ async function runListAutoplay(){
   listAutoplayRunning = false;
   renderAutoplayControls();
 }
+// 「從第幾個開始」：記的是字的編號，不是位置——篩選／排序變了，照樣能找到
+// 上次播到的那個字。每個語言各記一份。
+const AUTOPLAY_RESUME_LS = "flashcard_autoplay_resume_v1";
+function loadAutoplayResumeId(){
+  try{ return parseInt(localStorage.getItem(lsKey(AUTOPLAY_RESUME_LS)), 10) || null; }catch(e){ return null; }
+}
+function saveAutoplayResumeId(id){
+  try{
+    if(id) localStorage.setItem(lsKey(AUTOPLAY_RESUME_LS), String(id));
+    else localStorage.removeItem(lsKey(AUTOPLAY_RESUME_LS));
+  }catch(e){}
+}
+function syncAutoplayStartField(){
+  const input = document.getElementById("autoplayStartAt");
+  if(!input || document.activeElement === input) return;
+  const words = getVisibleWords();
+  const id = loadAutoplayResumeId();
+  const idx = id ? words.findIndex(w => w.id === id) : -1;
+  input.max = String(Math.max(1, words.length));
+  input.value = String(idx >= 0 ? idx + 1 : 1);
+  document.getElementById("autoplayStartTotal").textContent = `/ ${words.length} `;
+}
+document.getElementById("autoplayStartAt").addEventListener("change", (e) => {
+  const words = getVisibleWords();
+  const n = Math.min(Math.max(parseInt(e.target.value, 10) || 1, 1), Math.max(words.length, 1));
+  e.target.value = String(n);
+  saveAutoplayResumeId(words[n - 1] ? words[n - 1].id : null);
+});
+// 上面的 updateCount() 可能在這段程式載入前就先跑過（那時讀不到記錄），這裡補同步一次。
+syncAutoplayStartField();
 function toggleListAutoplay(){
-  if(listAutoplayRunning) pauseListAutoplay();
-  else runListAutoplay();          // 從頭，或從暫停處繼續（listAutoplayIndex 已保留）
+  if(listAutoplayRunning){ pauseListAutoplay(); return; }
+  // 重新開始（不是從暫停處繼續）：從「從第幾個開始」那格指定的位置播。
+  if(!listAutoplayPaused){
+    const n = parseInt(document.getElementById("autoplayStartAt").value, 10) || 1;
+    listAutoplayIndex = Math.max(0, n - 1);
+  }
+  runListAutoplay();
 }
 document.getElementById("btnListAutoplay").addEventListener("click", toggleListAutoplay);
 document.getElementById("autoplayFloatToggle").addEventListener("click", toggleListAutoplay);
