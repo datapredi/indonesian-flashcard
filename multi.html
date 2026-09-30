@@ -227,7 +227,7 @@
       <input type="text" id="wordSearch2" placeholder="＋第二個搜尋（兩批一起顯示）" style="flex:1 1 140px;">
     </div>
     <div class="toolbar hidden" id="compactReadBar">
-      <button id="btnCompactRead">📃 精簡閱讀模式（只看越南文＋中文＋🔊）</button>
+      <button id="btnCompactRead">📃 精簡閱讀模式</button>
     </div>
     <div class="toolbar hidden" id="fptViBar" style="flex-wrap:wrap;">
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
@@ -330,6 +330,7 @@
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
       <button id="btnToggleWorkOnly">💼 只顯示工作相關</button>
       <button id="btnToggleSentencesOnly">💬 只顯示句子</button>
+      <button id="btnToggleWeekdaysOnly">📅 只顯示星期</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
@@ -695,7 +696,8 @@ function updateLangButtons(){
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
   document.getElementById("btnViScriptBackfill").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
-  document.getElementById("compactReadBar").classList.toggle("hidden", currentLang !== "vi");
+  document.getElementById("compactReadBar").classList.toggle("hidden", !COMPACT_READ_LANGS.includes(currentLang));
+  if(typeof updateCompactReadLabel === "function") updateCompactReadLabel();
   document.getElementById("fptViBar").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("btnStartSpellCards").classList.toggle("hidden", currentLang !== "arz");
 }
@@ -1540,6 +1542,20 @@ let showWorkOnly = false;
 // 「只顯示句子」篩選（全語言通用）：老師造的完整句子跟單字混在同一份清單裡，
 // 這個只留句子。有句尾標點（. ! ? 。！？）或至少 6 個字就算句子；片語像
 // 「Bia thủ công」「Thành phố tiếp theo」不算（越南文一個音節一個字，門檻要高一點）。
+// 「只顯示星期」篩選（全語言通用）：靠中英文意思找出星期一～星期日，
+// 篩選時照星期一→星期日排好。
+let showWeekdaysOnly = false;
+const WEEKDAY_ZH_ORDER = "一二三四五六日天";
+const WEEKDAY_EN = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+function weekdayIndexOf(w){
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  const m = String(d.zh || "").match(/(?:星期|禮拜|礼拜|週|周)([一二三四五六日天])/);
+  if(m) return Math.min(WEEKDAY_ZH_ORDER.indexOf(m[1]), 6);
+  const e = String(d.en || "").toLowerCase().match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/);
+  if(e) return WEEKDAY_EN.indexOf(e[1]);
+  return -1;
+}
+function isWeekdayWord(w){ return weekdayIndexOf(w) >= 0; }
 let showSentencesOnly = false;
 function isSentenceWord(w){
   const t = w.text.replace(/\s*\(\d+\)$/, "").trim();   // 去掉撞名時加的 (2)
@@ -6297,6 +6313,7 @@ function getVisibleWords(){
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
     if(showWorkOnly && !isWorkWord(w)) return false;
     if(showSentencesOnly && !isSentenceWord(w)) return false;
+    if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
     if(groupFilter && (wordGroups[w.id] || "") !== groupFilter) return false;
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(diffFilter){
@@ -6331,6 +6348,9 @@ function getVisibleWords(){
   }else if(sortNewest){
     // id 是新增時「目前最大 id + 1」給的，所以 id 越大代表越晚加進來、越新。
     list.sort((a, b) => b.id - a.id);
+  }
+  if(showWeekdaysOnly){
+    list.sort((a, b) => weekdayIndexOf(a) - weekdayIndexOf(b) || a.text.localeCompare(b.text));
   }
   // 「只顯示數字」時的「由小到大排」：優先權最高，蓋掉上面的排序。
   if(showNumbersOnly && sortNumbersAsc){
@@ -7435,8 +7455,9 @@ document.getElementById("btnCopyZhForQuiz").addEventListener("click", async () =
   }
 });
 
-// 精簡閱讀模式：一格只有「越南文原文 · 中文 🔊」，密排、多欄，適合一次掃過
-// 很多個字複習閱讀，不用一直滑。目前只給越南文用。
+// 精簡閱讀模式：一格只有「原文 · 中文 🔊」，密排、多欄，適合一次掃過很多個字
+// 複習閱讀，不用一直滑。目前給越南文、印尼文用。
+var COMPACT_READ_LANGS = ["vi", "id"];
 let compactReadMode = false;
 try{ compactReadMode = localStorage.getItem("flashcard_compact_read_v1") === "1"; }catch(e){}
 function renderCompactList(el, words){
@@ -7461,7 +7482,7 @@ function renderCompactList(el, words){
     play.textContent = "🔊";
     play.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
-      speak(getSpeechText(w), play, "vi", recKeyFor(w.text));
+      speak(getSpeechText(w), play, currentLang, recKeyFor(w.text));
     });
     cell.appendChild(viSpan);
     cell.appendChild(zhSpan);
@@ -7520,7 +7541,7 @@ function renderList(){
   if(visibleWords.length === 0){
     renderEmptyState(el);
   }
-  if(compactReadMode && currentLang === "vi" && visibleWords.length){
+  if(compactReadMode && COMPACT_READ_LANGS.includes(currentLang) && visibleWords.length){
     renderCompactList(el, visibleWords);
     updateCount();
     updatePendingSyncBar();
@@ -7562,6 +7583,7 @@ function updateCount(){
   if(typeof updateGreetingsToggleLabel === "function") updateGreetingsToggleLabel();
   if(typeof updateWorkToggleLabel === "function") updateWorkToggleLabel();
   if(typeof updateSentencesToggleLabel === "function") updateSentencesToggleLabel();
+  if(typeof updateWeekdaysToggleLabel === "function") updateWeekdaysToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -7830,7 +7852,7 @@ document.getElementById("wordSearch2").addEventListener("input", renderList);
 function updateCompactReadLabel(){
   const btn = document.getElementById("btnCompactRead");
   if(!btn) return;
-  btn.textContent = compactReadMode ? "📖 恢復完整清單" : "📃 精簡閱讀模式（只看越南文＋中文＋🔊）";
+  btn.textContent = compactReadMode ? "📖 恢復完整清單" : `📃 精簡閱讀模式（只看${L().label}＋中文＋🔊）`;
   btn.classList.toggle("primary", compactReadMode);
 }
 document.getElementById("btnCompactRead").addEventListener("click", () => {
@@ -7969,6 +7991,19 @@ document.getElementById("btnToggleSentencesOnly").addEventListener("click", () =
   renderList();
 });
 updateSentencesToggleLabel();
+function updateWeekdaysToggleLabel(){
+  const btn = document.getElementById("btnToggleWeekdaysOnly");
+  if(!btn) return;
+  const n = allWords.filter(isWeekdayWord).length;
+  btn.textContent = showWeekdaysOnly ? `顯示全部單字 (星期 ${n} 個)` : `📅 只顯示星期 (${n})`;
+  btn.classList.toggle("primary", showWeekdaysOnly);
+}
+document.getElementById("btnToggleWeekdaysOnly").addEventListener("click", () => {
+  showWeekdaysOnly = !showWeekdaysOnly;
+  updateWeekdaysToggleLabel();
+  renderList();
+});
+updateWeekdaysToggleLabel();
 // 自訂分組：篩選下拉選單的選項要跟著現有的組更新
 function updateGroupFilterOptions(){
   const sel = document.getElementById("groupFilter");
