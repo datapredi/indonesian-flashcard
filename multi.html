@@ -696,8 +696,10 @@ function updateLangButtons(){
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
   document.getElementById("btnViScriptBackfill").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
-  document.getElementById("compactReadBar").classList.toggle("hidden", !COMPACT_READ_LANGS.includes(currentLang));
-  if(typeof updateCompactReadLabel === "function") updateCompactReadLabel();
+  document.getElementById("compactReadBar").classList.toggle("hidden", !isCompactReadLang());
+  // 這段在頁面剛載入時就會跑，那時精簡模式的變數還沒宣告好（let 有 TDZ），
+  // 讀不到就先跳過，等下面宣告完會自己更新一次按鈕文字。
+  try{ updateCompactReadLabel(); }catch(e){}
   document.getElementById("fptViBar").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("btnStartSpellCards").classList.toggle("hidden", currentLang !== "arz");
 }
@@ -7457,7 +7459,8 @@ document.getElementById("btnCopyZhForQuiz").addEventListener("click", async () =
 
 // 精簡閱讀模式：一格只有「原文 · 中文 🔊」，密排、多欄，適合一次掃過很多個字
 // 複習閱讀，不用一直滑。目前給越南文、印尼文用。
-var COMPACT_READ_LANGS = ["vi", "id"];
+// 用函式宣告（會被提升），頁面剛載入、切換語言那段比這裡早跑也叫得到。
+function isCompactReadLang(){ return currentLang === "vi" || currentLang === "id"; }
 let compactReadMode = false;
 try{ compactReadMode = localStorage.getItem("flashcard_compact_read_v1") === "1"; }catch(e){}
 function renderCompactList(el, words){
@@ -7541,7 +7544,7 @@ function renderList(){
   if(visibleWords.length === 0){
     renderEmptyState(el);
   }
-  if(compactReadMode && COMPACT_READ_LANGS.includes(currentLang) && visibleWords.length){
+  if(compactReadMode && isCompactReadLang() && visibleWords.length){
     renderCompactList(el, visibleWords);
     updateCount();
     updatePendingSyncBar();
