@@ -540,8 +540,8 @@
 // 所以開頁時先把 IndexedDB 全部讀進記憶體，kvStore 提供一樣的同步介面，
 // 讀直接從記憶體拿，寫入記憶體後再非同步寫進 IndexedDB。讀完才啟動主程式
 // （下面 type="text/plain" 的 #mainScript）。
-// 第一次啟動會把 localStorage 現有的資料整份複製過來；localStorage 原本的
-// 資料不刪，當作備份。
+// 第一次啟動會把 localStorage 現有的資料整份複製過來，之後把已經存進
+// IndexedDB 的單字卡資料從 localStorage 刪掉（見 freeLocalStorage）。
 // IndexedDB 開不起來（極少數私密瀏覽情境）就退回直接用 localStorage。
 const kvStore = (() => {
   const KV_DB_NAME = "flashcard_kv_v1";
@@ -613,6 +613,21 @@ const kvStore = (() => {
       tx.onabort = () => reject(tx.error || new Error("migration aborted"));
     });
   }
+  // localStorage 是整個 datapredi.github.io 共用的（yt_sync 的播放器也在
+  // 同一個網域），單字卡的舊資料留在裡面當備份，會把播放器存翻譯的空間
+  // 擠爆。已經確定存進 IndexedDB 的單字卡資料就從 localStorage 拿掉；
+  // API Key 是跟播放器共用的，留著。
+  function freeLocalStorage(){
+    try{
+      const keys = [];
+      for(let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+      keys.forEach(k => {
+        if(k && (k.startsWith("flashcard_") || k.startsWith("custom_word_db_v1")) && mem.has(k)){
+          localStorage.removeItem(k);
+        }
+      });
+    }catch(e){ console.error("清理 localStorage 失敗", e); }
+  }
   const ready = (async () => {
     try{
       const d = await openDB();
@@ -620,6 +635,7 @@ const kvStore = (() => {
       all.forEach((v, k) => mem.set(k, v));
       if(!mem.has(MIGRATED_KEY)) await migrateFromLocalStorage(d);
       db = d;
+      freeLocalStorage();
     }catch(e){
       console.error("IndexedDB 無法使用，改用 localStorage", e);
       db = null;
