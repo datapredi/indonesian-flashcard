@@ -532,6 +532,119 @@
 </div>
 
 <script>
+// ================= 資料儲存（IndexedDB） =================
+// 所有資料原本都存在 localStorage，但 Safari（尤其 iPhone）每個網站只給約
+// 5MB，好幾個語言的單字表 + 各種 AI 快取累積起來就塞滿了，存檔時會丟出
+// 「The quota has been exceeded」，AI 生成的結果白白付了錢卻存不進去。
+// 改存 IndexedDB（空間大很多），但主程式到處都是同步的 getItem/setItem，
+// 所以開頁時先把 IndexedDB 全部讀進記憶體，kvStore 提供一樣的同步介面，
+// 讀直接從記憶體拿，寫入記憶體後再非同步寫進 IndexedDB。讀完才啟動主程式
+// （下面 type="text/plain" 的 #mainScript）。
+// 第一次啟動會把 localStorage 現有的資料整份複製過來；localStorage 原本的
+// 資料不刪，當作備份（index.html 也還在讀那份）。
+// IndexedDB 開不起來（極少數私密瀏覽情境）就退回直接用 localStorage。
+const kvStore = (() => {
+  const KV_DB_NAME = "flashcard_kv_v1";
+  const KV_STORE = "kv";
+  const MIGRATED_KEY = "__migrated_from_localStorage";
+  const mem = new Map();
+  let db = null;
+  let writeErrorShown = false;
+  let fallback = false;
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function onWriteError(err){
+    console.error("IndexedDB 寫入失敗", err);
+    if(writeErrorShown) return;
+    writeErrorShown = true;
+    alert("資料存檔失敗：" + (err && err.message ? err.message : err) + "\n\n這次的變更可能沒有存到，重新整理後會不見。");
+  }
+  function write(fn){
+    if(!db) return;
+    try{
+      const tx = db.transaction(KV_STORE, "readwrite");
+      fn(tx.objectStore(KV_STORE));
+      tx.onerror = () => onWriteError(tx.error);
+      tx.onabort = () => { if(tx.error) onWriteError(tx.error); };
+    }catch(e){ onWriteError(e); }
+  }
+  function openDB(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(KV_DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(KV_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error("IndexedDB blocked"));
+    });
+  }
+  function readAll(d){
+    return new Promise((resolve, reject) => {
+      const tx = d.transaction(KV_STORE, "readonly");
+      const req = tx.objectStore(KV_STORE).openCursor();
+      const out = new Map();
+      req.onsuccess = () => {
+        const c = req.result;
+        if(c){ out.set(c.key, c.value); c.continue(); }
+        else resolve(out);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function migrateFromLocalStorage(d){
+    return new Promise((resolve, reject) => {
+      const tx = d.transaction(KV_STORE, "readwrite");
+      const st = tx.objectStore(KV_STORE);
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        const v = localStorage.getItem(k);
+        if(k !== null && v !== null){ st.put(v, k); mem.set(k, v); }
+      }
+      st.put("1", MIGRATED_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("migration aborted"));
+    });
+  }
+  const ready = (async () => {
+    try{
+      const d = await openDB();
+      const all = await readAll(d);
+      all.forEach((v, k) => mem.set(k, v));
+      if(!mem.has(MIGRATED_KEY)) await migrateFromLocalStorage(d);
+      db = d;
+    }catch(e){
+      console.error("IndexedDB 無法使用，改用 localStorage", e);
+      db = null;
+      mem.clear();
+      fallback = true;
+    }
+  })();
+  return {
+    ready,
+    getItem(k){
+      if(fallback) return lsGet(k);
+      return mem.has(k) ? mem.get(k) : null;
+    },
+    setItem(k, v){
+      v = String(v);
+      if(fallback){ localStorage.setItem(k, v); return; }
+      mem.set(k, v);
+      write(st => st.put(v, k));
+    },
+    removeItem(k){
+      if(fallback){ try{ localStorage.removeItem(k); }catch(e){} return; }
+      mem.delete(k);
+      write(st => st.delete(k));
+    }
+  };
+})();
+kvStore.ready.then(() => {
+  const s = document.createElement("script");
+  s.textContent = document.getElementById("mainScript").textContent;
+  document.body.appendChild(s);
+});
+</script>
+
+<script type="text/plain" id="mainScript">
 // ================= 語言切換 =================
 // 印尼文維持完全不加後綴的舊 key（跟 index.html 共用同一份資料，不用搬家）。
 // 其他語言（泰文、越南文...）所有 localStorage key 都加 "_語言代碼" 後綴，
@@ -542,13 +655,13 @@ const LANG_LS = "flashcard_lang_v1";
 // "wordFirst" = 外語x3 → 停頓 → 中文x1（預設）；"zhFirst" = 中文x1 → 停頓 → 外語x3。
 const LISTEN_ORDER_LS = "flashcard_listen_order_v1";
 const LANG_ORDER = ["id", "vi", "th", "ja", "ko", "yue", "arz", "en"];
-let currentLang = LANG_ORDER.includes(localStorage.getItem(LANG_LS)) ? localStorage.getItem(LANG_LS) : "id";
+let currentLang = LANG_ORDER.includes(kvStore.getItem(LANG_LS)) ? kvStore.getItem(LANG_LS) : "id";
 function lsKey(base){ return lsKeyForLang(base, currentLang); }
 function lsKeyForLang(base, lang){ return lang === "id" ? base : `${base}_${lang}`; }
 
 // 越南文南北口音發音差很多，這個是唯一需要在語言之外再多一層選項的地方。
 const VI_DIALECT_LS = "flashcard_vi_dialect_v1";
-let viDialect = localStorage.getItem(VI_DIALECT_LS) === "bac" ? "bac" : "nam"; // 預設南部（胡志明市）
+let viDialect = kvStore.getItem(VI_DIALECT_LS) === "bac" ? "bac" : "nam"; // 預設南部（胡志明市）
 
 const LANG_INFO = {
   id: {
@@ -643,21 +756,21 @@ function genderNoteForLang(lang){
 
 function setLang(l){
   if(l === currentLang) return;
-  localStorage.setItem(LANG_LS, l);
+  kvStore.setItem(LANG_LS, l);
   location.reload();
 }
 document.querySelectorAll(".lang-btn").forEach(btn => {
   btn.addEventListener("click", () => setLang(btn.dataset.lang));
 });
-if(localStorage.getItem(LISTEN_ORDER_LS) === "zhFirst") document.getElementById("listenOrder").value = "zhFirst";
+if(kvStore.getItem(LISTEN_ORDER_LS) === "zhFirst") document.getElementById("listenOrder").value = "zhFirst";
 document.getElementById("listenOrder").addEventListener("change", (e) => {
-  localStorage.setItem(LISTEN_ORDER_LS, e.target.value);
+  kvStore.setItem(LISTEN_ORDER_LS, e.target.value);
 });
 
 document.getElementById("viDialect").value = viDialect;
 document.getElementById("viDialect").addEventListener("change", (e) => {
   viDialect = e.target.value;
-  localStorage.setItem(VI_DIALECT_LS, viDialect);
+  kvStore.setItem(VI_DIALECT_LS, viDialect);
   // 聲調標記功能只在南部口音生效（MFRLS 是照南部 5 聲調設計的），切換口音要
   // 立刻更新按鈕顯示/隱藏，不用重新整理頁面才看得到變化。
   updateLangButtons();
@@ -1005,11 +1118,11 @@ function ttsCacheKey(text, instructions){ return `${TTS_MODEL}::${instructions |
 const FPT_PROXY_URL_LS = "flashcard_vitts_proxy_url_v1";
 const FPT_VOICE_LS = "flashcard_vitts_voice_v1";
 const FPT_VI_ENABLED_LS = "flashcard_vitts_enabled_v1";
-function fptProxyUrl(){ try{ return (localStorage.getItem(FPT_PROXY_URL_LS) || "").trim(); }catch(e){ return ""; } }
-function fptVoice(){ try{ return (localStorage.getItem(FPT_VOICE_LS) || "").trim(); }catch(e){ return ""; } }
+function fptProxyUrl(){ try{ return (kvStore.getItem(FPT_PROXY_URL_LS) || "").trim(); }catch(e){ return ""; } }
+function fptVoice(){ try{ return (kvStore.getItem(FPT_VOICE_LS) || "").trim(); }catch(e){ return ""; } }
 function fptViActive(lang){
   if((lang || currentLang) !== "vi") return false;
-  try{ if(localStorage.getItem(FPT_VI_ENABLED_LS) !== "1") return false; }catch(e){ return false; }
+  try{ if(kvStore.getItem(FPT_VI_ENABLED_LS) !== "1") return false; }catch(e){ return false; }
   return !!fptProxyUrl() && !!fptVoice();
 }
 const _fptInflight = new Map();
@@ -1278,14 +1391,14 @@ function defaultWordsForLang(){
 }
 
 function loadWordList(){
-  const saved = localStorage.getItem(lsKey(LS_KEY));
+  const saved = kvStore.getItem(lsKey(LS_KEY));
   if(saved){
     try{ return JSON.parse(saved); }catch(e){}
   }
   return defaultWordsForLang().slice();
 }
 function saveWordList(list){
-  localStorage.setItem(lsKey(LS_KEY), JSON.stringify(list));
+  kvStore.setItem(lsKey(LS_KEY), JSON.stringify(list));
 }
 
 // ---- 已學會的單字（Flash Card 跟測驗分開記錄，互不影響） ----
@@ -1293,15 +1406,15 @@ const MASTERED_CARDS_LS = "flashcard_mastered_cards_v1";
 const MASTERED_QUIZ_LS = "flashcard_mastered_quiz_v1";
 const MASTERED_LEGACY_LS = "flashcard_mastered_v1";
 function loadMasteredSet(key){
-  try{ return new Set(JSON.parse(localStorage.getItem(key)) || []); }catch(e){ return new Set(); }
+  try{ return new Set(JSON.parse(kvStore.getItem(key)) || []); }catch(e){ return new Set(); }
 }
-function saveMasteredSet(key, set){ localStorage.setItem(key, JSON.stringify([...set])); }
+function saveMasteredSet(key, set){ kvStore.setItem(key, JSON.stringify([...set])); }
 
 let cardMasteredIds = loadMasteredSet(lsKey(MASTERED_CARDS_LS));
 let quizMasteredIds = loadMasteredSet(lsKey(MASTERED_QUIZ_LS));
 // 舊版只有一個共用清單，第一次載入時把舊資料套用到兩個新清單，不遺失既有進度
 // （這個舊資料遷移只跟印尼文有關，泰文從一開始就是新版格式，不需要遷移）
-if(currentLang === "id" && !localStorage.getItem(lsKey(MASTERED_CARDS_LS)) && !localStorage.getItem(lsKey(MASTERED_QUIZ_LS))){
+if(currentLang === "id" && !kvStore.getItem(lsKey(MASTERED_CARDS_LS)) && !kvStore.getItem(lsKey(MASTERED_QUIZ_LS))){
   const legacy = loadMasteredSet(MASTERED_LEGACY_LS);
   if(legacy.size){
     cardMasteredIds = new Set(legacy);
@@ -1331,8 +1444,8 @@ let showTeacherOnly = false;
 // 是非題不一樣，這個是多選一，所以存成 { id: "yellow"|"red"|"green" } 而不是 Set。
 const COLOR_FLAG_LS = "flashcard_color_flag_v1";
 let colorFlags = {};
-try{ colorFlags = JSON.parse(localStorage.getItem(lsKey(COLOR_FLAG_LS))) || {}; }catch(e){ colorFlags = {}; }
-function saveColorFlags(){ localStorage.setItem(lsKey(COLOR_FLAG_LS), JSON.stringify(colorFlags)); }
+try{ colorFlags = JSON.parse(kvStore.getItem(lsKey(COLOR_FLAG_LS))) || {}; }catch(e){ colorFlags = {}; }
+function saveColorFlags(){ kvStore.setItem(lsKey(COLOR_FLAG_LS), JSON.stringify(colorFlags)); }
 const COLOR_FLAG_META = {
   yellow: { label: "黃", emoji: "🟨", hex: "#ffd400" },
   red:    { label: "紅", emoji: "🟥", hex: "#ff4d4d" },
@@ -1343,8 +1456,8 @@ const COLOR_FLAG_META = {
 // 一個組，存成 { id: "組名" }，換語言各存一份。複習時可以只看某一組。
 const WORD_GROUP_LS = "flashcard_word_group_v1";
 let wordGroups = {};
-try{ wordGroups = JSON.parse(localStorage.getItem(lsKey(WORD_GROUP_LS))) || {}; }catch(e){ wordGroups = {}; }
-function saveWordGroups(){ localStorage.setItem(lsKey(WORD_GROUP_LS), JSON.stringify(wordGroups)); }
+try{ wordGroups = JSON.parse(kvStore.getItem(lsKey(WORD_GROUP_LS))) || {}; }catch(e){ wordGroups = {}; }
+function saveWordGroups(){ kvStore.setItem(lsKey(WORD_GROUP_LS), JSON.stringify(wordGroups)); }
 function distinctGroups(){
   return [...new Set(Object.values(wordGroups).map(s => String(s || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
@@ -1373,8 +1486,8 @@ let groupFilter = ""; // getVisibleWords 用：空＝全部；否則只顯示這
 // 各自能選一個值（例如分組＝9/12、類別＝common expression 同時成立）。
 const WORD_CATEGORY_LS = "flashcard_word_category_v1";
 let wordCategories = {};
-try{ wordCategories = JSON.parse(localStorage.getItem(lsKey(WORD_CATEGORY_LS))) || {}; }catch(e){ wordCategories = {}; }
-function saveWordCategories(){ localStorage.setItem(lsKey(WORD_CATEGORY_LS), JSON.stringify(wordCategories)); }
+try{ wordCategories = JSON.parse(kvStore.getItem(lsKey(WORD_CATEGORY_LS))) || {}; }catch(e){ wordCategories = {}; }
+function saveWordCategories(){ kvStore.setItem(lsKey(WORD_CATEGORY_LS), JSON.stringify(wordCategories)); }
 function distinctCategories(){
   return [...new Set(Object.values(wordCategories).map(s => String(s || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
@@ -1441,8 +1554,8 @@ function fmtDuration(sec){
 // 語言各存一份，也會一起進備份。
 const WORD_NOTES_LS = "flashcard_word_notes_v1";
 let wordNotes = {};
-try{ wordNotes = JSON.parse(localStorage.getItem(lsKey(WORD_NOTES_LS))) || {}; }catch(e){ wordNotes = {}; }
-function saveWordNotes(){ localStorage.setItem(lsKey(WORD_NOTES_LS), JSON.stringify(wordNotes)); }
+try{ wordNotes = JSON.parse(kvStore.getItem(lsKey(WORD_NOTES_LS))) || {}; }catch(e){ wordNotes = {}; }
+function saveWordNotes(){ kvStore.setItem(lsKey(WORD_NOTES_LS), JSON.stringify(wordNotes)); }
 function getWordNote(text){ return wordNotes[text] || ""; }
 function setWordNote(text, val){
   const v = (val || "").trim();
@@ -1468,8 +1581,8 @@ let allWords = loadWordList();
 // 就自動只補這一個，其他沒問題的字完全不會被動到，不用整批重轉。
 const CONVERTED_MAP_LS = "flashcard_converted_map_v2";
 let convertedMap = {};
-try{ convertedMap = JSON.parse(localStorage.getItem(lsKey(CONVERTED_MAP_LS))) || {}; }catch(e){ convertedMap = {}; }
-function saveConvertedMap(){ localStorage.setItem(lsKey(CONVERTED_MAP_LS), JSON.stringify(convertedMap)); }
+try{ convertedMap = JSON.parse(kvStore.getItem(lsKey(CONVERTED_MAP_LS))) || {}; }catch(e){ convertedMap = {}; }
+function saveConvertedMap(){ kvStore.setItem(lsKey(CONVERTED_MAP_LS), JSON.stringify(convertedMap)); }
 
 // ---- 同一份來源字，不管轉成哪個語言，中文/英文意思都要一致（給跨語言查詢比對用） ----
 // 這個 key 故意不經過 lsKey() 包裝——要跨語言共用同一份，不能像單字表那樣每個
@@ -1478,14 +1591,14 @@ function saveConvertedMap(){ localStorage.setItem(lsKey(CONVERTED_MAP_LS), JSON.
 // 飄移，跨語言查詢（🌐）才配得到。
 const SOURCE_MEANING_CACHE_LS = "flashcard_source_meaning_cache_v1";
 let sourceMeaningCache = {};
-try{ sourceMeaningCache = JSON.parse(localStorage.getItem(SOURCE_MEANING_CACHE_LS)) || {}; }catch(e){ sourceMeaningCache = {}; }
-function saveSourceMeaningCache(){ localStorage.setItem(SOURCE_MEANING_CACHE_LS, JSON.stringify(sourceMeaningCache)); }
+try{ sourceMeaningCache = JSON.parse(kvStore.getItem(SOURCE_MEANING_CACHE_LS)) || {}; }catch(e){ sourceMeaningCache = {}; }
+function saveSourceMeaningCache(){ kvStore.setItem(SOURCE_MEANING_CACHE_LS, JSON.stringify(sourceMeaningCache)); }
 
 // ---- 難度標記（E簡單/M中等/H困難，用單字文字當 key，跟翻譯一樣不會被重新匯入洗掉） ----
 const DIFFICULTY_LS = "flashcard_difficulty_v1";
 let difficultyMap = {};
-try{ difficultyMap = JSON.parse(localStorage.getItem(lsKey(DIFFICULTY_LS))) || {}; }catch(e){ difficultyMap = {}; }
-function saveDifficultyMap(){ localStorage.setItem(lsKey(DIFFICULTY_LS), JSON.stringify(difficultyMap)); }
+try{ difficultyMap = JSON.parse(kvStore.getItem(lsKey(DIFFICULTY_LS))) || {}; }catch(e){ difficultyMap = {}; }
+function saveDifficultyMap(){ kvStore.setItem(lsKey(DIFFICULTY_LS), JSON.stringify(difficultyMap)); }
 function getDifficulty(text){ return difficultyMap[text.toLowerCase()] || null; }
 function setDifficulty(text, level){
   const key = text.toLowerCase();
@@ -1498,11 +1611,11 @@ const CARD_DIRECTION_LS = "flashcard_direction_v1";
 // ---- 已選取的單字（記住上次選取狀態，重新整理不會重置） ----
 const SELECTED_LS = "flashcard_selected_v1";
 function loadSelected(){
-  const raw = localStorage.getItem(lsKey(SELECTED_LS));
+  const raw = kvStore.getItem(lsKey(SELECTED_LS));
   if(raw === null) return null;
   try{ return new Set(JSON.parse(raw)); }catch(e){ return null; }
 }
-function saveSelected(){ localStorage.setItem(lsKey(SELECTED_LS), JSON.stringify([...selected])); }
+function saveSelected(){ kvStore.setItem(lsKey(SELECTED_LS), JSON.stringify([...selected])); }
 
 const savedSelected = loadSelected();
 let selected = savedSelected
@@ -1647,17 +1760,17 @@ const API_KEY_LS = "anthropic_api_key";
 const CUSTOM_DB_LS = "custom_word_db_v1";
 
 function loadCustomDB(){
-  try{ return JSON.parse(localStorage.getItem(lsKey(CUSTOM_DB_LS))) || {}; }catch(e){ return {}; }
+  try{ return JSON.parse(kvStore.getItem(lsKey(CUSTOM_DB_LS))) || {}; }catch(e){ return {}; }
 }
-function saveCustomDB(){ localStorage.setItem(lsKey(CUSTOM_DB_LS), JSON.stringify(customDB)); }
+function saveCustomDB(){ kvStore.setItem(lsKey(CUSTOM_DB_LS), JSON.stringify(customDB)); }
 // API Key 兩種語言共用同一把（不是資料，是憑證），故意不加語言後綴。
-function getApiKey(){ return localStorage.getItem(API_KEY_LS) || ""; }
-function setApiKey(k){ localStorage.setItem(API_KEY_LS, k); }
+function getApiKey(){ return kvStore.getItem(API_KEY_LS) || ""; }
+function setApiKey(k){ kvStore.setItem(API_KEY_LS, k); }
 
 // ---- 跑步聽力模式用的 OpenAI TTS Key ----
 const OPENAI_KEY_LS = "openai_api_key";
-function getOpenaiKey(){ return localStorage.getItem(OPENAI_KEY_LS) || ""; }
-function setOpenaiKey(k){ localStorage.setItem(OPENAI_KEY_LS, k); }
+function getOpenaiKey(){ return kvStore.getItem(OPENAI_KEY_LS) || ""; }
+function setOpenaiKey(k){ kvStore.setItem(OPENAI_KEY_LS, k); }
 
 let customDB = loadCustomDB();
 
@@ -1666,12 +1779,12 @@ let customDB = loadCustomDB();
 // 語言裡舊資料殘留的 sameAsSource 清掉，只跑一次（用旗標記住跑過了），
 // 不會每次載入都重新掃全部語言的資料。
 const SAME_AS_SOURCE_CLEANUP_LS = "flashcard_same_as_source_cleanup_v1_done";
-if(!localStorage.getItem(SAME_AS_SOURCE_CLEANUP_LS)){
+if(!kvStore.getItem(SAME_AS_SOURCE_CLEANUP_LS)){
   LANG_ORDER.forEach(lang => {
     if(lang === "id" || lang === "ms") return;
     const dbKey = lsKeyForLang(CUSTOM_DB_LS, lang);
     let db;
-    try{ db = JSON.parse(localStorage.getItem(dbKey)) || {}; }catch(e){ return; }
+    try{ db = JSON.parse(kvStore.getItem(dbKey)) || {}; }catch(e){ return; }
     let changed = false;
     Object.keys(db).forEach(text => {
       if(db[text] && db[text].sameAsSource){
@@ -1679,7 +1792,7 @@ if(!localStorage.getItem(SAME_AS_SOURCE_CLEANUP_LS)){
         changed = true;
       }
     });
-    if(changed) localStorage.setItem(dbKey, JSON.stringify(db));
+    if(changed) kvStore.setItem(dbKey, JSON.stringify(db));
   });
   // 目前這個語言的記憶體副本也要跟著清，不然要重新整理過一次才會消失。
   if(currentLang !== "id" && currentLang !== "ms"){
@@ -1687,7 +1800,7 @@ if(!localStorage.getItem(SAME_AS_SOURCE_CLEANUP_LS)){
       if(customDB[text] && customDB[text].sameAsSource) delete customDB[text].sameAsSource;
     });
   }
-  localStorage.setItem(SAME_AS_SOURCE_CLEANUP_LS, "1");
+  kvStore.setItem(SAME_AS_SOURCE_CLEANUP_LS, "1");
 }
 
 // 印尼文以外的語言先給空題庫，翻譯/發音/例句都是靠 AI 生成、存進 customDB
@@ -1823,10 +1936,10 @@ function getCrossLangStatus(zhMeaning, enMeaning){
   LANG_ORDER.forEach((lang) => {
     if(lang === currentLang) return;
     try{
-      const wordsRaw = localStorage.getItem(lsKeyForLang(LS_KEY, lang));
+      const wordsRaw = kvStore.getItem(lsKeyForLang(LS_KEY, lang));
       const words = wordsRaw ? JSON.parse(wordsRaw) : [];
       let customOther = {};
-      try{ customOther = JSON.parse(localStorage.getItem(lsKeyForLang(CUSTOM_DB_LS, lang))) || {}; }catch(e){}
+      try{ customOther = JSON.parse(kvStore.getItem(lsKeyForLang(CUSTOM_DB_LS, lang))) || {}; }catch(e){}
       const builtIn = lang === "id" ? WORD_DB : EMPTY_DB;
       const match = words.find((w) => {
         const data = customOther[w.text] || builtIn[w.text];
@@ -1931,9 +2044,9 @@ ${quizNativePromptLines(info.label, hasScript)}`;
   const wordsKey = lsKeyForLang(LS_KEY, lang);
   const dbKey = lsKeyForLang(CUSTOM_DB_LS, lang);
   let words = [];
-  try{ words = JSON.parse(localStorage.getItem(wordsKey)) || []; }catch(e){ words = []; }
+  try{ words = JSON.parse(kvStore.getItem(wordsKey)) || []; }catch(e){ words = []; }
   let db = {};
-  try{ db = JSON.parse(localStorage.getItem(dbKey)) || {}; }catch(e){ db = {}; }
+  try{ db = JSON.parse(kvStore.getItem(dbKey)) || {}; }catch(e){ db = {}; }
 
   // 意思比對沒找到（不然不會走到這裡），但生成出來的拼字可能剛好跟這個語言
   // 裡「不同意思」的既有字撞名（同拼字不同概念）。之前這種情況會直接放棄不加
@@ -1954,8 +2067,8 @@ ${quizNativePromptLines(info.label, hasScript)}`;
   if(isIndo) entry.pron = parsed.pron;
   db[text] = entry;
 
-  localStorage.setItem(wordsKey, JSON.stringify(words));
-  localStorage.setItem(dbKey, JSON.stringify(db));
+  kvStore.setItem(wordsKey, JSON.stringify(words));
+  kvStore.setItem(dbKey, JSON.stringify(db));
   return { lang, skipped: false, text, nativeScript: entry.nativeScript || null };
 }
 
@@ -2386,15 +2499,15 @@ async function gradeTranslation(zhSentence, targetWords, userAnswer){
 
 const USAGE_CACHE_LS = "flashcard_usage_cache_v2"; // v2: added A1-A2 level constraint to the prompt
 let usageCache = {};
-try{ usageCache = JSON.parse(localStorage.getItem(lsKey(USAGE_CACHE_LS))) || {}; }catch(e){ usageCache = {}; }
-function saveUsageCache(){ localStorage.setItem(lsKey(USAGE_CACHE_LS), JSON.stringify(usageCache)); }
+try{ usageCache = JSON.parse(kvStore.getItem(lsKey(USAGE_CACHE_LS))) || {}; }catch(e){ usageCache = {}; }
+function saveUsageCache(){ kvStore.setItem(lsKey(USAGE_CACHE_LS), JSON.stringify(usageCache)); }
 
 // 日文文法解析——只有日文語感上助詞、動詞變化這些對中文母語者比較難懂，
 // 其他語言（尤其印尼文/馬來文這種語序接近中文的）用不太到，先只做日文。
 const GRAMMAR_BREAKDOWN_CACHE_LS = "flashcard_grammar_breakdown_cache_v1";
 let grammarBreakdownCache = {};
-try{ grammarBreakdownCache = JSON.parse(localStorage.getItem(lsKey(GRAMMAR_BREAKDOWN_CACHE_LS))) || {}; }catch(e){ grammarBreakdownCache = {}; }
-function saveGrammarBreakdownCache(){ localStorage.setItem(lsKey(GRAMMAR_BREAKDOWN_CACHE_LS), JSON.stringify(grammarBreakdownCache)); }
+try{ grammarBreakdownCache = JSON.parse(kvStore.getItem(lsKey(GRAMMAR_BREAKDOWN_CACHE_LS))) || {}; }catch(e){ grammarBreakdownCache = {}; }
+function saveGrammarBreakdownCache(){ kvStore.setItem(lsKey(GRAMMAR_BREAKDOWN_CACHE_LS), JSON.stringify(grammarBreakdownCache)); }
 
 async function getGrammarBreakdown(sentenceNative){
   if(grammarBreakdownCache[sentenceNative]) return grammarBreakdownCache[sentenceNative];
@@ -2422,8 +2535,8 @@ async function getGrammarBreakdown(sentenceNative){
 // 對齊是簡單任務）。快取 key＝「例句原文||中文」。
 const ALIGN_CACHE_LS = "flashcard_align_cache_v1";
 let alignCache = {};
-try{ alignCache = JSON.parse(localStorage.getItem(lsKey(ALIGN_CACHE_LS))) || {}; }catch(e){ alignCache = {}; }
-function saveAlignCache(){ localStorage.setItem(lsKey(ALIGN_CACHE_LS), JSON.stringify(alignCache)); }
+try{ alignCache = JSON.parse(kvStore.getItem(lsKey(ALIGN_CACHE_LS))) || {}; }catch(e){ alignCache = {}; }
+function saveAlignCache(){ kvStore.setItem(lsKey(ALIGN_CACHE_LS), JSON.stringify(alignCache)); }
 async function getSentenceAlignment(sentence, zh, words){
   const key = sentence + "||" + zh;
   if(alignCache[key]) return alignCache[key];
@@ -2513,16 +2626,16 @@ async function getUsageExamples(text, zh, force){
 
 const ANTONYMS_CACHE_LS = "flashcard_antonyms_cache_v1"; // 反義詞（相反詞），所有語言通用
 let antonymsCache = {};
-try{ antonymsCache = JSON.parse(localStorage.getItem(lsKey(ANTONYMS_CACHE_LS))) || {}; }catch(e){ antonymsCache = {}; }
-function saveAntonymsCache(){ localStorage.setItem(lsKey(ANTONYMS_CACHE_LS), JSON.stringify(antonymsCache)); }
+try{ antonymsCache = JSON.parse(kvStore.getItem(lsKey(ANTONYMS_CACHE_LS))) || {}; }catch(e){ antonymsCache = {}; }
+function saveAntonymsCache(){ kvStore.setItem(lsKey(ANTONYMS_CACHE_LS), JSON.stringify(antonymsCache)); }
 
 // 埃及口語專用：把「同一個字因為對話對象或主詞的性別／單複數而換的形式」收在
 // 同一張卡片裡看，不用把 ezayak／ezayik／ezayku 拆成三個單字。快取結構：
 // { baseNote: 變化規則說明, forms: [{ label, romanized, nativeScript, zh }] }。
 const INFLECTIONS_CACHE_LS = "flashcard_inflections_cache_v1";
 let inflectionsCache = {};
-try{ inflectionsCache = JSON.parse(localStorage.getItem(lsKey(INFLECTIONS_CACHE_LS))) || {}; }catch(e){ inflectionsCache = {}; }
-function saveInflectionsCache(){ localStorage.setItem(lsKey(INFLECTIONS_CACHE_LS), JSON.stringify(inflectionsCache)); }
+try{ inflectionsCache = JSON.parse(kvStore.getItem(lsKey(INFLECTIONS_CACHE_LS))) || {}; }catch(e){ inflectionsCache = {}; }
+function saveInflectionsCache(){ kvStore.setItem(lsKey(INFLECTIONS_CACHE_LS), JSON.stringify(inflectionsCache)); }
 
 // 埃及阿拉伯文「字母拆解」：阿拉伯文通常不寫短母音，也有 ال 同化、疊音之類，所以
 // 字母跟羅馬拼音對不起來。這個把字按「由右到左的讀音順序」一格一格拆開，每格對到
@@ -2530,18 +2643,18 @@ function saveInflectionsCache(){ localStorage.setItem(lsKey(INFLECTIONS_CACHE_LS
 // 的樣子。快取 key＝阿拉伯文原文。
 const AR_BREAKDOWN_CACHE_LS = "flashcard_ar_breakdown_cache_v1";
 let arBreakdownCache = {};
-try{ arBreakdownCache = JSON.parse(localStorage.getItem(lsKey(AR_BREAKDOWN_CACHE_LS))) || {}; }catch(e){ arBreakdownCache = {}; }
-function saveArBreakdownCache(){ localStorage.setItem(lsKey(AR_BREAKDOWN_CACHE_LS), JSON.stringify(arBreakdownCache)); }
+try{ arBreakdownCache = JSON.parse(kvStore.getItem(lsKey(AR_BREAKDOWN_CACHE_LS))) || {}; }catch(e){ arBreakdownCache = {}; }
+function saveArBreakdownCache(){ kvStore.setItem(lsKey(AR_BREAKDOWN_CACHE_LS), JSON.stringify(arBreakdownCache)); }
 
 // 字母表：每個字母在字首／字中／字尾的連接例字（一次全部生成、存起來，預設
 // 收起來讓版面乾淨，按鈕才展開）。
 const ARABIC_EXAMPLES_CACHE_LS = "flashcard_arabic_letter_examples_v1";
 let arabicLetterExamplesCache = {};
-try{ arabicLetterExamplesCache = JSON.parse(localStorage.getItem(ARABIC_EXAMPLES_CACHE_LS)) || {}; }catch(e){ arabicLetterExamplesCache = {}; }
-function saveArabicLetterExamplesCache(){ localStorage.setItem(ARABIC_EXAMPLES_CACHE_LS, JSON.stringify(arabicLetterExamplesCache)); }
+try{ arabicLetterExamplesCache = JSON.parse(kvStore.getItem(ARABIC_EXAMPLES_CACHE_LS)) || {}; }catch(e){ arabicLetterExamplesCache = {}; }
+function saveArabicLetterExamplesCache(){ kvStore.setItem(ARABIC_EXAMPLES_CACHE_LS, JSON.stringify(arabicLetterExamplesCache)); }
 const ARABIC_EXAMPLES_SHOWN_LS = "flashcard_arabic_examples_shown_v1";
 let arabicExamplesShown = false;
-try{ arabicExamplesShown = localStorage.getItem(ARABIC_EXAMPLES_SHOWN_LS) === "1"; }catch(e){}
+try{ arabicExamplesShown = kvStore.getItem(ARABIC_EXAMPLES_SHOWN_LS) === "1"; }catch(e){}
 const ARABIC_EXAMPLE_RULES = `【最重要的規則——一定要遵守】
 1. 字中形（medial）：這個字母在單字裡，**左右兩邊都要直接連著別的字母**。也就是說，它前面那個字母必須是「會往左連」的字母，它後面也要還有字母。
 2. 字尾形（final）：這個字母在單字**結尾**，而且**前面那個字母會往左連**（所以它是接著連下來、收尾的形狀）。
@@ -2650,8 +2763,8 @@ async function getEgyptianLetterBreakdown(nativeScript, romanized, force){
 // 詞綴作用，跟同詞根的其他常見衍生字。
 const ID_MORPH_CACHE_LS = "flashcard_id_morph_cache_v1";
 let idMorphCache = {};
-try{ idMorphCache = JSON.parse(localStorage.getItem(lsKey(ID_MORPH_CACHE_LS))) || {}; }catch(e){ idMorphCache = {}; }
-function saveIdMorphCache(){ localStorage.setItem(lsKey(ID_MORPH_CACHE_LS), JSON.stringify(idMorphCache)); }
+try{ idMorphCache = JSON.parse(kvStore.getItem(lsKey(ID_MORPH_CACHE_LS))) || {}; }catch(e){ idMorphCache = {}; }
+function saveIdMorphCache(){ kvStore.setItem(lsKey(ID_MORPH_CACHE_LS), JSON.stringify(idMorphCache)); }
 async function getIndoMorphology(text, zh, force){
   if(!force && idMorphCache[text]) return idMorphCache[text];
   const schema = {
@@ -2701,8 +2814,8 @@ async function getIndoMorphology(text, zh, force){
 // 記「來自：原字」。快取 key＝原字，每個語言各一份。
 const CHUNKS_CACHE_LS = "flashcard_chunks_cache_v1";
 let chunksCache = {};
-try{ chunksCache = JSON.parse(localStorage.getItem(lsKey(CHUNKS_CACHE_LS))) || {}; }catch(e){ chunksCache = {}; }
-function saveChunksCache(){ localStorage.setItem(lsKey(CHUNKS_CACHE_LS), JSON.stringify(chunksCache)); }
+try{ chunksCache = JSON.parse(kvStore.getItem(lsKey(CHUNKS_CACHE_LS))) || {}; }catch(e){ chunksCache = {}; }
+function saveChunksCache(){ kvStore.setItem(lsKey(CHUNKS_CACHE_LS), JSON.stringify(chunksCache)); }
 function chunkItemSchema(){
   const hasScript = L().hasScript;
   return {
@@ -2872,8 +2985,8 @@ function thaiToneRuleText(cls, vowelLength, endingType, toneMark){
 }
 const THAI_TONE_RULE_CACHE_LS = "flashcard_thai_tone_rule_cache_v4"; // v2：改成 AI 只報事實、聲調由 JS 查表算；v3：拆音節加上 ตัวสะกดออกเสียงซ้ำ（พัทยา = พัท+ทะ+ยา）；v4：不發音字母／รร／ฤ，加口語聲調提示
 let thaiToneRuleCache = {};
-try{ thaiToneRuleCache = JSON.parse(localStorage.getItem(lsKey(THAI_TONE_RULE_CACHE_LS))) || {}; }catch(e){ thaiToneRuleCache = {}; }
-function saveThaiToneRuleCache(){ localStorage.setItem(lsKey(THAI_TONE_RULE_CACHE_LS), JSON.stringify(thaiToneRuleCache)); }
+try{ thaiToneRuleCache = JSON.parse(kvStore.getItem(lsKey(THAI_TONE_RULE_CACHE_LS))) || {}; }catch(e){ thaiToneRuleCache = {}; }
+function saveThaiToneRuleCache(){ kvStore.setItem(lsKey(THAI_TONE_RULE_CACHE_LS), JSON.stringify(thaiToneRuleCache)); }
 async function getThaiToneAnalysis(nativeScript, romanized, force){
   const key = nativeScript || romanized;
   if(!force && thaiToneRuleCache[key]) return thaiToneRuleCache[key];
@@ -3147,14 +3260,14 @@ function makeSpeakableLabel(text, fontSize, lang, speakText, speakInstructions, 
 // 字母表每張卡片可以打自己的筆記——key＝"語言:字母"，全域存一份、也進備份。
 const LETTER_NOTES_LS = "flashcard_letter_notes_v1";
 let letterNotes = {};
-try{ letterNotes = JSON.parse(localStorage.getItem(LETTER_NOTES_LS)) || {}; }catch(e){ letterNotes = {}; }
-function saveLetterNotes(){ localStorage.setItem(LETTER_NOTES_LS, JSON.stringify(letterNotes)); }
+try{ letterNotes = JSON.parse(kvStore.getItem(LETTER_NOTES_LS)) || {}; }catch(e){ letterNotes = {}; }
+function saveLetterNotes(){ kvStore.setItem(LETTER_NOTES_LS, JSON.stringify(letterNotes)); }
 
 // 字母卡片換底色（黃／紅／藍／綠），跟筆記一樣用 "目前語言:字母" 當 key。
 const LETTER_COLORS_LS = "flashcard_letter_colors_v1";
 let letterColors = {};
-try{ letterColors = JSON.parse(localStorage.getItem(LETTER_COLORS_LS)) || {}; }catch(e){ letterColors = {}; }
-function saveLetterColors(){ localStorage.setItem(LETTER_COLORS_LS, JSON.stringify(letterColors)); }
+try{ letterColors = JSON.parse(kvStore.getItem(LETTER_COLORS_LS)) || {}; }catch(e){ letterColors = {}; }
+function saveLetterColors(){ kvStore.setItem(LETTER_COLORS_LS, JSON.stringify(letterColors)); }
 const LETTER_COLOR_HEX = { yellow: "#ffd400", red: "#ff4d4d", blue: "#3b82f6", green: "#34c759" };
 function attachLetterColor(cardEl, key){
   // 記住卡片原本的底色（例如越南文短母音 ă／â 本來就有黃底），沒選顏色時要
@@ -3280,14 +3393,14 @@ function renderThaiAlphabetPanel(){
   const bodies = {};
   const tabBtns = {};
   let savedTab = "class";
-  try{ savedTab = localStorage.getItem(THAI_ALPHA_TAB_LS) || "class"; }catch(e){}
+  try{ savedTab = kvStore.getItem(THAI_ALPHA_TAB_LS) || "class"; }catch(e){}
   if(!tabDefs.some(([k]) => k === savedTab)) savedTab = "class";
   function showTab(key){
     tabDefs.forEach(([k]) => {
       bodies[k].classList.toggle("hidden", k !== key);
       tabBtns[k].classList.toggle("primary", k === key);
     });
-    try{ localStorage.setItem(THAI_ALPHA_TAB_LS, key); }catch(e){}
+    try{ kvStore.setItem(THAI_ALPHA_TAB_LS, key); }catch(e){}
   }
   tabDefs.forEach(([key, label]) => {
     const b = document.createElement("button");
@@ -4066,7 +4179,7 @@ function renderArabicAlphabetPanel(){
     }else{
       arabicExamplesShown = false;
     }
-    try{ localStorage.setItem(ARABIC_EXAMPLES_SHOWN_LS, arabicExamplesShown ? "1" : "0"); }catch(e){}
+    try{ kvStore.setItem(ARABIC_EXAMPLES_SHOWN_LS, arabicExamplesShown ? "1" : "0"); }catch(e){}
     renderArabicAlphabetPanel();
   });
   panel.appendChild(exBtn);
@@ -4140,8 +4253,8 @@ function getToneMarksFnForCurrentLang(){ return currentLang === "vi" ? getViTone
 
 const TONE_MARKS_CACHE_LS = "flashcard_tone_marks_cache_v1"; // 泰文專用：HLMRF 聲調標記，只在泰文模式使用
 let toneMarksCache = {};
-try{ toneMarksCache = JSON.parse(localStorage.getItem(lsKey(TONE_MARKS_CACHE_LS))) || {}; }catch(e){ toneMarksCache = {}; }
-function saveToneMarksCache(){ localStorage.setItem(lsKey(TONE_MARKS_CACHE_LS), JSON.stringify(toneMarksCache)); }
+try{ toneMarksCache = JSON.parse(kvStore.getItem(lsKey(TONE_MARKS_CACHE_LS))) || {}; }catch(e){ toneMarksCache = {}; }
+function saveToneMarksCache(){ kvStore.setItem(lsKey(TONE_MARKS_CACHE_LS), JSON.stringify(toneMarksCache)); }
 
 // 泰文拆音節要照實際發音。AI 最常錯的是「ตัวสะกดออกเสียงซ้ำ」：一個子音同時
 // 當前一個音節的尾音、又當下一個音節的開頭（พัทยา 唸 phát-thá-yaa，不是
@@ -4185,8 +4298,8 @@ ${THAI_SYLLABLE_RULE}
 
 const VI_TONE_MARKS_CACHE_LS = "flashcard_vi_tone_marks_cache_v1"; // 越南文專用：南部（胡志明）口音 5 聲調 MFRLS 標記
 let viToneMarksCache = {};
-try{ viToneMarksCache = JSON.parse(localStorage.getItem(lsKey(VI_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ viToneMarksCache = {}; }
-function saveViToneMarksCache(){ localStorage.setItem(lsKey(VI_TONE_MARKS_CACHE_LS), JSON.stringify(viToneMarksCache)); }
+try{ viToneMarksCache = JSON.parse(kvStore.getItem(lsKey(VI_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ viToneMarksCache = {}; }
+function saveViToneMarksCache(){ kvStore.setItem(lsKey(VI_TONE_MARKS_CACHE_LS), JSON.stringify(viToneMarksCache)); }
 
 async function getViToneMarks(text, nativeScript){
   if(viToneMarksCache[text]) return viToneMarksCache[text];
@@ -4223,8 +4336,8 @@ async function getViToneMarks(text, nativeScript){
 
 const NATIVE_TONE_MARKS_CACHE_LS = "flashcard_native_tone_marks_cache_v1"; // 泰文專用：把 HLMRF 標在泰文原生字母上，不是羅馬拼音
 let nativeToneMarksCache = {};
-try{ nativeToneMarksCache = JSON.parse(localStorage.getItem(lsKey(NATIVE_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ nativeToneMarksCache = {}; }
-function saveNativeToneMarksCache(){ localStorage.setItem(lsKey(NATIVE_TONE_MARKS_CACHE_LS), JSON.stringify(nativeToneMarksCache)); }
+try{ nativeToneMarksCache = JSON.parse(kvStore.getItem(lsKey(NATIVE_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ nativeToneMarksCache = {}; }
+function saveNativeToneMarksCache(){ kvStore.setItem(lsKey(NATIVE_TONE_MARKS_CACHE_LS), JSON.stringify(nativeToneMarksCache)); }
 
 async function getNativeToneMarks(text, nativeScript){
   if(nativeToneMarksCache[text]) return nativeToneMarksCache[text];
@@ -4256,8 +4369,8 @@ ${THAI_SYLLABLE_RULE}
 
 const VI_NATIVE_TONE_MARKS_CACHE_LS = "flashcard_vi_native_tone_marks_cache_v1"; // 越南文專用：把 MFRLS 標在帶重音符號的越南文原生拼法上
 let viNativeToneMarksCache = {};
-try{ viNativeToneMarksCache = JSON.parse(localStorage.getItem(lsKey(VI_NATIVE_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ viNativeToneMarksCache = {}; }
-function saveViNativeToneMarksCache(){ localStorage.setItem(lsKey(VI_NATIVE_TONE_MARKS_CACHE_LS), JSON.stringify(viNativeToneMarksCache)); }
+try{ viNativeToneMarksCache = JSON.parse(kvStore.getItem(lsKey(VI_NATIVE_TONE_MARKS_CACHE_LS))) || {}; }catch(e){ viNativeToneMarksCache = {}; }
+function saveViNativeToneMarksCache(){ kvStore.setItem(lsKey(VI_NATIVE_TONE_MARKS_CACHE_LS), JSON.stringify(viNativeToneMarksCache)); }
 
 async function getViNativeToneMarks(text, nativeScript){
   if(viNativeToneMarksCache[text]) return viNativeToneMarksCache[text];
@@ -4292,8 +4405,8 @@ async function getViNativeToneMarks(text, nativeScript){
 
 const MINIMAL_PAIRS_CACHE_LS = "flashcard_minimal_pairs_cache_v6"; // 泰文專用：容易搞混的極小對立詞/發音相近字。v2: 加上 toneMarked 欄位；v3: 放寬不只嚴格極小對立詞、最多列 6 個；v4: 限制 A1-A2 優先、B1 補位，加上重新生成；v5: 改用「自助旅行日常會話」實際範圍取代不可靠的 CEFR 自我判斷，加經典組合當錨點；v6: 改用寫死的經典組合表格保底合併，不再單靠 AI 每次自己記得
 let minimalPairsCache = {};
-try{ minimalPairsCache = JSON.parse(localStorage.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
-function saveMinimalPairsCache(){ localStorage.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
+try{ minimalPairsCache = JSON.parse(kvStore.getItem(lsKey(MINIMAL_PAIRS_CACHE_LS))) || {}; }catch(e){ minimalPairsCache = {}; }
+function saveMinimalPairsCache(){ kvStore.setItem(lsKey(MINIMAL_PAIRS_CACHE_LS), JSON.stringify(minimalPairsCache)); }
 
 // 真正可靠、不用靠 AI 每次自己記得的判斷邏輯：直接比對使用者自己單字表裡
 // 所有泰文字的羅馬拼音，用編輯距離（Levenshtein distance）找出拼法很接近、
@@ -4463,8 +4576,8 @@ function isNativeScriptInList(nativeScript){
 // 當快取 key（同一個字在不同句子裡上下文可能不同，不能只用字本身快取）。
 const WORD_IN_CONTEXT_CACHE_LS = "flashcard_word_in_context_cache_v4"; // v2: 改用「數位置＋自我核對」的提示詞；v3: 提示詞裡加一段話要求 zh/en 要照 nativeScript 寫（測試後發現同一次生成裡還是會跳回去用拼音本身猜，沒用）；v4: 改成拆兩次獨立呼叫，第二次完全不提拼音本身，只給已確定的原生文字問意思，結構上杜絕跳回去的可能
 let wordInContextCache = {};
-try{ wordInContextCache = JSON.parse(localStorage.getItem(lsKey(WORD_IN_CONTEXT_CACHE_LS))) || {}; }catch(e){ wordInContextCache = {}; }
-function saveWordInContextCache(){ localStorage.setItem(lsKey(WORD_IN_CONTEXT_CACHE_LS), JSON.stringify(wordInContextCache)); }
+try{ wordInContextCache = JSON.parse(kvStore.getItem(lsKey(WORD_IN_CONTEXT_CACHE_LS))) || {}; }catch(e){ wordInContextCache = {}; }
+function saveWordInContextCache(){ kvStore.setItem(lsKey(WORD_IN_CONTEXT_CACHE_LS), JSON.stringify(wordInContextCache)); }
 // 拆成兩次獨立呼叫，不要一次問完：第一次只問「這個位置對應的原生文字是
 // 什麼」，第二次只給「已經確定好、帶聲調符號的原生文字」去問意思，完全不
 // 再提到拼音本身。這是因為實測發現單一次呼叫時，就算 nativeScript 判斷對了
@@ -7481,7 +7594,7 @@ document.getElementById("btnCopyZhForQuiz").addEventListener("click", async () =
 // 用函式宣告（會被提升），頁面剛載入、切換語言那段比這裡早跑也叫得到。
 function isCompactReadLang(){ return currentLang === "vi" || currentLang === "id"; }
 let compactReadMode = false;
-try{ compactReadMode = localStorage.getItem("flashcard_compact_read_v1") === "1"; }catch(e){}
+try{ compactReadMode = kvStore.getItem("flashcard_compact_read_v1") === "1"; }catch(e){}
 function renderCompactList(el, words){
   const grid = document.createElement("div");
   grid.style.cssText = "display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:2px 14px; padding:8px 4px;";
@@ -7879,25 +7992,25 @@ function updateCompactReadLabel(){
 }
 document.getElementById("btnCompactRead").addEventListener("click", () => {
   compactReadMode = !compactReadMode;
-  try{ localStorage.setItem("flashcard_compact_read_v1", compactReadMode ? "1" : "0"); }catch(e){}
+  try{ kvStore.setItem("flashcard_compact_read_v1", compactReadMode ? "1" : "0"); }catch(e){}
   updateCompactReadLabel();
   renderList();
 });
 updateCompactReadLabel();
 // 南部腔 TTS（ElevenLabs）設定：載入已存的值 + 綁定變更
 try{
-  document.getElementById("fptProxyUrl").value = localStorage.getItem(FPT_PROXY_URL_LS) || "";
-  document.getElementById("fptVoice").value = localStorage.getItem(FPT_VOICE_LS) || "";
-  document.getElementById("fptViEnabled").checked = localStorage.getItem(FPT_VI_ENABLED_LS) === "1";
+  document.getElementById("fptProxyUrl").value = kvStore.getItem(FPT_PROXY_URL_LS) || "";
+  document.getElementById("fptVoice").value = kvStore.getItem(FPT_VOICE_LS) || "";
+  document.getElementById("fptViEnabled").checked = kvStore.getItem(FPT_VI_ENABLED_LS) === "1";
 }catch(e){}
 document.getElementById("fptProxyUrl").addEventListener("change", (e) => {
-  try{ localStorage.setItem(FPT_PROXY_URL_LS, e.target.value.trim()); }catch(err){}
+  try{ kvStore.setItem(FPT_PROXY_URL_LS, e.target.value.trim()); }catch(err){}
 });
 document.getElementById("fptVoice").addEventListener("change", (e) => {
-  try{ localStorage.setItem(FPT_VOICE_LS, e.target.value.trim()); }catch(err){}
+  try{ kvStore.setItem(FPT_VOICE_LS, e.target.value.trim()); }catch(err){}
 });
 document.getElementById("fptViEnabled").addEventListener("change", (e) => {
-  try{ localStorage.setItem(FPT_VI_ENABLED_LS, e.target.checked ? "1" : "0"); }catch(err){}
+  try{ kvStore.setItem(FPT_VI_ENABLED_LS, e.target.checked ? "1" : "0"); }catch(err){}
   if(e.target.checked && (!fptProxyUrl() || !fptVoice())){
     alert("要先填「Cloudflare Worker 網址」跟「ElevenLabs voice ID」，南部腔才會生效。");
   }
@@ -8343,12 +8456,12 @@ async function runListAutoplay(){
 // 裡排第幾個——篩選／排序變了，照樣找得到那個字。每個語言各記一份。
 const AUTOPLAY_RESUME_LS = "flashcard_autoplay_resume_v1";
 function loadAutoplayResumeId(){
-  try{ return parseInt(localStorage.getItem(lsKey(AUTOPLAY_RESUME_LS)), 10) || null; }catch(e){ return null; }
+  try{ return parseInt(kvStore.getItem(lsKey(AUTOPLAY_RESUME_LS)), 10) || null; }catch(e){ return null; }
 }
 function saveAutoplayResumeId(id){
   try{
-    if(id) localStorage.setItem(lsKey(AUTOPLAY_RESUME_LS), String(id));
-    else localStorage.removeItem(lsKey(AUTOPLAY_RESUME_LS));
+    if(id) kvStore.setItem(lsKey(AUTOPLAY_RESUME_LS), String(id));
+    else kvStore.removeItem(lsKey(AUTOPLAY_RESUME_LS));
   }catch(e){}
 }
 // 編號 → 目前清單裡的位置。那個編號不在目前清單裡（被篩掉、刪掉）的話，
@@ -8391,25 +8504,25 @@ document.getElementById("autoplayFloatNext").addEventListener("click", autoplayS
 document.getElementById("autoplayFloatClose").addEventListener("click", stopListAutoplay);
 // 「加唸中文」勾選狀態記起來（全語言通用）
 const AUTOPLAY_ZH_LS = "flashcard_autoplay_include_zh_v1";
-if(localStorage.getItem(AUTOPLAY_ZH_LS) === "1") document.getElementById("autoplayIncludeZh").checked = true;
+if(kvStore.getItem(AUTOPLAY_ZH_LS) === "1") document.getElementById("autoplayIncludeZh").checked = true;
 document.getElementById("autoplayIncludeZh").addEventListener("change", (e) => {
-  localStorage.setItem(AUTOPLAY_ZH_LS, e.target.checked ? "1" : "0");
+  kvStore.setItem(AUTOPLAY_ZH_LS, e.target.checked ? "1" : "0");
   renderAutoplayControls(); // 估計時間會變
 });
 // 「每字唸幾次」記起來（全語言通用），改了也重算估計時間
 const AUTOPLAY_REPS_LS = "flashcard_autoplay_reps_v1";
 {
-  const saved = localStorage.getItem(AUTOPLAY_REPS_LS);
+  const saved = kvStore.getItem(AUTOPLAY_REPS_LS);
   if(saved === "1" || saved === "2" || saved === "3") document.getElementById("autoplayReps").value = saved;
 }
 document.getElementById("autoplayReps").addEventListener("change", (e) => {
-  localStorage.setItem(AUTOPLAY_REPS_LS, e.target.value);
+  kvStore.setItem(AUTOPLAY_REPS_LS, e.target.value);
   renderAutoplayControls();
 });
 // 依序播放語速（1 / 1.2 / 1.5）記起來
 const AUTOPLAY_SPEED_LS = "flashcard_autoplay_speed_v1";
 {
-  const saved = parseFloat(localStorage.getItem(AUTOPLAY_SPEED_LS));
+  const saved = parseFloat(kvStore.getItem(AUTOPLAY_SPEED_LS));
   if(saved === 1 || saved === 1.2 || saved === 1.5){
     autoplaySpeed = saved;
     document.getElementById("autoplaySpeed").value = String(saved);
@@ -8417,7 +8530,7 @@ const AUTOPLAY_SPEED_LS = "flashcard_autoplay_speed_v1";
 }
 document.getElementById("autoplaySpeed").addEventListener("change", (e) => {
   autoplaySpeed = parseFloat(e.target.value) || 1;
-  localStorage.setItem(AUTOPLAY_SPEED_LS, String(autoplaySpeed));
+  kvStore.setItem(AUTOPLAY_SPEED_LS, String(autoplaySpeed));
   // 正在播的話，馬上套用到目前這段音檔（GPT 語音）
   if(listAutoplayRunning){
     try{ document.getElementById("listenAudio").playbackRate = autoplaySpeed; }catch(e2){}
@@ -8645,13 +8758,13 @@ const BACKUP_GLOBAL_KEYS = [LANG_LS, VI_DIALECT_LS, SOURCE_MEANING_CACHE_LS, MAS
 function exportBackup(){
   const data = { version: 1, exportedAt: new Date().toISOString(), keys: {} };
   BACKUP_GLOBAL_KEYS.forEach(k => {
-    const v = localStorage.getItem(k);
+    const v = kvStore.getItem(k);
     if(v !== null) data.keys[k] = v;
   });
   LANG_ORDER.forEach(lang => {
     BACKUP_PER_LANG_BASES.forEach(base => {
       const key = lsKeyForLang(base, lang);
-      const v = localStorage.getItem(key);
+      const v = kvStore.getItem(key);
       if(v !== null) data.keys[key] = v;
     });
   });
@@ -8690,7 +8803,7 @@ document.getElementById("fileInputBackup").addEventListener("change", (e) => {
     }
     const keys = Object.keys(data.keys);
     if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key、不影響錄音），共 ${keys.length} 筆資料。這個動作沒辦法復原，確定要還原嗎？`)) return;
-    keys.forEach(k => localStorage.setItem(k, data.keys[k]));
+    keys.forEach(k => kvStore.setItem(k, data.keys[k]));
     alert("還原完成，頁面即將重新整理套用新資料。");
     location.reload();
   };
@@ -9159,7 +9272,7 @@ document.getElementById("btnImportConvertPaste").addEventListener("click", () =>
 let cardSession = [];
 let cardIndex = 0;
 
-let cardDirection = localStorage.getItem(lsKey(CARD_DIRECTION_LS)) === "zh-id" ? "zh-id" : "id-zh";
+let cardDirection = kvStore.getItem(lsKey(CARD_DIRECTION_LS)) === "zh-id" ? "zh-id" : "id-zh";
 
 function updateCardDirectionLabel(){
   document.getElementById("btnCardDirection").textContent = cardDirection === "id-zh"
@@ -9169,7 +9282,7 @@ function updateCardDirectionLabel(){
 updateCardDirectionLabel();
 document.getElementById("btnCardDirection").addEventListener("click", () => {
   cardDirection = cardDirection === "id-zh" ? "zh-id" : "id-zh";
-  localStorage.setItem(lsKey(CARD_DIRECTION_LS), cardDirection);
+  kvStore.setItem(lsKey(CARD_DIRECTION_LS), cardDirection);
   updateCardDirectionLabel();
   if(cardSession.length) renderCard();
 });
@@ -9266,8 +9379,8 @@ document.getElementById("btnCardRight").onclick = () => {
 // 「全部都記得了」，所以另外給一顆「重置」按鈕，把這個語言的記錄清空重來。
 const ALPHA_MASTERED_LS = "flashcard_alpha_mastered_v1";
 let alphaMastered = {};
-try{ alphaMastered = JSON.parse(localStorage.getItem(ALPHA_MASTERED_LS)) || {}; }catch(e){ alphaMastered = {}; }
-function saveAlphaMastered(){ localStorage.setItem(ALPHA_MASTERED_LS, JSON.stringify(alphaMastered)); }
+try{ alphaMastered = JSON.parse(kvStore.getItem(ALPHA_MASTERED_LS)) || {}; }catch(e){ alphaMastered = {}; }
+function saveAlphaMastered(){ kvStore.setItem(ALPHA_MASTERED_LS, JSON.stringify(alphaMastered)); }
 function alphaMasteredSet(lang){ return new Set(alphaMastered[lang] || []); }
 let alphaCardSession = [];
 let alphaCardIndex = 0;
@@ -9696,12 +9809,12 @@ let listenTimeoutId = null;
 const LISTEN_PROGRESS_LS = "flashcard_listen_progress_v1";
 function saveListenProgress(){
   if(listenSession.length === 0) return;
-  localStorage.setItem(lsKey(LISTEN_PROGRESS_LS), JSON.stringify({ ids: listenSession.map(w => w.id), index: listenIndex }));
+  kvStore.setItem(lsKey(LISTEN_PROGRESS_LS), JSON.stringify({ ids: listenSession.map(w => w.id), index: listenIndex }));
 }
 function loadListenProgress(){
-  try{ return JSON.parse(localStorage.getItem(lsKey(LISTEN_PROGRESS_LS))); }catch(e){ return null; }
+  try{ return JSON.parse(kvStore.getItem(lsKey(LISTEN_PROGRESS_LS))); }catch(e){ return null; }
 }
-function clearListenProgress(){ localStorage.removeItem(lsKey(LISTEN_PROGRESS_LS)); }
+function clearListenProgress(){ kvStore.removeItem(lsKey(LISTEN_PROGRESS_LS)); }
 function updateResumeListenBtn(){
   const btn = document.getElementById("btnResumeListen");
   const progress = loadListenProgress();
