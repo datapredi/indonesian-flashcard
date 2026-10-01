@@ -541,7 +541,7 @@
 // 讀直接從記憶體拿，寫入記憶體後再非同步寫進 IndexedDB。讀完才啟動主程式
 // （下面 type="text/plain" 的 #mainScript）。
 // 第一次啟動會把 localStorage 現有的資料整份複製過來；localStorage 原本的
-// 資料不刪，當作備份（index.html 也還在讀那份）。
+// 資料不刪，當作備份。
 // IndexedDB 開不起來（極少數私密瀏覽情境）就退回直接用 localStorage。
 const kvStore = (() => {
   const KV_DB_NAME = "flashcard_kv_v1";
@@ -656,7 +656,7 @@ kvStore.ready.then(() => {
 
 <script type="text/plain" id="mainScript">
 // ================= 語言切換 =================
-// 印尼文維持完全不加後綴的舊 key（跟 index.html 共用同一份資料，不用搬家）。
+// 印尼文維持完全不加後綴的舊 key（沿用最早純印尼文版的資料，不用搬家）。
 // 其他語言（泰文、越南文...）所有 localStorage key 都加 "_語言代碼" 後綴，
 // 各語言的單字表/已學會/難度/翻譯快取/例句快取完全分開，互不干擾。切換語言時
 // 直接整頁重新載入，避免要手動重置一堆模組層級的變數狀態，風險最低。
