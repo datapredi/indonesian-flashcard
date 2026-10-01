@@ -558,13 +558,22 @@ const kvStore = (() => {
     writeErrorShown = true;
     alert("資料存檔失敗：" + (err && err.message ? err.message : err) + "\n\n這次的變更可能沒有存到，重新整理後會不見。");
   }
+  // 還沒寫完的交易。重新整理頁面前要先等它們寫完（見 flush），不然 Safari
+  // 會在重新整理時直接中斷寫到一半的交易——切換語言就是先存語言再重新整理，
+  // 存檔被中斷的話重新整理後還是停在原本的語言。
+  const pending = new Set();
   function write(fn){
     if(!db) return;
     try{
       const tx = db.transaction(KV_STORE, "readwrite");
       fn(tx.objectStore(KV_STORE));
-      tx.onerror = () => onWriteError(tx.error);
-      tx.onabort = () => { if(tx.error) onWriteError(tx.error); };
+      const done = new Promise(resolve => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => { onWriteError(tx.error); resolve(); };
+        tx.onabort = () => { if(tx.error) onWriteError(tx.error); resolve(); };
+      });
+      pending.add(done);
+      done.then(() => pending.delete(done));
     }catch(e){ onWriteError(e); }
   }
   function openDB(){
@@ -620,6 +629,7 @@ const kvStore = (() => {
   })();
   return {
     ready,
+    flush(){ return Promise.all([...pending]); },
     getItem(k){
       if(fallback) return lsGet(k);
       return mem.has(k) ? mem.get(k) : null;
@@ -757,7 +767,7 @@ function genderNoteForLang(lang){
 function setLang(l){
   if(l === currentLang) return;
   kvStore.setItem(LANG_LS, l);
-  location.reload();
+  kvStore.flush().then(() => location.reload());
 }
 document.querySelectorAll(".lang-btn").forEach(btn => {
   btn.addEventListener("click", () => setLang(btn.dataset.lang));
@@ -8804,8 +8814,10 @@ document.getElementById("fileInputBackup").addEventListener("change", (e) => {
     const keys = Object.keys(data.keys);
     if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key、不影響錄音），共 ${keys.length} 筆資料。這個動作沒辦法復原，確定要還原嗎？`)) return;
     keys.forEach(k => kvStore.setItem(k, data.keys[k]));
-    alert("還原完成，頁面即將重新整理套用新資料。");
-    location.reload();
+    kvStore.flush().then(() => {
+      alert("還原完成，頁面即將重新整理套用新資料。");
+      location.reload();
+    });
   };
   reader.readAsText(file);
 });
