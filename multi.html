@@ -1703,17 +1703,26 @@ function lookup(text){
 // 用 !lookup(w.text) 判斷「缺資料」會誤判成「已經完整」而永遠不會被
 // 這個按鈕補齊，測驗模式也會少資料壞掉。改用這個檢查資料是不是真的完整。
 function needsGeneration(w){
+  return needsCoreGeneration(w) || needsQuizNativeOnly(w);
+}
+// 真正缺翻譯（意思/測驗題/原生文字）的字——列表紅字提示跟「AI 自動生成」
+// 按鈕的主要數量都只看這個。
+function needsCoreGeneration(w){
   const data = lookup(w.text);
   if(!data || !data.quizEn) return true;
   // hasScript 語言（泰文、越南文…）少了原生文字也算不完整——發音、Forvo、
   // 聲調面板都要靠它。例句點字新增的字有時候會卡在「有 quizEn、卻沒有
   // nativeScript」的半成品狀態，要讓「AI 自動生成」抓得到、能補。
   if(L().hasScript && !data.nativeScript) return true;
-  // 測驗選項（correct/distractors）本身補的原生文字是後來才加的欄位，舊資料
-  // 有 quizEn/correct 但沒有 correctNative——這種半成品也要讓「AI 自動生成」
-  // 抓得到，不然測驗選項永遠沒有原生文字可以正確唸出來。
-  if(L().hasScript && data.correct && !data.correctNative) return true;
   return false;
+}
+// 翻譯完整、只缺測驗選項朗讀用的原生文字（correctNative 是 9/19 才加的欄位，
+// 之前建的舊字全部都缺）。這種字補的時候會整組重新產生測驗題，數量又可能
+// 很多，所以不算進紅字提示，「AI 自動生成」也會另外問過才補。
+function needsQuizNativeOnly(w){
+  if(needsCoreGeneration(w)) return false;
+  const data = lookup(w.text);
+  return !!(L().hasScript && data.correct && !data.correctNative);
 }
 // 這個字目前處於哪個補資料階段：
 // - "known"：意思已經確定（hasScript 語言要連原生文字都有才算，那才是背後真正
@@ -5643,9 +5652,18 @@ document.getElementById("btnGenerate").onclick = async () => {
     alert("請先輸入並儲存 API Key。");
     return;
   }
-  const missing = allWords.filter(needsGeneration);
+  const missing = allWords.filter(needsCoreGeneration);
+  const quizNativeOnly = allWords.filter(needsQuizNativeOnly);
+  if(quizNativeOnly.length > 0){
+    const calls = Math.ceil(quizNativeOnly.length / 8);
+    const head = missing.length > 0
+      ? `有 ${missing.length} 個字缺翻譯，會先補這些。\n\n另外`
+      : "目前清單裡的單字都已經有翻譯了。\n\n不過";
+    const ok = confirm(`${head}有 ${quizNativeOnly.length} 個舊字只缺「測驗選項的發音資料」（補了測驗選項才會有 🔊）。補的時候會重新產生這些字的測驗題，大約要呼叫 AI ${calls} 次。\n\n要一起補嗎？`);
+    if(ok) missing.push(...quizNativeOnly);
+  }
   if(missing.length === 0){
-    alert("目前清單裡的單字都已經有翻譯了！");
+    if(quizNativeOnly.length === 0) alert("目前清單裡的單字都已經有翻譯了！");
     return;
   }
   const btn = document.getElementById("btnGenerate");
@@ -6377,11 +6395,12 @@ function sameAsSourceTagHtml(){ return ""; }  // 「🟰 跟原文相同」標�
 function createWordItem(w){
   const data = lookup(w.text);
   const row = document.createElement("label");
-  // 紅字提示「還需要生成資料」要跟 needsGeneration() 用同一套標準——不能只看
+  // 紅字提示「還需要生成資料」要跟 needsCoreGeneration() 用同一套標準——不能只看
   // 「有沒有 data」，因為例句點字新增的字現在一定會先存 nativeScript（就算
   // 還沒有中英文意思也一樣），data 會是真值，但其實還是不完整、還是需要按
   // 「AI 自動生成缺少的翻譯」才會有測驗需要的完整資料。
-  row.className = "item" + (needsGeneration(w) ? " no-data" : "");
+  // 只缺測驗選項發音資料的舊字不算（見 needsQuizNativeOnly）。
+  row.className = "item" + (needsCoreGeneration(w) ? " no-data" : "");
   row.dataset.wordId = w.id;
   // 越南文：主標題顯示英文拼音（拆掉聲調符號的版本），帶聲調的原文放在下面
   // 那一行。就算當初是直接用越南文原文輸入、沒有另外存英文拼音也沒關係——
