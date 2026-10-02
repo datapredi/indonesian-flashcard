@@ -311,6 +311,7 @@
       <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
       <button id="btnToggleSentencesOnly">💬 只顯示句子</button>
+      <button id="btnToggleNonSentencesOnly">🔤 只顯示非句子</button>
       <button id="btnToggleWeekdaysOnly">📅 只顯示星期</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
@@ -1723,6 +1724,7 @@ function weekdayIndexOf(w){
 }
 function isWeekdayWord(w){ return weekdayIndexOf(w) >= 0; }
 let showSentencesOnly = false;
+let showNonSentencesOnly = false; // 跟「只顯示句子」相反，兩個一次只會開一個
 function isSentenceWord(w){
   const t = w.text.replace(/\s*\(\d+\)$/, "").trim();   // 去掉撞名時加的 (2)
   if(/[.!?。！？]["”’」]?$/.test(t)) return true;
@@ -6266,6 +6268,7 @@ function getVisibleWords(){
     if(showNumbersOnly && !isNumberWord(w)) return false;
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
     if(showSentencesOnly && !isSentenceWord(w)) return false;
+    if(showNonSentencesOnly && isSentenceWord(w)) return false;
     if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
     if(groupFilter && (wordGroups[w.id] || "") !== groupFilter) return false;
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
@@ -7888,9 +7891,21 @@ function updateSentencesToggleLabel(){
   const n = allWords.filter(isSentenceWord).length;
   btn.textContent = showSentencesOnly ? `顯示全部單字 (句子 ${n} 個)` : `💬 只顯示句子 (${n})`;
   btn.classList.toggle("primary", showSentencesOnly);
+  const nonBtn = document.getElementById("btnToggleNonSentencesOnly");
+  if(!nonBtn) return;
+  const m = allWords.length - n;
+  nonBtn.textContent = showNonSentencesOnly ? `顯示全部單字 (非句子 ${m} 個)` : `🔤 只顯示非句子 (${m})`;
+  nonBtn.classList.toggle("primary", showNonSentencesOnly);
 }
+document.getElementById("btnToggleNonSentencesOnly").addEventListener("click", () => {
+  showNonSentencesOnly = !showNonSentencesOnly;
+  if(showNonSentencesOnly) showSentencesOnly = false;
+  updateSentencesToggleLabel();
+  renderList();
+});
 document.getElementById("btnToggleSentencesOnly").addEventListener("click", () => {
   showSentencesOnly = !showSentencesOnly;
+  if(showSentencesOnly) showNonSentencesOnly = false;
   updateSentencesToggleLabel();
   renderList();
 });
