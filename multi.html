@@ -265,6 +265,10 @@
         <input type="checkbox" id="autoplayIncludeZh">
         之後加唸一次中文
       </label>
+      <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;" title="播完清單最後一個字之後，自動回到第一個字繼續播，直到按暫停或 ✕">
+        <input type="checkbox" id="autoplayLoop">
+        🔁 循環播放
+      </label>
     </div>
 
     <div class="toolbar">
@@ -8437,7 +8441,7 @@ async function speakZhForAutoplay(zh){
   }catch(e){ /* 中文唸不出來就跳過，不要卡住整個播放 */ }
 }
 async function runListAutoplay(){
-  const words = getVisibleWords();
+  let words = getVisibleWords();
   if(words.length === 0){ stopListAutoplay(); return; }
   if(listAutoplayIndex >= words.length) listAutoplayIndex = 0;
   listAutoplayRunning = true;
@@ -8491,7 +8495,7 @@ async function runListAutoplay(){
         const zhNow = (lookup(w.text) || {}).zh;
         if(zhNow) prefetchTTSAudio(zhForSpeech(zhNow), TTS_INSTRUCTIONS_ZH);
       }
-      const nextW = words[listAutoplayIndex + 1];
+      const nextW = words[listAutoplayIndex + 1] || (autoplayLoopOn() ? words[0] : null);
       if(nextW){
         prefetchWordAudio(currentLang, getSpeechText(nextW));
         if(wantZh){
@@ -8522,6 +8526,14 @@ async function runListAutoplay(){
     if(autoplayJump === -1) listAutoplayIndex = Math.max(0, listAutoplayIndex - 1);
     else listAutoplayIndex++;
     autoplayJump = 0;
+    // 🔁 循環播放：播完最後一個字就回到第一個字。重新抓一次清單（這輪中間
+    // 可能有改篩選、標 ⚠️），順便刷新列表把這輪標的 ⚠️ 顯示出來。
+    if(listAutoplayRunning && listAutoplayIndex >= words.length && autoplayLoopOn()){
+      renderList();
+      words = getVisibleWords();
+      if(words.length === 0) break;
+      listAutoplayIndex = 0;
+    }
   }
   autoplayCurrentWord = null;
   if(listAutoplayPaused){ renderList(); return; }   // 被暫停：保留 index/highlight，但把這次標的 ⚠️ 刷出來
@@ -8592,6 +8604,13 @@ if(kvStore.getItem(AUTOPLAY_ZH_LS) === "1") document.getElementById("autoplayInc
 document.getElementById("autoplayIncludeZh").addEventListener("change", (e) => {
   kvStore.setItem(AUTOPLAY_ZH_LS, e.target.checked ? "1" : "0");
   renderAutoplayControls(); // 估計時間會變
+});
+// 「🔁 循環播放」勾選狀態記起來（全語言通用）
+const AUTOPLAY_LOOP_LS = "flashcard_autoplay_loop_v1";
+function autoplayLoopOn(){ return document.getElementById("autoplayLoop").checked; }
+if(kvStore.getItem(AUTOPLAY_LOOP_LS) === "1") document.getElementById("autoplayLoop").checked = true;
+document.getElementById("autoplayLoop").addEventListener("change", (e) => {
+  kvStore.setItem(AUTOPLAY_LOOP_LS, e.target.checked ? "1" : "0");
 });
 // 「每字唸幾次」記起來（全語言通用），改了也重算估計時間
 const AUTOPLAY_REPS_LS = "flashcard_autoplay_reps_v1";
