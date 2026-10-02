@@ -297,13 +297,8 @@
     <div class="note">用於「跑步聽力模式」把單字轉成真正的音檔（存在這台電腦，同一個字只會生成一次，之後重播不再花錢）。</div>
     <div class="toolbar">
       <button id="btnGenerateAll">🚀 全部生成例句＋發音（出發前先跑一輪，離線也能用）</button>
-      <button id="btnGenerateAllTones" class="hidden">🎵 全部生成聲調標記</button>
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
       <button id="btnJaKanjiBackfill" class="hidden">🈶 幫舊字補上漢字寫法（日文）</button>
-      <button id="btnViScriptBackfill" class="hidden">🇻🇳 幫舊字補／修正越南文寫法（帶聲調符號）</button>
-      <button id="btnBackfillRegisterCefr">🏷️ 掃描全部單字，補難易度 A1~C2／口語標籤</button>
-      <button id="btnBackfillLoan">🌍 掃描全部單字，標記外來字來源</button>
-      <button id="btnScanChunks">🧩 掃描單字，建議常用字塊</button>
       <div id="chunkReview" class="hidden"></div>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
@@ -311,13 +306,10 @@
     <div class="toolbar">
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
-      <button id="btnClearCompare">🗑️ 清空比對清單</button>
-      <button id="btnTogglePronFlagOnly">⚠️ 只顯示發音待複習</button>
       <button id="btnToggleTeacherOnly">🎓 只顯示老師講過</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
-      <button id="btnToggleWorkOnly">💼 只顯示工作相關</button>
       <button id="btnToggleSentencesOnly">💬 只顯示句子</button>
       <button id="btnToggleWeekdaysOnly">📅 只顯示星期</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
@@ -865,12 +857,9 @@ function updateLangButtons(){
   document.getElementById("arabicAlphabetBar").classList.toggle("hidden", currentLang !== "arz");
   if(currentLang !== "arz") document.getElementById("arabicAlphabetPanel").classList.add("hidden");
   const toneLangActiveTop = isToneLangActive();
-  document.getElementById("btnGenerateAllTones").classList.toggle("hidden", !toneLangActiveTop);
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", !toneLangActiveTop || currentLang === "vi");
-  document.getElementById("btnGenerateAllTones").textContent = "🎵 全部生成聲調標記";
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
-  document.getElementById("btnViScriptBackfill").classList.toggle("hidden", currentLang !== "vi");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
   document.getElementById("compactReadBar").classList.toggle("hidden", !isCompactReadLang());
   // 這段在頁面剛載入時就會跑，那時精簡模式的變數還沒宣告好（let 有 TDZ），
@@ -1716,7 +1705,6 @@ function isGreetingWord(w){
   return false;
 }
 
-let showWorkOnly = false;
 // 「只顯示句子」篩選（全語言通用）：老師造的完整句子跟單字混在同一份清單裡，
 // 這個只留句子。有句尾標點（. ! ? 。！？）或至少 6 個字就算句子；片語像
 // 「Bia thủ công」「Thành phố tiếp theo」不算（越南文一個音節一個字，門檻要高一點）。
@@ -1739,17 +1727,6 @@ function isSentenceWord(w){
   const t = w.text.replace(/\s*\(\d+\)$/, "").trim();   // 去掉撞名時加的 (2)
   if(/[.!?。！？]["”’」]?$/.test(t)) return true;
   return t.split(/\s+/).filter(Boolean).length >= 6;
-}
-// 「只顯示跟工作有關」篩選（全語言通用）：靠中英文意思判斷是不是職場／工作
-// 相關（上班下班、辦公室、同事老闆、薪水、開會、專案、面試、履歷、職稱…）。
-// 純靠意思比對，概略的。
-const WORK_ZH_RE = /工作|上班|下班|加班|值班|輪班|職業|職務|職位|職稱|職場|辦公室|辦公|公司|企業|工廠|工地|店裡|開店|做生意|生意|業務|營業|同事|同僚|上司|下屬|部下|老闆|老板|主管|經理|總監|董事|員工|職員|人員|團隊|部門|客戶|顧客|廠商|供應商|會議|開會|簡報|報告|文件|合約|合同|專案|項目|任務|截止|期限|進度|薪水|薪資|工資|薪俸|月薪|時薪|年薪|獎金|加薪|升遷|升職|調職|離職|辭職|退休|裁員|解僱|開除|面試|履歷|應徵|求職|徵才|招聘|招募|實習|上工|打卡|請假|出差|通勤|電子郵件|電郵|郵件|信箱|老師|教師|工程師|醫生|醫師|護理師|護士|律師|會計師|設計師|廚師|司機|警察|軍人|農夫|漁夫|工人|技師|技工|木工|水電工|business|worker/;
-const WORK_EN_RE = /\b(work|works|working|job|jobs|office|company|business|corporate|factory|workshop|workplace|colleague|coworker|co-worker|boss|manager|managing|supervisor|director|executive|employee|employer|employ(ment)?|staff|personnel|team|department|client|customer|vendor|supplier|meeting|conference|report|presentation|document|contract|project|task|assignment|deadline|schedule|salary|wage|wages|pay(check|slip|roll)?|bonus|raise|promotion|transfer|resign(ation)?|retire(ment)?|layoff|laid off|fired|dismissal|interview|resume|cv|curriculum vitae|career|profession|occupation|internship|intern|shift|overtime|commute|clock in|email|e-mail|inbox|teacher|engineer|doctor|nurse|lawyer|accountant|designer|chef|driver|farmer|worker|clerk|secretary|assistant)\b/i;
-function isWorkWord(w){
-  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
-  if(d.zh && WORK_ZH_RE.test(String(d.zh))) return true;
-  if(d.en && WORK_EN_RE.test(String(d.en))) return true;
-  return false;
 }
 
 // 「只顯示數字」篩選用：靠中英文意思判斷這個字是不是數字/數量詞（1、2…、100、
@@ -5867,34 +5844,6 @@ document.getElementById("btnGenerateAll").onclick = async () => {
   }
 };
 
-document.getElementById("btnGenerateAllTones").onclick = async () => {
-  if(!getApiKey()){ alert("需要 Anthropic API Key 才能生成聲調標記，請先在上面輸入並儲存。"); return; }
-  const list = allWords.filter(w => selected.has(w.id));
-  if(list.length === 0){ alert("目前沒有勾選任何字，請先勾選要標聲調的字。"); return; }
-  const btn = document.getElementById("btnGenerateAllTones");
-  const originalLabel = btn.textContent;
-  const cache = currentLang === "vi" ? viToneMarksCache : toneMarksCache;
-  const fn = currentLang === "vi" ? getViToneMarks : getToneMarks;
-  btn.disabled = true;
-  await acquireWakeLock();
-  try{
-    let done = 0;
-    let failCount = 0;
-    for(const w of list){
-      const data = lookup(w.text);
-      btn.textContent = `生成聲調標記中... (${done}/${list.length})`;
-      try{
-        if(!cache[w.text]) await fn(w.text, data ? data.nativeScript : "");
-      }catch(e){ failCount++; }
-      done++;
-    }
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    alert(`完成，處理了 ${done} 個字。${failCount > 0 ? `有 ${failCount} 次個別項目失敗（可能是網路不穩），可以再按一次這個按鈕補齊，已經成功的不會重跑。` : "全部成功。"}`);
-  } finally {
-    releaseWakeLock();
-  }
-};
 
 document.getElementById("btnGenerateAllNativeTones").onclick = async () => {
   if(!getApiKey()){ alert("需要 Anthropic API Key 才能生成聲調標記，請先在上面輸入並儲存。"); return; }
@@ -6112,83 +6061,9 @@ ${lines}`;
   btn.textContent = originalLabel;
   return { done, changed, failCount };
 }
-document.getElementById("btnBackfillRegisterCefr").onclick = async () => {
-  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
-  // 掃全部單字（不只勾選的）：已經有中文意思、但還沒有難易度（cefr）或口語
-  // 標籤（register）的字。意思／例句／測驗題完全不動，只補這兩個欄位。
-  const list = allWords.filter(w => {
-    const d = lookup(w.text);
-    return d && d.zh && (!d.cefr || !d.register);
-  });
-  if(list.length === 0){ alert("目前每個有翻譯的單字都已經有難易度／口語標籤了，不用補。"); return; }
-  if(!confirm(`會用 AI 掃過 ${list.length} 個還沒有難易度標籤的單字，補上 A1~C2 難易度和口語／正式標籤。原本的意思、例句、測驗題都不會動。要開始嗎？`)) return;
-  const btn = document.getElementById("btnBackfillRegisterCefr");
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  await acquireWakeLock();
-  try{
-    const batches = chunkArr(list, 12);
-    let done = 0, failCount = 0;
-    for(const batch of batches){
-      btn.textContent = `補難易度標籤中... (${done}/${list.length})`;
-      try{
-        const items = batch.map(w => {
-          const d = lookup(w.text);
-          return { text: w.text, nativeScript: d.nativeScript, zh: d.zh };
-        });
-        const entries = await generateRegisterCefrForKnownWords(items);
-        batch.forEach((w, i) => {
-          if(!entries[i]) return;
-          customDB[w.text] = Object.assign({}, lookup(w.text), {
-            register: entries[i].register,
-            cefr: entries[i].cefr,
-            loanFrom: entries[i].loanFrom,
-            loanWord: entries[i].loanWord
-          });
-        });
-        saveCustomDB();
-        renderList();
-      }catch(e){
-        failCount += batch.length;
-      }
-      done += batch.length;
-    }
-    alert(`完成，掃過 ${done} 個字。${failCount > 0 ? `有 ${failCount} 個失敗（可能網路不穩），可以再按一次補齊，已經補好的會自動跳過。` : "全部成功。"}`);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    releaseWakeLock();
-  }
-};
 
 // 🧩 批次建議字塊：掃過所有「單獨一個字」，列出建議讓使用者勾選，勾到的才加
 // 成新卡。已經有快取的字直接用快取，不重複花 API。
-document.getElementById("btnScanChunks").onclick = async () => {
-  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
-  const candidates = allWords.filter(w => !hiddenIds.has(w.id) && isChunkCandidate(w));
-  if(candidates.length === 0){ alert("目前沒有單獨一個字、而且已經有翻譯的單字可以建議字塊。"); return; }
-  const uncached = candidates.filter(w => !chunksCache[w.text]);
-  if(uncached.length > 0 && !confirm(`會用 AI 幫 ${uncached.length} 個單字建議常用字塊（另外 ${candidates.length - uncached.length} 個之前建議過，直接沿用）。建議出來之後由你勾選要加哪些，不會自動加、也不會改動原本的字。要開始嗎？`)) return;
-  const btn = document.getElementById("btnScanChunks");
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  await acquireWakeLock();
-  let failCount = 0;
-  try{
-    const batches = chunkArr(uncached, 8);
-    let done = 0;
-    for(const batch of batches){
-      btn.textContent = `建議字塊中... (${done}/${uncached.length})`;
-      try{ await getWordChunksBatch(batch); }catch(e){ failCount += batch.length; }
-      done += batch.length;
-    }
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    releaseWakeLock();
-  }
-  renderChunkReview(candidates.filter(w => chunksCache[w.text]), failCount);
-};
 function renderChunkReview(words, failCount){
   const box = document.getElementById("chunkReview");
   box.innerHTML = "";
@@ -6301,72 +6176,7 @@ ${list}`;
   const parsed = await callClaude(prompt, schema, 2048);
   return parsed.entries;
 }
-document.getElementById("btnBackfillLoan").onclick = async () => {
-  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
-  const list = allWords.filter(w => {
-    const d = lookup(w.text);
-    return d && d.zh && d.loanFrom === undefined;
-  });
-  if(list.length === 0){ alert("每個有翻譯的單字都已經判斷過是不是外來字了，不用補。"); return; }
-  if(!confirm(`會用 AI 掃過 ${list.length} 個還沒判斷過的單字，是外來字的就標上來源語言（例如 🌍荷蘭語 kantoor）。原本的意思、例句、測驗題都不會動。要開始嗎？`)) return;
-  const btn = document.getElementById("btnBackfillLoan");
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  await acquireWakeLock();
-  try{
-    const batches = chunkArr(list, 12);
-    let done = 0, failCount = 0, loanCount = 0;
-    for(const batch of batches){
-      btn.textContent = `標記外來字中... (${done}/${list.length})`;
-      try{
-        const items = batch.map(w => {
-          const d = lookup(w.text);
-          return { text: w.text, nativeScript: d.nativeScript, zh: d.zh };
-        });
-        const entries = await generateLoanForKnownWords(items);
-        batch.forEach((w, i) => {
-          if(!entries[i]) return;
-          if(entries[i].loanFrom) loanCount++;
-          customDB[w.text] = Object.assign({}, lookup(w.text), {
-            loanFrom: entries[i].loanFrom || "",
-            loanWord: entries[i].loanFrom ? (entries[i].loanWord || "") : ""
-          });
-        });
-        saveCustomDB();
-        renderList();
-      }catch(e){
-        failCount += batch.length;
-      }
-      done += batch.length;
-    }
-    alert(`完成，掃過 ${done} 個字，其中 ${loanCount} 個是外來字。${failCount > 0 ? `有 ${failCount} 個失敗（可能網路不穩），可以再按一次補齊，已經判斷過的會自動跳過。` : ""}`);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    releaseWakeLock();
-  }
-};
 
-document.getElementById("btnViScriptBackfill").onclick = async () => {
-  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
-  const list = allWords.filter(w => selected.has(w.id)).filter(w => {
-    const d = lookup(w.text);
-    return d && d.zh;
-  });
-  if(list.length === 0){ alert("勾選的字裡面沒有可以處理的越南文字（可以先按「全選」再試一次）。"); return; }
-  if(!confirm(`會掃過勾選的 ${list.length} 個越南文字，用 AI 補上／修正「帶聲調符號的正確越南文寫法」，意思和用詞不動。要開始嗎？`)) return;
-  const btn = document.getElementById("btnViScriptBackfill");
-  btn.disabled = true;
-  await acquireWakeLock();
-  try{
-    const { done, changed, failCount } = await backfillViScript(list, btn);
-    renderList();
-    alert(`完成，掃過 ${done} 個字，改了 ${changed} 個寫法。${failCount > 0 ? `有 ${failCount} 個失敗（網路不穩之類），可以再按一次，已改過的不會重複。` : ""}`);
-  } finally {
-    btn.disabled = false;
-    releaseWakeLock();
-  }
-};
 
 // 搜尋用的正規化：轉小寫、拆掉聲調/變音符號（NFD 之後去掉 combining marks）、
 // 越南文的 đ→d。這樣在越南文分頁打 "an" 也找得到 "ăn"、"bạn"，打 "roi" 找得到
@@ -6452,7 +6262,6 @@ function getVisibleWords(){
     if(showTeacherOnly && !teacherFlagIds.has(w.id)) return false;
     if(showNumbersOnly && !isNumberWord(w)) return false;
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
-    if(showWorkOnly && !isWorkWord(w)) return false;
     if(showSentencesOnly && !isSentenceWord(w)) return false;
     if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
     if(groupFilter && (wordGroups[w.id] || "") !== groupFilter) return false;
@@ -7724,7 +7533,6 @@ function updateCount(){
   document.getElementById("selCount").textContent = parts.join("・");
   if(typeof updateNumbersToggleLabel === "function") updateNumbersToggleLabel();
   if(typeof updateGreetingsToggleLabel === "function") updateGreetingsToggleLabel();
-  if(typeof updateWorkToggleLabel === "function") updateWorkToggleLabel();
   if(typeof updateSentencesToggleLabel === "function") updateSentencesToggleLabel();
   if(typeof updateWeekdaysToggleLabel === "function") updateWeekdaysToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
@@ -8015,17 +7823,10 @@ document.getElementById("btnToggleCompareOnly").addEventListener("click", () => 
   updateCompareToggleLabel();
   renderList();
 });
-document.getElementById("btnClearCompare").addEventListener("click", () => {
-  if(compareSet.size === 0) return;
-  compareSet = new Set();
-  saveCompareSet();
-  showCompareOnly = false;
-  updateCompareToggleLabel();
-  renderList();
-});
 updateCompareToggleLabel();
 function updatePronFlagToggleLabel(){
   const btn = document.getElementById("btnTogglePronFlagOnly");
+  if(!btn) return; // 「只顯示發音待複習」按鈕已拿掉，showPronFlagOnly 永遠是 false
   btn.textContent = showPronFlagOnly ? `顯示全部單字 (發音待複習 ${pronFlagIds.size} 個)` : `⚠️ 只顯示發音待複習 (${pronFlagIds.size})`;
   btn.classList.toggle("primary", showPronFlagOnly);
 }
@@ -8041,11 +7842,6 @@ document.getElementById("btnToggleTeacherOnly").addEventListener("click", () => 
   renderList();
 });
 updateTeacherToggleLabel();
-document.getElementById("btnTogglePronFlagOnly").addEventListener("click", () => {
-  showPronFlagOnly = !showPronFlagOnly;
-  updatePronFlagToggleLabel();
-  renderList();
-});
 updatePronFlagToggleLabel();
 function updateNumbersToggleLabel(){
   const btn = document.getElementById("btnToggleNumbersOnly");
@@ -8083,19 +7879,6 @@ document.getElementById("btnToggleGreetingsOnly").addEventListener("click", () =
   renderList();
 });
 updateGreetingsToggleLabel();
-function updateWorkToggleLabel(){
-  const btn = document.getElementById("btnToggleWorkOnly");
-  if(!btn) return;
-  const n = allWords.filter(isWorkWord).length;
-  btn.textContent = showWorkOnly ? `顯示全部單字 (工作相關 ${n} 個)` : `💼 只顯示工作相關 (${n})`;
-  btn.classList.toggle("primary", showWorkOnly);
-}
-document.getElementById("btnToggleWorkOnly").addEventListener("click", () => {
-  showWorkOnly = !showWorkOnly;
-  updateWorkToggleLabel();
-  renderList();
-});
-updateWorkToggleLabel();
 function updateSentencesToggleLabel(){
   const btn = document.getElementById("btnToggleSentencesOnly");
   if(!btn) return;
