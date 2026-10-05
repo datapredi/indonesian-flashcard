@@ -313,6 +313,7 @@
       <button id="btnToggleSentencesOnly">💬 只顯示句子</button>
       <button id="btnToggleNonSentencesOnly">🔤 只顯示非句子</button>
       <button id="btnToggleWeekdaysOnly">📅 只顯示星期</button>
+      <button id="btnToggleTimeAdvOnly">⏰ 只顯示時間副詞</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
@@ -1709,6 +1710,27 @@ function isGreetingWord(w){
 // 「只顯示句子」篩選（全語言通用）：老師造的完整句子跟單字混在同一份清單裡，
 // 這個只留句子。有句尾標點（. ! ? 。！？）或至少 6 個字就算句子；片語像
 // 「Bia thủ công」「Thành phố tiếp theo」不算（越南文一個音節一個字，門檻要高一點）。
+// 「只顯示時間副詞」篩選（全語言通用）：靠中英文意思判斷是不是時間副詞／
+// 時間詞（已經、還沒、剛才、馬上、以後、常常、今天、明天…）。意思欄位常常
+// 是「已經；早就」這種用標點隔開的好幾個說法，所以拆開之後「整段」比對
+// 清單（可以多帶一個「了／的／地」），不用「包含」——不然「先生」會被
+// 「先」、「成就」會被「就」誤抓。句子不算。
+let showTimeAdvOnly = false;
+const TIME_ADV_ZH = new Set(("現在 目前 此刻 當下 這時候 那時候 當時 剛才 剛剛 剛 才剛 方才 已經 早就 早已 曾經 曾 還沒 還沒有 尚未 還 仍然 仍 依然 還是 一直 始終 正在 正 將 將要 就要 快要 即將 馬上 立刻 立即 趕快 趕緊 等一下 等一會 待會 待會兒 一會兒 稍後 晚點 遲早 隨時 以後 之後 後來 然後 接著 以前 之前 從前 先 首先 最後 終於 總算 最近 近來 這陣子 這幾天 常常 經常 時常 往往 通常 平常 平時 總是 老是 每次 每天 天天 每週 每個月 每年 有時 有時候 偶爾 很少 難得 從不 從來 從來不 從來沒有 再 又 再次 又一次 今天 明天 昨天 後天 前天 大後天 今早 今晚 明早 明晚 昨晚 早上 上午 中午 下午 傍晚 晚上 半夜 凌晨 這週 這禮拜 上週 下週 上禮拜 下禮拜 週末 這個月 上個月 下個月 今年 明年 去年 後年 前年 將來 未來 過去 一開始 起初 太早 太晚 準時 按時 及時 就 才").split(" "));
+const TIME_ADV_EN = new Set(("now|right now|currently|at the moment|at present|already|yet|not yet|still|just|just now|recently|lately|soon|later|later on|immediately|right away|at once|instantly|in a moment|in a while|afterwards|afterward|then|before|beforehand|earlier|previously|formerly|ever|never|always|often|usually|normally|generally|sometimes|occasionally|rarely|seldom|frequently|every day|daily|weekly|monthly|yearly|again|once again|finally|eventually|at last|at first|in the end|meanwhile|today|tomorrow|yesterday|tonight|this morning|this evening|last night|the day after tomorrow|the day before yesterday|this week|last week|next week|this month|last month|next month|this year|last year|next year|on the weekend|early|late|on time|in the future|in the past|nowadays|these days|forever|anytime|someday|sooner or later|in the morning|in the afternoon|in the evening|at night").split("|"));
+function splitMeaningParts(str){
+  return String(str || "").split(/[，,、;；\/／()（）\n]|\s+or\s+/).map(x => x.trim()).filter(Boolean);
+}
+function isTimeAdvWord(w){
+  if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  if(splitMeaningParts(d.zh).some(p => {
+    const t = p.replace(/[。！？!?.]+$/, "");
+    return TIME_ADV_ZH.has(t) || TIME_ADV_ZH.has(t.replace(/[了的地]$/, ""));
+  })) return true;
+  if(splitMeaningParts(d.en).some(p => TIME_ADV_EN.has(p.toLowerCase().replace(/[.!?]+$/, "")))) return true;
+  return false;
+}
 // 「只顯示星期」篩選（全語言通用）：靠中英文意思找出星期一～星期日，
 // 篩選時照星期一→星期日排好。
 let showWeekdaysOnly = false;
@@ -6270,6 +6292,7 @@ function getVisibleWords(){
     if(showSentencesOnly && !isSentenceWord(w)) return false;
     if(showNonSentencesOnly && isSentenceWord(w)) return false;
     if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
+    if(showTimeAdvOnly && !isTimeAdvWord(w)) return false;
     if(groupFilter && (wordGroups[w.id] || "") !== groupFilter) return false;
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(diffFilter){
@@ -7541,6 +7564,7 @@ function updateCount(){
   if(typeof updateGreetingsToggleLabel === "function") updateGreetingsToggleLabel();
   if(typeof updateSentencesToggleLabel === "function") updateSentencesToggleLabel();
   if(typeof updateWeekdaysToggleLabel === "function") updateWeekdaysToggleLabel();
+  if(typeof updateTimeAdvToggleLabel === "function") updateTimeAdvToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -7923,6 +7947,19 @@ document.getElementById("btnToggleWeekdaysOnly").addEventListener("click", () =>
   renderList();
 });
 updateWeekdaysToggleLabel();
+function updateTimeAdvToggleLabel(){
+  const btn = document.getElementById("btnToggleTimeAdvOnly");
+  if(!btn) return;
+  const n = allWords.filter(isTimeAdvWord).length;
+  btn.textContent = showTimeAdvOnly ? `顯示全部單字 (時間副詞 ${n} 個)` : `⏰ 只顯示時間副詞 (${n})`;
+  btn.classList.toggle("primary", showTimeAdvOnly);
+}
+document.getElementById("btnToggleTimeAdvOnly").addEventListener("click", () => {
+  showTimeAdvOnly = !showTimeAdvOnly;
+  updateTimeAdvToggleLabel();
+  renderList();
+});
+updateTimeAdvToggleLabel();
 // 自訂分組：篩選下拉選單的選項要跟著現有的組更新
 function updateGroupFilterOptions(){
   const sel = document.getElementById("groupFilter");
