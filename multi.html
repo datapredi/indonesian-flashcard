@@ -315,6 +315,7 @@
       <button id="btnToggleWeekdaysOnly">📅 只顯示星期</button>
       <button id="btnToggleTimeAdvOnly">⏰ 只顯示時間副詞</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
+      <select id="groupFilter2" class="hidden" title="同時再顯示另一個分組（兩組的字一起列出來）"><option value="">➕ 再加一組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
       <button id="btnAssignCategory">🏷️ 把勾選的字加入類別…</button>
@@ -1534,6 +1535,8 @@ function refreshAllGroupSelects(){
   });
 }
 let groupFilter = ""; // getVisibleWords 用：空＝全部；否則只顯示這一組
+// 第二個分組篩選：選了第一組之後才出現，兩組的字一起顯示（聯集）。
+let groupFilter2 = "";
 
 // 第二組獨立的自訂標籤——「類別」（例如 common expression／conversation），
 // 跟上面的「分組」（通常拿來標上課日期）完全分開、互不影響，一個字兩個維度
@@ -6293,7 +6296,10 @@ function getVisibleWords(){
     if(showNonSentencesOnly && isSentenceWord(w)) return false;
     if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
     if(showTimeAdvOnly && !isTimeAdvWord(w)) return false;
-    if(groupFilter && (wordGroups[w.id] || "") !== groupFilter) return false;
+    if(groupFilter){
+      const g = wordGroups[w.id] || "";
+      if(g !== groupFilter && !(groupFilter2 && g === groupFilter2)) return false;
+    }
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
@@ -7971,9 +7977,24 @@ function updateGroupFilterOptions(){
     + groups.map(g => `<option value="${g.replace(/"/g, "&quot;")}">📁 ${g}（${counts[g] || 0}）</option>`).join("");
   sel.value = groupFilter;
   if(sel.value !== groupFilter){ groupFilter = ""; sel.value = ""; } // 選的組被刪光了
+  // 第二組：選項同上（不列第一組已選的那組），沒選第一組時藏起來、清空。
+  const sel2 = document.getElementById("groupFilter2");
+  if(!sel2) return;
+  sel2.innerHTML = '<option value="">➕ 再加一組</option>'
+    + groups.filter(g => g !== groupFilter).map(g => `<option value="${g.replace(/"/g, "&quot;")}">📁 ${g}（${counts[g] || 0}）</option>`).join("");
+  if(!groupFilter) groupFilter2 = "";
+  sel2.value = groupFilter2;
+  if(sel2.value !== groupFilter2){ groupFilter2 = ""; sel2.value = ""; }
+  sel2.classList.toggle("hidden", !groupFilter);
 }
 document.getElementById("groupFilter").addEventListener("change", (e) => {
   groupFilter = e.target.value;
+  if(groupFilter === groupFilter2) groupFilter2 = "";
+  updateGroupFilterOptions();
+  renderList();
+});
+document.getElementById("groupFilter2").addEventListener("change", (e) => {
+  groupFilter2 = e.target.value;
   renderList();
 });
 document.getElementById("btnAssignGroup").addEventListener("click", () => {
