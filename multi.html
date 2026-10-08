@@ -49,6 +49,12 @@
   .item{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:10px 14px; border-bottom:1px solid var(--border);}
   .item:last-child{border-bottom:none;}
   .item .id-text{font-weight:600;}
+  /* 越南文南部口音尾音：藍＝拼 t 唸 c；紫＝收尾嘴唇要閉起來（像 -p） */
+  :root{ --vi-final-c:#1d6fd6; --vi-final-p:#8a3fc7; }
+  @media (prefers-color-scheme: dark){ :root{ --vi-final-c:#6aa8f5; --vi-final-p:#c38af0; } }
+  .vi-final-c{color:var(--vi-final-c); font-weight:800;}
+  .vi-final-p{color:var(--vi-final-p); font-weight:800;}
+  .vi-final-legend{font-size:0.8rem; color:var(--muted); align-self:center;}
   .item .meaning{color:var(--muted); font-size:0.82rem;}
   .item.no-data .id-text{color:var(--muted);}
   .item.no-data .meaning{color:var(--danger);}
@@ -168,6 +174,7 @@
   <div class="list hidden" id="thaiAlphabetPanel" style="padding:14px;"></div>
   <div class="toolbar hidden" id="viAlphabetBar">
     <button id="btnToggleViAlphabet">📖 越南文母音／子音對照表</button>
+    <span class="vi-final-legend">尾音（南部）：<span class="vi-final-c">t</span> 唸 c　<span class="vi-final-p">c／t</span> 嘴唇閉起來</span>
   </div>
   <div class="list hidden" id="viAlphabetPanel" style="padding:14px;"></div>
   <div class="toolbar hidden" id="arabicAlphabetBar">
@@ -6242,12 +6249,57 @@ const VI_CONSONANT_RULES = [
   { re: /^v/,  len: 1, label: "聲母 v：北部唸 v，南部口語常唸 y" },
   { re: /^s/,  len: 1, label: "聲母 s：北部併入 x（都唸 s），南部捲舌、跟 x 分得開" }
 ];
-function viHighlightRegional(text, checkTone){
+// 南部口音的尾音（老師確認過的規則）：
+// - oc、ôc、ôt（還有 uc、ut，講義例子）→ 收尾嘴唇閉起來，像 -p（học、tốt、một、chút、mục）
+// - ot、其他母音＋t → 拼 t 但唸成 c（ngọt、rất、biết、việt、mát）
+// - i／y＋t（ít、huýt）南部還是 t，不標；其他＋c 本來就唸 c，拼法唸法一樣，不標。
+// 要看母音帽子（o 跟 ô 規則不同），所以一定要用帶符號的原文判斷，只拆掉
+// 聲調符號（保留 ^ ˘ 跟 ơ／ư 的鉤）。回傳每個音節（用空白分）的 "c"／"p"／null。
+const VI_TONE_ONLY_RE = /[\u0300\u0301\u0303\u0309\u0323]/g;
+function viSouthernFinalClass(syl){
+  const base = String(syl || "").toLowerCase().normalize("NFD").replace(VI_TONE_ONLY_RE, "").normalize("NFC")
+    .replace(/[^a-zăâđêôơư]+$/, "");
+  const m = base.match(/([a-zăâêôơư])([ct])$/);
+  if(!m) return null;
+  const [, v, f] = m;
+  if(f === "c") return (v === "o" || v === "ô" || v === "u") ? "p" : null;
+  if(v === "ô" || v === "u") return "p";
+  if(v === "i" || v === "y") return null;
+  return "c";
+}
+function viSouthernFinals(nativeText){
+  return String(nativeText || "").split(/\s+/).filter(Boolean).map(viSouthernFinalClass);
+}
+// 音節裡最後一個字母的位置（後面可能接標點），拿來上色。
+function viLastLetterIndex(tok){
+  for(let i = tok.length - 1; i >= 0; i--){ if(/[a-zA-ZđĐ]/.test(tok[i].normalize("NFD")[0])) return i; }
+  return -1;
+}
+// 只標尾音、不標南北差異的版本（Flash Card 用）。
+function viFinalsHTML(text, finals){
+  if(!text) return "";
+  let k = 0;
+  return String(text).split(/(\s+)/).map(tok => {
+    if(tok === "" || /^\s+$/.test(tok)) return escapeHtmlText(tok);
+    const cls = finals ? finals[k++] : null;
+    const fi = cls ? viLastLetterIndex(tok) : -1;
+    if(fi < 0) return escapeHtmlText(tok);
+    return escapeHtmlText(tok.slice(0, fi)) + `<span class="vi-final-${cls}">${escapeHtmlText(tok[fi])}</span>` + escapeHtmlText(tok.slice(fi + 1));
+  }).join("");
+}
+function escapeHtmlText(t){ return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+// finals：viSouthernFinals(原文) 的結果，跟 text 的音節一一對應（拆掉聲調的
+// 拼音版也是同樣的音節數，所以兩行都能用同一份）；不傳就不標尾音。
+function viHighlightRegional(text, checkTone, finals){
   if(!text) return { html: "", reasons: [] };
   const toks = String(text).split(/(\s+)/); // 保留空白，重組時原樣接回去
   const reasons = new Set();
+  let syllable = 0;
   const html = toks.map(tok => {
     if(tok === "" || /^\s+$/.test(tok)) return tok;
+    const finalCls = finals ? finals[syllable] : null;
+    syllable++;
+    const finalIdx = finalCls ? viLastLetterIndex(tok) : -1;
     const low = tok.toLowerCase();
     const rule = VI_CONSONANT_RULES.find(r => r.re.test(low));
     const prefixLen = rule ? rule.len : 0;
@@ -6257,10 +6309,11 @@ function viHighlightRegional(text, checkTone){
       for(const ch of tok){ if(VI_NGA_RE.test(ch)){ hasNga = true; break; } }
       if(hasNga) reasons.add("聲調 ngã（～）：南部併入 hỏi，跟北部唸法不同");
     }
-    if(!prefixLen && !hasNga) return tok;
+    if(!prefixLen && !hasNga && finalIdx < 0) return tok;
     let out = "";
     for(let i = 0; i < tok.length; i++){
       const ch = tok[i];
+      if(i === finalIdx){ out += `<span class="vi-final-${finalCls}">${ch}</span>`; continue; }
       const flag = i < prefixLen || (checkTone && VI_NGA_RE.test(ch));
       out += flag ? `<span style="color:var(--danger); font-weight:700;">${ch}</span>` : ch;
     }
@@ -6374,8 +6427,9 @@ function createWordItem(w){
   if(currentLang === "vi"){
     viNative = (data && data.nativeScript) || w.text;
     viMain = stripVietToneMarks(viNative);
-    const nativeHi = viHighlightRegional(viNative, true);   // 帶聲調符號，聲母＋ngã 都要標
-    const mainHi = viHighlightRegional(viMain, false);      // 已拆聲調，只剩聲母規則能標
+    const finals = viSouthernFinals(viNative);               // 南部尾音（藍 -c／紫 -p），兩行共用
+    const nativeHi = viHighlightRegional(viNative, true, finals);   // 帶聲調符號，聲母＋ngã 都要標
+    const mainHi = viHighlightRegional(viMain, false, finals);      // 已拆聲調，只剩聲母規則能標
     viRegionReasons = nativeHi.reasons;
     viNativeHTML = nativeHi.html;
     viMainHTML = mainHi.html;
@@ -9167,8 +9221,16 @@ function renderCard(){
     ? `↩︎ 對方回：${data.reply.romanized || data.reply.nativeScript || ""}${data.reply.zh ? " · " + data.reply.zh : ""}`
     : "";
   const cardNative = document.getElementById("cardNative");
+  // 越南文：把南部尾音標色（跟單字表一樣），音節數對不上就照原樣顯示。
+  const viCardHTML = (() => {
+    if(currentLang !== "vi") return null;
+    const finals = viSouthernFinals((data && data.nativeScript) || w.text);
+    if(String(w.text).split(/\s+/).filter(Boolean).length !== finals.length || !finals.some(Boolean)) return null;
+    return viFinalsHTML(w.text, finals);
+  })();
   if(cardDirection === "id-zh"){
     document.getElementById("cardFront").textContent = w.text;
+    if(viCardHTML) document.getElementById("cardFront").innerHTML = viCardHTML;
     // 認羅馬拼音回想意思時，漢字原文一起顯示在正面當輔助（不是答案，不算洩題）
     document.getElementById("cardPron").textContent = nativeText || pronText.trim();
     document.getElementById("cardPron").classList.toggle("is-native", !!nativeText);
@@ -9179,6 +9241,7 @@ function renderCard(){
     document.getElementById("cardPron").textContent = "";
     document.getElementById("cardPron").classList.remove("is-native");
     document.getElementById("cardBack").textContent = w.text + pronText;
+    if(viCardHTML) document.getElementById("cardBack").innerHTML = viCardHTML + escapeHtmlText(pronText);
     // 中文回想日文時，漢字原文是答案的一部分，跟著背面一起翻開才顯示
     cardNative.textContent = [nativeText, replyText].filter(Boolean).join("　");
   }
