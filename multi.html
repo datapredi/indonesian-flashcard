@@ -320,6 +320,7 @@
       <button id="btnToggleNonSentencesOnly">🔤 只顯示非句子</button>
       <button id="btnToggleWeekdaysOnly">📅 只顯示星期</button>
       <button id="btnToggleTimeAdvOnly">⏰ 只顯示時間副詞</button>
+      <button id="btnToggleConjOnly">🧷 只顯示連接詞</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <select id="groupFilter2" class="hidden" title="同時再顯示另一個分組（兩組的字一起列出來）"><option value="">➕ 再加一組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
@@ -1759,6 +1760,22 @@ function isTimeAdvWord(w){
     return TIME_ADV_ZH.has(t) || TIME_ADV_ZH.has(t.replace(/[了的地]$/, ""));
   })) return true;
   if(splitMeaningParts(d.en).some(p => TIME_ADV_EN.has(p.toLowerCase().replace(/[.!?]+$/, "")))) return true;
+  return false;
+}
+// 「只顯示連接詞」篩選（全語言通用）：跟上面時間副詞同一套做法——中英文
+// 意思拆段之後「整段」比對清單（和、但是、所以、因為、如果、雖然、或者、
+// and、but、because…），不用「包含」，避免「但」抓到「但願」之類。句子不算。
+let showConjOnly = false;
+const CONJ_ZH = new Set(("和 跟 與 及 以及 同 還有 而且 並且 並 而 但是 但 可是 不過 然而 卻 只是 所以 因此 因而 於是 因為 由於 既然 那麼 那 如果 要是 假如 假設 萬一 只要 只有 除非 雖然 雖 儘管 即使 就算 哪怕 或 或者 或是 還是 要不然 不然 否則 要不 而是 不但 不僅 不只 甚至 何況 況且 另外 此外 再說 總之 換句話說 也就是說 例如 比如 譬如 為了 以便 以免 免得 一旦 無論 不管 不論 同時 一邊 然後 接著 之後 以後 結果 反而 不如 與其 寧可 好讓 所以說 因為這樣").split(" "));
+const CONJ_EN = new Set(("and|or|but|so|because|since|as|although|though|even though|even if|if|unless|whether|while|whereas|however|therefore|thus|hence|then|also|as well as|either|neither|nor|otherwise|so that|in order to|in order that|in case|as long as|as soon as|provided that|besides|moreover|furthermore|in addition|instead|rather|in other words|that is|for example|for instance|in short|anyway|after that|and then|as a result|consequently|not only|but also|yet").split("|"));
+function isConjWord(w){
+  if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  if(splitMeaningParts(d.zh).some(p => {
+    const t = p.replace(/[。！？!?.]+$/, "");
+    return CONJ_ZH.has(t) || CONJ_ZH.has(t.replace(/[的地]$/, ""));
+  })) return true;
+  if(splitMeaningParts(d.en).some(p => CONJ_EN.has(p.toLowerCase().replace(/[.!?]+$/, "")))) return true;
   return false;
 }
 // 「只顯示星期」篩選（全語言通用）：靠中英文意思找出星期一～星期日，
@@ -6370,6 +6387,7 @@ function getVisibleWords(){
     if(showNonSentencesOnly && isSentenceWord(w)) return false;
     if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
     if(showTimeAdvOnly && !isTimeAdvWord(w)) return false;
+    if(showConjOnly && !isConjWord(w)) return false;
     if(groupFilter){
       const g = wordGroups[w.id] || "";
       if(g !== groupFilter && !(groupFilter2 && g === groupFilter2)) return false;
@@ -7687,6 +7705,7 @@ function updateCount(){
   if(typeof updateSentencesToggleLabel === "function") updateSentencesToggleLabel();
   if(typeof updateWeekdaysToggleLabel === "function") updateWeekdaysToggleLabel();
   if(typeof updateTimeAdvToggleLabel === "function") updateTimeAdvToggleLabel();
+  if(typeof updateConjToggleLabel === "function") updateConjToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -8085,6 +8104,19 @@ document.getElementById("btnToggleTimeAdvOnly").addEventListener("click", () => 
   renderList();
 });
 updateTimeAdvToggleLabel();
+function updateConjToggleLabel(){
+  const btn = document.getElementById("btnToggleConjOnly");
+  if(!btn) return;
+  const n = allWords.filter(isConjWord).length;
+  btn.textContent = showConjOnly ? `顯示全部單字 (連接詞 ${n} 個)` : `🧷 只顯示連接詞 (${n})`;
+  btn.classList.toggle("primary", showConjOnly);
+}
+document.getElementById("btnToggleConjOnly").addEventListener("click", () => {
+  showConjOnly = !showConjOnly;
+  updateConjToggleLabel();
+  renderList();
+});
+updateConjToggleLabel();
 // 自訂分組：篩選下拉選單的選項要跟著現有的組更新
 function updateGroupFilterOptions(){
   const sel = document.getElementById("groupFilter");
