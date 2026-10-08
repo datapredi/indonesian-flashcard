@@ -535,21 +535,79 @@
 // IndexedDB 的單字卡資料從 localStorage 刪掉（見 freeLocalStorage）。
 // IndexedDB 開不起來時會重試；還是不行而且 localStorage 裡還有舊資料
 // （還沒搬過）才退回用 localStorage，否則顯示錯誤請使用者重新載入。
+// 備份副本（Cache Storage）：iPhone Safari 的 IndexedDB 有時重新整理後整個
+// 卡死（open 永遠沒回應），同一個分頁怎麼重新整理都沒用，只能另開新分頁。
+// 所以每次存檔也同步寫一份到 Cache Storage（Safari 用不同的機制存，不受
+// IndexedDB 卡住影響）。IndexedDB 讀不到時改從這份副本載入，頁面照常能用；
+// 之後 IndexedDB 恢復時，用「版本號」（__rev，每存一次 +1）判斷哪邊比較新，
+// 副本比較新就整份補回 IndexedDB。
 const kvStore = (() => {
   const KV_DB_NAME = "flashcard_kv_v1";
   const KV_STORE = "kv";
   const MIGRATED_KEY = "__migrated_from_localStorage";
+  const REV_KEY = "__rev";
+  const MIRROR_NAME = "flashcard_kv_mirror_v1";
+  const MIRROR_PREFIX = "/__flashcard_kv__/";
   const mem = new Map();
   let db = null;
   let writeErrorShown = false;
-  let fallback = false;
+  let fallback = false;     // 只用 localStorage（IndexedDB／副本都沒有，而且舊資料還在 localStorage）
+  let mirrorMode = false;   // 這次是從副本載入的：IndexedDB 壞了，存檔只寫副本
+  let rev = 0;
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
   function onWriteError(err){
-    console.error("IndexedDB 寫入失敗", err);
+    console.error("存檔失敗", err);
     if(writeErrorShown) return;
     writeErrorShown = true;
     alert("資料存檔失敗：" + (err && err.message ? err.message : err) + "\n\n這次的變更可能沒有存到，重新整理後會不見。");
   }
+  function withTimeout(promise, ms, label){
+    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(label + " 逾時")), ms))]);
+  }
+
+  // ---- 備份副本（Cache Storage）----
+  const hasMirror = typeof caches !== "undefined";
+  let mirrorChain = Promise.resolve();
+  let mirrorCachePromise = null;
+  let mirrorFailed = false;
+  function mirrorCache(){
+    if(!mirrorCachePromise) mirrorCachePromise = caches.open(MIRROR_NAME);
+    return mirrorCachePromise;
+  }
+  function mirrorUrl(k){ return MIRROR_PREFIX + encodeURIComponent(k); }
+  // 依序排隊寫，確保同一個 key 先存的不會蓋掉後存的。
+  function mirrorWrite(keys){
+    if(!hasMirror) return;
+    mirrorChain = mirrorChain.then(async () => {
+      const c = await withTimeout(mirrorCache(), 5000, "開啟備份副本");
+      for(const k of keys){
+        if(mem.has(k)) await c.put(mirrorUrl(k), new Response(mem.get(k), { headers: { "content-type": "text/plain;charset=utf-8" } }));
+        else await c.delete(mirrorUrl(k));
+      }
+    }).catch(e => {
+      console.warn("備份副本寫入失敗", e);
+      if(mirrorMode){ mirrorFailed = true; onWriteError(e); }
+    });
+  }
+  async function readMirror(){
+    const c = await mirrorCache();
+    const reqs = await c.keys();
+    const out = new Map();
+    for(const r of reqs){
+      const path = new URL(r.url).pathname;
+      if(!path.startsWith(MIRROR_PREFIX)) continue;
+      const res = await c.match(r);
+      if(res) out.set(decodeURIComponent(path.slice(MIRROR_PREFIX.length)), await res.text());
+    }
+    return out;
+  }
+  async function readMirrorRev(){
+    const c = await mirrorCache();
+    const res = await c.match(mirrorUrl(REV_KEY));
+    return res ? Number(await res.text()) || 0 : 0;
+  }
+
+  // ---- IndexedDB ----
   // 還沒寫完的交易。重新整理頁面前要先等它們寫完（見 flush），不然 Safari
   // 會在重新整理時直接中斷寫到一半的交易——切換語言就是先存語言再重新整理，
   // 存檔被中斷的話重新整理後還是停在原本的語言。
@@ -559,24 +617,25 @@ const kvStore = (() => {
   const dirty = new Set();
   let reconnecting = null;
   let reconnectTries = 0; // 連續重連失敗幾次（成功寫入一筆就歸零），最多試 3 次
-  function write(k){
-    if(!db){ dirty.add(k); reconnect(); return; }
+  function idbWrite(keys){
+    if(mirrorMode) return; // IndexedDB 這次壞掉了，只寫副本；下次正常載入時再補回去
+    if(!db){ keys.forEach(k => dirty.add(k)); reconnect(); return; }
     try{
       const tx = db.transaction(KV_STORE, "readwrite");
       const st = tx.objectStore(KV_STORE);
-      if(mem.has(k)) st.put(mem.get(k), k); else st.delete(k);
+      keys.forEach(k => { if(mem.has(k)) st.put(mem.get(k), k); else st.delete(k); });
       const done = new Promise(resolve => {
         tx.oncomplete = () => { reconnectTries = 0; resolve(); };
-        tx.onerror = () => { dirty.add(k); reconnect(tx.error); resolve(); };
-        tx.onabort = () => { dirty.add(k); reconnect(tx.error); resolve(); };
+        tx.onerror = () => { keys.forEach(k => dirty.add(k)); reconnect(tx.error); resolve(); };
+        tx.onabort = () => { keys.forEach(k => dirty.add(k)); reconnect(tx.error); resolve(); };
       });
       pending.add(done);
       done.then(() => pending.delete(done));
-    }catch(e){ dirty.add(k); reconnect(e); }
+    }catch(e){ keys.forEach(k => dirty.add(k)); reconnect(e); }
   }
   // iPhone 把頁面放到背景久了，Safari 可能把 IndexedDB 連線砍掉（之後每次寫入
   // 都會失敗）。偵測到就重新開一次連線、把沒存到的 key 補寫回去；重連也失敗
-  // 才跳警告。
+  // 才跳警告（副本有存到的話資料其實沒丟，下次載入會補回來）。
   function attachDB(d){
     db = d;
     d.onclose = () => { if(db === d){ db = null; reconnect(); } };
@@ -584,8 +643,11 @@ const kvStore = (() => {
   }
   function reconnect(cause){
     if(cause) console.warn("IndexedDB 寫入失敗，重新連線", cause);
-    if(reconnecting || fallback) return reconnecting;
-    if(reconnectTries >= 3){ onWriteError(cause || new Error("IndexedDB 一直連不上")); return null; }
+    if(reconnecting || fallback || mirrorMode) return reconnecting;
+    if(reconnectTries >= 3){
+      if(!hasMirror || mirrorFailed) onWriteError(cause || new Error("IndexedDB 一直連不上"));
+      return null;
+    }
     reconnectTries++;
     if(db){ try{ db.close(); }catch(e){} db = null; }
     reconnecting = (async () => {
@@ -594,7 +656,7 @@ const kvStore = (() => {
         attachDB(d);
         const keys = [...dirty];
         dirty.clear();
-        keys.forEach(k => write(k));
+        if(keys.length) idbWrite(keys);
       }catch(e){
         console.warn("重新連線失敗", e);
       }finally{
@@ -638,9 +700,22 @@ const kvStore = (() => {
         if(k !== null && v !== null){ st.put(v, k); mem.set(k, v); }
       }
       st.put("1", MIGRATED_KEY);
+      mem.set(MIGRATED_KEY, "1");
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error || new Error("migration aborted"));
+    });
+  }
+  // 整份 mem 一次寫進 IndexedDB（副本比較新、要補回去時用）。
+  function writeAllToIDB(d){
+    return new Promise((resolve, reject) => {
+      const tx = d.transaction(KV_STORE, "readwrite");
+      const st = tx.objectStore(KV_STORE);
+      st.clear();
+      mem.forEach((v, k) => st.put(v, k));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("aborted"));
     });
   }
   // localStorage 是整個 datapredi.github.io 共用的（yt_sync 的播放器也在
@@ -658,13 +733,9 @@ const kvStore = (() => {
       });
     }catch(e){ console.error("清理 localStorage 失敗", e); }
   }
-  function withTimeout(promise, ms, label){
-    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(label + " 逾時")), ms))]);
-  }
   // iOS Safari 的已知問題：重新整理（切換語言就是重新整理）之後，
-  // indexedDB.open 偶爾會永遠沒有回應，頁面就卡在讀資料、主程式不會啟動，
-  // 只能另開分頁。先反覆呼叫 indexedDB.databases() 把它「叫醒」（跟
-  // safari-14-idb-fix 同一招），再加逾時、重試幾次，不要無限期卡住。
+  // indexedDB.open 偶爾會永遠沒有回應。先反覆呼叫 indexedDB.databases()
+  // 把它「叫醒」（跟 safari-14-idb-fix 同一招），再加逾時，不要無限期卡住。
   function idbWake(){
     if(!indexedDB.databases) return Promise.resolve();
     let timer;
@@ -675,11 +746,11 @@ const kvStore = (() => {
     }).finally(() => clearInterval(timer));
   }
   async function openAndLoad(){
-    await withTimeout(idbWake(), 2000, "IndexedDB 喚醒").catch(() => {});
-    const { d, upgraded } = await withTimeout(openDB(), 4000, "開啟 IndexedDB");
-    const all = await withTimeout(readAll(d), 20000, "讀取 IndexedDB");
+    await withTimeout(idbWake(), 1500, "IndexedDB 喚醒").catch(() => {});
+    const { d, upgraded } = await withTimeout(openDB(), 3000, "開啟 IndexedDB");
+    const all = await withTimeout(readAll(d), 8000, "讀取 IndexedDB");
     // 資料庫本來就存在（不是第一次建立），卻一筆資料都讀不到——正常情況不可能
-    // （至少會有搬家完成的標記），代表 Safari 這次讀取出問題。當作失敗重試，
+    // （至少會有搬家完成的標記），代表 Safari 這次讀取出問題。當作失敗，
     // 絕對不能拿「空的」資料啟動，不然之後一存檔就會把真正的單字蓋掉。
     if(!upgraded && all.size === 0 && !localStorageHasFlashcardData()){
       try{ d.close(); }catch(e){}
@@ -688,8 +759,7 @@ const kvStore = (() => {
     return { d, all };
   }
   // 單字卡的資料還留在 localStorage 嗎？（搬進 IndexedDB 之後就會被
-  // freeLocalStorage 清掉）——還在才能安全地退回用 localStorage，
-  // 不然退回去會看到空的單字表，之後的變更也會存錯地方。
+  // freeLocalStorage 清掉）——還在才能安全地退回用 localStorage。
   function localStorageHasFlashcardData(){
     try{
       for(let i = 0; i < localStorage.length; i++){
@@ -710,15 +780,53 @@ const kvStore = (() => {
     box.querySelector("button").onclick = () => location.reload();
     document.body.appendChild(box);
   }
+  function showMirrorNotice(){
+    const bar = document.createElement("div");
+    bar.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99998;background:#fff7d6;color:#5a4500;border:1px solid #e6cf7a;border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.4;";
+    bar.textContent = "Safari 的資料庫這次卡住了，已改用備份副本載入，可以照常使用、存檔也會保留。之後開新分頁會自動同步回去。";
+    const x = document.createElement("button");
+    x.textContent = "✕";
+    x.style.cssText = "float:right;margin-left:8px;padding:0 6px;";
+    x.onclick = () => bar.remove();
+    bar.prepend(x);
+    document.body.appendChild(bar);
+    setTimeout(() => bar.remove(), 8000);
+  }
+
   const ready = (async () => {
     if(typeof indexedDB === "undefined"){ fallback = true; return; }
     let lastErr;
-    for(let attempt = 0; attempt < 2; attempt++){
+    // 有備份副本的話只試一次 IndexedDB 就好：卡住的分頁再試也是卡住，
+    // 早點改用副本，畫面不用空白等太久。
+    const attempts = hasMirror ? 1 : 2;
+    for(let attempt = 0; attempt < attempts; attempt++){
       try{
         const { d, all } = await openAndLoad();
         all.forEach((v, k) => mem.set(k, v));
         if(!mem.has(MIGRATED_KEY)) await migrateFromLocalStorage(d);
+        rev = Number(mem.get(REV_KEY)) || 0;
+        // 還沒有版本號（剛加這個機制）：從 1 開始，副本才認得出是完整的一份。
+        let needRevWrite = false;
+        if(!rev){ rev = 1; mem.set(REV_KEY, "1"); needRevWrite = true; }
+        // 上次是用副本存的（IndexedDB 那時壞掉）→ 副本比較新，整份補回 IndexedDB。
+        if(hasMirror){
+          try{
+            const mRev = await withTimeout(readMirrorRev(), 3000, "讀取備份副本版本");
+            if(mRev > rev){
+              const m = await withTimeout(readMirror(), 8000, "讀取備份副本");
+              if(m.size){
+                mem.clear();
+                m.forEach((v, k) => mem.set(k, v));
+                rev = mRev;
+                await writeAllToIDB(d);
+              }
+            }else if(mRev < rev){
+              mirrorWrite([...mem.keys()]); // 副本是舊的或還沒建立：整份更新
+            }
+          }catch(e){ console.warn("備份副本檢查失敗", e); }
+        }
         attachDB(d);
+        if(needRevWrite) idbWrite([REV_KEY]);
         freeLocalStorage();
         return;
       }catch(e){
@@ -727,6 +835,19 @@ const kvStore = (() => {
         mem.clear();
       }
     }
+    // IndexedDB 不能用 → 改從備份副本載入。
+    if(hasMirror){
+      try{
+        const m = await withTimeout(readMirror(), 8000, "讀取備份副本");
+        if(m.size && m.has(REV_KEY)){
+          m.forEach((v, k) => mem.set(k, v));
+          rev = Number(mem.get(REV_KEY)) || 0;
+          mirrorMode = true;
+          showMirrorNotice();
+          return;
+        }
+      }catch(e){ console.error("備份副本讀取失敗", e); lastErr = e; }
+    }
     if(localStorageHasFlashcardData()){
       fallback = true;
       return;
@@ -734,10 +855,20 @@ const kvStore = (() => {
     showLoadError(lastErr);
     throw lastErr;
   })();
+
+  function bumpRev(){
+    rev++;
+    mem.set(REV_KEY, String(rev));
+  }
+  function persist(k){
+    bumpRev();
+    idbWrite([k, REV_KEY]);
+    mirrorWrite([k, REV_KEY]);
+  }
   return {
     ready,
     // 最多等 3 秒，寫入真的卡住也不要讓切換語言永遠沒反應。
-    flush(){ return Promise.race([Promise.all([...pending, reconnecting]), new Promise(r => setTimeout(r, 3000))]); },
+    flush(){ return Promise.race([Promise.all([...pending, reconnecting, mirrorChain]), new Promise(r => setTimeout(r, 3000))]); },
     getItem(k){
       if(fallback) return lsGet(k);
       return mem.has(k) ? mem.get(k) : null;
@@ -746,12 +877,12 @@ const kvStore = (() => {
       v = String(v);
       if(fallback){ localStorage.setItem(k, v); return; }
       mem.set(k, v);
-      write(k);
+      persist(k);
     },
     removeItem(k){
       if(fallback){ try{ localStorage.removeItem(k); }catch(e){} return; }
       mem.delete(k);
-      write(k);
+      persist(k);
     }
   };
 })();
