@@ -64,7 +64,6 @@
   .item.color-green{background:color-mix(in srgb, #34c759 20%, var(--bg));}
   .item.autoplay-current.color-yellow, .item.autoplay-current.color-red, .item.autoplay-current.color-green{box-shadow:inset 4px 0 0 var(--accent);}
   .color-flag-select{border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--fg); font-size:13px; padding:2px 4px;}
-  .move-after-input{width:56px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--fg); font-size:13px; padding:2px 4px; text-align:center;}
   /* 文字區塊固定佔滿一整行，按鈕多的話會自動排到下一行，不會把單字擠成一個字母一行 */
   .item > div{flex:1 1 100%; min-width:0;}
   .speak-btn{flex:0 0 auto; padding:6px 10px; font-size:1rem; border-radius:10px;}
@@ -7390,77 +7389,6 @@ function createWordItem(w){
     if(categoryFilter) renderList();
   });
   row.appendChild(categorySelect);
-
-  // 輸入一個編號，把「那個編號的字」搬到「這個字」下面——這個字本身不動，
-  // 動的是被輸入的那個字，方便把兩個容易搞混的字擺在一起比較。原本用
-  // disableAllSorts()+renderList()：因為預設是「新單字在前」（照 id 倒序
-  // 顯示），一關掉排序整個列表就會整批換成照 allWords 陣列順序顯示，看起來
-  // 像是「其他字也全部被搬動了」，其實只是排序方式整個換掉造成的視覺錯覺。
-  // 改成不動排序設定、不整批重繪，只把「被搬動那個字」自己的列＋8個面板這一
-  // 整組 DOM 直接搬到「這個字」的列＋面板後面，畫面上真的就只有那一個字的
-  // 位置變了。allWords 陣列順序還是照樣更新（給以後真的切到無排序模式時用），
-  // 只是不會逼著使用者切排序模式。
-  const moveInput = document.createElement("input");
-  moveInput.type = "number";
-  moveInput.className = "move-after-input";
-  moveInput.placeholder = "把#搬下面";
-  moveInput.title = "輸入編號，把那個編號的字搬到這個字下面（這個字本身不動，方便比較）";
-  moveInput.addEventListener("click", (e) => e.stopPropagation());
-  moveInput.addEventListener("keydown", (e) => {
-    e.stopPropagation();
-    if(e.key === "Enter"){ e.preventDefault(); moveInput.blur(); }
-  });
-  moveInput.addEventListener("change", (e) => {
-    e.stopPropagation();
-    const raw = moveInput.value.trim();
-    moveInput.value = "";
-    if(!raw) return;
-    const movedId = Number(raw);
-    if(!Number.isFinite(movedId)) return;
-    if(movedId === w.id){ alert("不能把這個字搬到自己下面。"); return; }
-    const moved = allWords.find(x => x.id === movedId);
-    if(!moved){ alert(`找不到編號 ${movedId} 的字。`); return; }
-
-    // 先更新陣列順序（無排序檢視／持久化用）
-    const movedIdx = allWords.indexOf(moved);
-    if(movedIdx === -1) return;
-    allWords.splice(movedIdx, 1);
-    const anchorIdx = allWords.indexOf(w);
-    allWords.splice(anchorIdx + 1, 0, moved);
-    saveWordList(allWords);
-
-    // 被搬的字現在被搜尋／難度篩選擋住 → 直接幫忙清掉這兩個，讓它出現，
-    // 不用使用者自己先清搜尋、再去找目標字。清掉之後整個列表會重繪，
-    // 原本的 row 參照就失效了，要改用 data-word-id 重新抓。
-    if(!getVisibleWords().some(x => x.id === movedId)){
-      document.getElementById("wordSearch").value = "";
-      document.getElementById("wordSearch2").value = "";
-      document.getElementById("difficultyFilter").value = "";
-      renderList();
-    }
-    function collectGroup(rowEl){
-      const group = [rowEl];
-      let sib = rowEl.nextElementSibling;
-      for(let i = 0; i < 9 && sib; i++){ group.push(sib); sib = sib.nextElementSibling; }
-      return group;
-    }
-    const anchorRowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
-    const movedRowEl = document.querySelector(`#wordList .item[data-word-id="${movedId}"]`);
-    if(anchorRowEl && movedRowEl){
-      const anchorGroup = collectGroup(anchorRowEl);
-      const movedGroup = collectGroup(movedRowEl);
-      const insertPoint = anchorGroup[anchorGroup.length - 1].nextSibling;
-      const parent = anchorRowEl.parentNode;
-      movedGroup.forEach(el => parent.insertBefore(el, insertPoint));
-      movedRowEl.classList.remove("jump-highlight");
-      void movedRowEl.offsetWidth;
-      movedRowEl.classList.add("jump-highlight");
-      movedRowEl.scrollIntoView({ behavior: "smooth", block: "center" });
-    }else{
-      alert(`已把編號 ${movedId} 搬到「${w.text}」下面（陣列順序已更新）。但它現在被其他篩選（例如只顯示某類）擋住，看不到；把那個篩選關掉就會出現在「${w.text}」下面。`);
-    }
-  });
-  row.appendChild(moveInput);
 
   // 「當作新字」：有些字以前就存在，但老師最近又重新教了一次，想把它當成剛學
   // 的新字。做法是重新編號成目前最大編號 +1、搬到 allWords 最後面——這樣
