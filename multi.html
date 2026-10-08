@@ -6848,8 +6848,10 @@ function createWordItem(w){
   linksInputRow.style.cssText = "display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;";
   const linksInput = document.createElement("input");
   linksInput.type = "text";
-  linksInput.inputMode = "numeric";
-  linksInput.placeholder = "要比較的單字編號，例如 256, 310";
+  // iPhone 的 numeric 鍵盤只有數字、打不出隔開用的符號；decimal 鍵盤多一個
+  // 「.」（有些地區是「,」）。下面拆編號時任何非數字都算分隔，所以都能用。
+  linksInput.inputMode = "decimal";
+  linksInput.placeholder = "單字編號，用 . 或 , 隔開，例如 256.310";
   linksInput.style.cssText = "flex:1 1 180px; min-width:0;";
   const linksSaveBtn = document.createElement("button");
   linksSaveBtn.type = "button";
@@ -6863,7 +6865,7 @@ function createWordItem(w){
     linksList.innerHTML = "";
     const ids = getWordLinks(w.id);
     if(!ids.length){
-      linksList.innerHTML = '<div class="note-saved">還沒有要比較的字。輸入編號（清單上每個字前面的數字），用逗號或空白隔開，按儲存。</div>';
+      linksList.innerHTML = '<div class="note-saved">還沒有要比較的字。輸入編號（清單上每個字前面的數字），用 . 或 , 隔開，按儲存。</div>';
       return;
     }
     ids.forEach(id => {
