@@ -1621,6 +1621,27 @@ let wordNotes = {};
 try{ wordNotes = JSON.parse(kvStore.getItem(lsKey(WORD_NOTES_LS))) || {}; }catch(e){ wordNotes = {}; }
 function saveWordNotes(){ kvStore.setItem(lsKey(WORD_NOTES_LS), JSON.stringify(wordNotes)); }
 function getWordNote(text){ return wordNotes[text] || ""; }
+// 🔗 要一起比較的字：{ 單字編號: [其他單字編號, …] }，每個語言各一份。
+// 連結是雙向的：在 100 填 256，256 那邊也會自動出現 100。
+const WORD_LINKS_LS = "flashcard_word_links_v1";
+let wordLinks = {};
+try{ wordLinks = JSON.parse(kvStore.getItem(lsKey(WORD_LINKS_LS))) || {}; }catch(e){ wordLinks = {}; }
+function saveWordLinks(){ kvStore.setItem(lsKey(WORD_LINKS_LS), JSON.stringify(wordLinks)); }
+function getWordLinks(id){ return (wordLinks[id] || []).slice(); }
+function setWordLinks(id, newIds){
+  const old = getWordLinks(id);
+  const next = [...new Set(newIds.filter(x => x !== id))];
+  const unlink = (a, b) => {
+    const list = (wordLinks[a] || []).filter(x => x !== b);
+    if(list.length) wordLinks[a] = list; else delete wordLinks[a];
+  };
+  const link = (a, b) => { const list = wordLinks[a] || []; if(!list.includes(b)) wordLinks[a] = list.concat(b); };
+  old.filter(x => !next.includes(x)).forEach(x => unlink(x, id));
+  next.filter(x => !old.includes(x)).forEach(x => link(x, id));
+  if(next.length) wordLinks[id] = next; else delete wordLinks[id];
+  saveWordLinks();
+  return [...new Set([...old, ...next])]; // 受影響的字（要更新它們的 🔗 按鈕）
+}
 function setWordNote(text, val){
   const v = (val || "").trim();
   if(v) wordNotes[text] = v; else delete wordNotes[text];
@@ -1971,16 +1992,16 @@ async function completeMissingWordData(missing, btn, labelPrefix, skipRender){
     if(!skipRender) renderList();
   }
 }
-// 重新整個換掉單一個字的列（+ 跟著它的 8 個面板），不重繪整個列表——給「在
+// 重新整個換掉單一個字的列（+ 跟著它的 9 個面板），不重繪整個列表——給「在
 // 展開中的面板裡補資料」這種情境用，避免 renderList() 把使用者正在看的其他
 // 面板收合掉。原本只用 innerHTML 補「意思」那一行文字，結果剛加入時因為還
 // 沒有資料，原文（nativeScript）顯示、埃及文 أ 切換／字母拆解／變位按鈕、
 // Forvo 連結這些會依資料有無決定「要不要畫出來」的東西，從一開始就沒被
 // 建到 row 裡，光改文字不會讓它們補畫出來——所以改成用 createWordItem()
-// 整組重新產生，直接換掉舊的 row 跟緊接在後面的 8 個面板（renderList()／
+// 整組重新產生，直接換掉舊的 row 跟緊接在後面的 9 個面板（renderList()／
 // addWordToList() 每一列都是固定按這個順序排的：row, usagePanel,
 // antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel,
-// minimalPairsPanel, crossLangPanel）。這個字剛加進來，這些面板一定都還沒
+// minimalPairsPanel, crossLangPanel, linksPanel）。這個字剛加進來，這些面板一定都還沒
 // 展開過，整組換掉不會影響使用者正在看的別的字的面板。
 function refreshWordRowDisplay(id){
   const w = allWords.find(x => x.id === id);
@@ -1990,10 +2011,10 @@ function refreshWordRowDisplay(id){
   const parent = oldRow.parentNode;
   const toRemove = [oldRow];
   let sib = oldRow.nextElementSibling;
-  for(let i = 0; i < 8 && sib; i++){ toRemove.push(sib); sib = sib.nextElementSibling; }
+  for(let i = 0; i < 9 && sib; i++){ toRemove.push(sib); sib = sib.nextElementSibling; }
   const anchor = toRemove[toRemove.length - 1].nextSibling;
-  const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
-  [row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel]
+  const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel } = createWordItem(w);
+  [row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel]
     .forEach(el => parent.insertBefore(el, anchor));
   toRemove.forEach(el => parent.removeChild(el));
 }
@@ -4557,8 +4578,9 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(newWord);
-    el.insertBefore(crossLangPanel, el.firstChild);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel } = createWordItem(newWord);
+    el.insertBefore(linksPanel, el.firstChild);
+    el.insertBefore(crossLangPanel, linksPanel);
     el.insertBefore(minimalPairsPanel, crossLangPanel);
     el.insertBefore(nativeTonePanel, minimalPairsPanel);
     el.insertBefore(tonePanel, nativeTonePanel);
@@ -6809,6 +6831,115 @@ function createWordItem(w){
   });
   row.appendChild(notesBtn);
 
+  // 🔗 比較：輸入其他單字的編號（例如 256, 310），展開就能把它們列在一起比對。
+  const linksPanel = document.createElement("div");
+  linksPanel.className = "usage-panel hidden";
+  const linksBtn = document.createElement("button");
+  linksBtn.type = "button";
+  linksBtn.className = "usage-btn row-links-btn";
+  function refreshLinksBtn(){
+    const n = getWordLinks(w.id).length;
+    linksBtn.textContent = n ? `🔗${n}` : "🔗";
+    linksBtn.title = n ? `展開 ${n} 個要比較的字` : "加入要一起比較的字（輸入編號）";
+    linksBtn.classList.toggle("primary", n > 0);
+  }
+  refreshLinksBtn();
+  const linksInputRow = document.createElement("div");
+  linksInputRow.style.cssText = "display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;";
+  const linksInput = document.createElement("input");
+  linksInput.type = "text";
+  linksInput.inputMode = "numeric";
+  linksInput.placeholder = "要比較的單字編號，例如 256, 310";
+  linksInput.style.cssText = "flex:1 1 180px; min-width:0;";
+  const linksSaveBtn = document.createElement("button");
+  linksSaveBtn.type = "button";
+  linksSaveBtn.textContent = "儲存";
+  linksInputRow.appendChild(linksInput);
+  linksInputRow.appendChild(linksSaveBtn);
+  const linksList = document.createElement("div");
+  linksPanel.appendChild(linksInputRow);
+  linksPanel.appendChild(linksList);
+  function renderLinksList(){
+    linksList.innerHTML = "";
+    const ids = getWordLinks(w.id);
+    if(!ids.length){
+      linksList.innerHTML = '<div class="note-saved">還沒有要比較的字。輸入編號（清單上每個字前面的數字），用逗號或空白隔開，按儲存。</div>';
+      return;
+    }
+    ids.forEach(id => {
+      const t = allWords.find(x => x.id === id);
+      const line = document.createElement("div");
+      line.style.cssText = "display:flex; gap:8px; align-items:center; padding:6px 0; border-top:1px solid var(--border);";
+      if(!t){
+        line.textContent = `#${id}：找不到這個編號（可能刪掉了）`;
+        line.style.color = "var(--muted)";
+        linksList.appendChild(line);
+        return;
+      }
+      const d = lookup(t.text) || {};
+      const speakBtn = document.createElement("button");
+      speakBtn.type = "button";
+      speakBtn.className = "usage-btn";
+      speakBtn.textContent = "🔊";
+      speakBtn.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        speak(getSpeechText(t), speakBtn, null, recKeyFor(t.text)).catch(() => {});
+      });
+      const label = document.createElement("div");
+      label.style.cssText = "flex:1; min-width:0; cursor:pointer;";
+      label.title = "跳到這個字";
+      let shown = escapeHtmlText(t.text);
+      if(currentLang === "vi"){
+        const native = d.nativeScript || t.text;
+        shown = viHighlightRegional(native, true, viSouthernFinals(native)).html;
+      }else if(d.nativeScript && currentLang !== "id" && currentLang !== "en"){
+        shown = `${escapeHtmlText(t.text)} <span style="color:var(--accent2);">${escapeHtmlText(d.nativeScript)}</span>`;
+      }
+      label.innerHTML = `<b>${t.id}.</b> <span style="font-weight:600;">${shown}</span>`
+        + `<div class="meaning">${d.zh ? escapeHtmlText(d.zh + (d.en ? " · " + d.en : "")) : "尚無翻譯資料"}</div>`;
+      label.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const target = document.querySelector(`#wordList .item[data-word-id="${t.id}"]`);
+        if(!target){ alert(`${t.id}. ${t.text} 目前被篩選或搜尋藏起來了，清掉篩選才看得到。`); return; }
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+        target.classList.add("autoplay-current");
+        setTimeout(() => target.classList.remove("autoplay-current"), 1500);
+      });
+      line.appendChild(speakBtn);
+      line.appendChild(label);
+      linksList.appendChild(line);
+    });
+  }
+  function commitLinks(){
+    const raw = linksInput.value.split(/[^0-9]+/).filter(Boolean).map(Number);
+    const missing = raw.filter(id => !allWords.some(x => x.id === id));
+    const ids = raw.filter(id => id !== w.id && !missing.includes(id));
+    const touched = setWordLinks(w.id, ids);
+    linksInput.value = getWordLinks(w.id).join(", ");
+    refreshLinksBtn();
+    renderLinksList();
+    // 雙向連結：另一頭那些字的 🔗 數字也要跟著變。
+    touched.forEach(id => {
+      const b = document.querySelector(`#wordList .item[data-word-id="${id}"] .row-links-btn`);
+      if(!b) return;
+      const n = getWordLinks(id).length;
+      b.textContent = n ? `🔗${n}` : "🔗";
+      b.classList.toggle("primary", n > 0);
+    });
+    if(missing.length) alert(`找不到這些編號：${missing.join(", ")}`);
+  }
+  linksSaveBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); commitLinks(); });
+  linksInput.addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); commitLinks(); } });
+  linksBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(!linksPanel.classList.contains("hidden")){ linksPanel.classList.add("hidden"); return; }
+    linksInput.value = getWordLinks(w.id).join(", ");
+    renderLinksList();
+    linksPanel.classList.remove("hidden");
+    if(!getWordLinks(w.id).length) linksInput.focus();
+  });
+  row.appendChild(linksBtn);
+
   // 埃及阿拉伯文：一顆按鈕切換顯示/隱藏這個字的阿拉伯文原文（資料裡現成的 nativeScript，
   // 不用問 AI）。預設收起來，想對照原文再點開。
   if(currentLang === "arz" && data && data.nativeScript){
@@ -7308,7 +7439,7 @@ function createWordItem(w){
     function collectGroup(rowEl){
       const group = [rowEl];
       let sib = rowEl.nextElementSibling;
-      for(let i = 0; i < 8 && sib; i++){ group.push(sib); sib = sib.nextElementSibling; }
+      for(let i = 0; i < 9 && sib; i++){ group.push(sib); sib = sib.nextElementSibling; }
       return group;
     }
     const anchorRowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
@@ -7447,7 +7578,7 @@ function createWordItem(w){
   });
   row.appendChild(crossLangBtn);
 
-  return { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel };
+  return { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel };
 }
 
 function updatePendingSyncBar(){
@@ -7590,7 +7721,7 @@ function renderList(){
     return;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel } = createWordItem(w);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
     el.appendChild(antonymsPanel);
@@ -7600,6 +7731,7 @@ function renderList(){
     el.appendChild(nativeTonePanel);
     el.appendChild(minimalPairsPanel);
     el.appendChild(crossLangPanel);
+    el.appendChild(linksPanel);
   });
   updateCount();
   updatePendingSyncBar();
@@ -7836,6 +7968,9 @@ document.getElementById("btnRenumber").onclick = () => {
   saveWordGroups();
   wordCategories = remapIdMap(wordCategories);
   saveWordCategories();
+  wordLinks = remapIdMap(wordLinks);
+  Object.keys(wordLinks).forEach(id => { wordLinks[id] = wordLinks[id].map(x => idMap.get(x)).filter(x => x !== undefined); });
+  saveWordLinks();
   // 剛匯入清單只是這次瀏覽階段暫時用的標記，編號全部變了之後對應不上，
   // 直接清空比留著錯誤的對應關係安全。
   newlyImportedIds = new Set();
@@ -8660,7 +8795,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
-  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, HIDDEN_LS,
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS
 ];
