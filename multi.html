@@ -554,25 +554,63 @@ const kvStore = (() => {
   // 會在重新整理時直接中斷寫到一半的交易——切換語言就是先存語言再重新整理，
   // 存檔被中斷的話重新整理後還是停在原本的語言。
   const pending = new Set();
-  function write(fn){
-    if(!db) return;
+  // 還沒成功寫進 IndexedDB 的 key（連線斷掉、寫入失敗時記下來）。重新連上之後
+  // 照記憶體裡最新的值補寫，不會因為一次斷線就默默漏存。
+  const dirty = new Set();
+  let reconnecting = null;
+  let reconnectTries = 0; // 連續重連失敗幾次（成功寫入一筆就歸零），最多試 3 次
+  function write(k){
+    if(!db){ dirty.add(k); reconnect(); return; }
     try{
       const tx = db.transaction(KV_STORE, "readwrite");
-      fn(tx.objectStore(KV_STORE));
+      const st = tx.objectStore(KV_STORE);
+      if(mem.has(k)) st.put(mem.get(k), k); else st.delete(k);
       const done = new Promise(resolve => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => { onWriteError(tx.error); resolve(); };
-        tx.onabort = () => { if(tx.error) onWriteError(tx.error); resolve(); };
+        tx.oncomplete = () => { reconnectTries = 0; resolve(); };
+        tx.onerror = () => { dirty.add(k); reconnect(tx.error); resolve(); };
+        tx.onabort = () => { dirty.add(k); reconnect(tx.error); resolve(); };
       });
       pending.add(done);
       done.then(() => pending.delete(done));
-    }catch(e){ onWriteError(e); }
+    }catch(e){ dirty.add(k); reconnect(e); }
+  }
+  // iPhone 把頁面放到背景久了，Safari 可能把 IndexedDB 連線砍掉（之後每次寫入
+  // 都會失敗）。偵測到就重新開一次連線、把沒存到的 key 補寫回去；重連也失敗
+  // 才跳警告。
+  function attachDB(d){
+    db = d;
+    d.onclose = () => { if(db === d){ db = null; reconnect(); } };
+    d.onversionchange = () => { d.close(); if(db === d) db = null; };
+  }
+  function reconnect(cause){
+    if(cause) console.warn("IndexedDB 寫入失敗，重新連線", cause);
+    if(reconnecting || fallback) return reconnecting;
+    if(reconnectTries >= 3){ onWriteError(cause || new Error("IndexedDB 一直連不上")); return null; }
+    reconnectTries++;
+    if(db){ try{ db.close(); }catch(e){} db = null; }
+    reconnecting = (async () => {
+      try{
+        const { d } = await withTimeout(openDB(), 4000, "重新連線 IndexedDB");
+        attachDB(d);
+        const keys = [...dirty];
+        dirty.clear();
+        keys.forEach(k => write(k));
+      }catch(e){
+        console.warn("重新連線失敗", e);
+      }finally{
+        reconnecting = null;
+        // 補寫的時候又失敗（還在 dirty 裡）：稍等一下再試，最多 3 次。
+        if(dirty.size) setTimeout(() => reconnect(), 300);
+      }
+    })();
+    return reconnecting;
   }
   function openDB(){
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(KV_DB_NAME, 1);
-      req.onupgradeneeded = () => { req.result.createObjectStore(KV_STORE); };
-      req.onsuccess = () => resolve(req.result);
+      let upgraded = false;
+      req.onupgradeneeded = () => { upgraded = true; req.result.createObjectStore(KV_STORE); };
+      req.onsuccess = () => resolve({ d: req.result, upgraded });
       req.onerror = () => reject(req.error);
       req.onblocked = () => reject(new Error("IndexedDB blocked"));
     });
@@ -638,8 +676,15 @@ const kvStore = (() => {
   }
   async function openAndLoad(){
     await withTimeout(idbWake(), 2000, "IndexedDB 喚醒").catch(() => {});
-    const d = await withTimeout(openDB(), 4000, "開啟 IndexedDB");
+    const { d, upgraded } = await withTimeout(openDB(), 4000, "開啟 IndexedDB");
     const all = await withTimeout(readAll(d), 20000, "讀取 IndexedDB");
+    // 資料庫本來就存在（不是第一次建立），卻一筆資料都讀不到——正常情況不可能
+    // （至少會有搬家完成的標記），代表 Safari 這次讀取出問題。當作失敗重試，
+    // 絕對不能拿「空的」資料啟動，不然之後一存檔就會把真正的單字蓋掉。
+    if(!upgraded && all.size === 0 && !localStorageHasFlashcardData()){
+      try{ d.close(); }catch(e){}
+      throw new Error("讀到空的資料庫（Safari 暫時讀取異常）");
+    }
     return { d, all };
   }
   // 單字卡的資料還留在 localStorage 嗎？（搬進 IndexedDB 之後就會被
@@ -673,7 +718,7 @@ const kvStore = (() => {
         const { d, all } = await openAndLoad();
         all.forEach((v, k) => mem.set(k, v));
         if(!mem.has(MIGRATED_KEY)) await migrateFromLocalStorage(d);
-        db = d;
+        attachDB(d);
         freeLocalStorage();
         return;
       }catch(e){
@@ -689,12 +734,10 @@ const kvStore = (() => {
     showLoadError(lastErr);
     throw lastErr;
   })();
-  // 頁面要離開（重新整理、切換語言）時先關掉連線，降低下一頁開不起來的機率。
-  window.addEventListener("pagehide", (e) => { if(!e.persisted && db){ db.close(); db = null; } });
   return {
     ready,
     // 最多等 3 秒，寫入真的卡住也不要讓切換語言永遠沒反應。
-    flush(){ return Promise.race([Promise.all([...pending]), new Promise(r => setTimeout(r, 3000))]); },
+    flush(){ return Promise.race([Promise.all([...pending, reconnecting]), new Promise(r => setTimeout(r, 3000))]); },
     getItem(k){
       if(fallback) return lsGet(k);
       return mem.has(k) ? mem.get(k) : null;
@@ -703,15 +746,19 @@ const kvStore = (() => {
       v = String(v);
       if(fallback){ localStorage.setItem(k, v); return; }
       mem.set(k, v);
-      write(st => st.put(v, k));
+      write(k);
     },
     removeItem(k){
       if(fallback){ try{ localStorage.removeItem(k); }catch(e){} return; }
       mem.delete(k);
-      write(st => st.delete(k));
+      write(k);
     }
   };
 })();
+{
+  const wl = document.getElementById("wordList");
+  if(wl && !wl.children.length) wl.innerHTML = '<div class="empty-msg" style="padding:20px; text-align:center; color:var(--muted);">讀取單字資料中…</div>';
+}
 kvStore.ready.then(() => {
   const s = document.createElement("script");
   s.textContent = document.getElementById("mainScript").textContent;
