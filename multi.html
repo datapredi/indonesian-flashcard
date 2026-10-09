@@ -2186,16 +2186,16 @@ async function completeMissingWordData(missing, btn, labelPrefix, skipRender){
     if(!skipRender) renderList();
   }
 }
-// 重新整個換掉單一個字的列（+ 跟著它的 9 個面板），不重繪整個列表——給「在
+// 重新整個換掉單一個字的列（+ 跟著它的 10 個面板），不重繪整個列表——給「在
 // 展開中的面板裡補資料」這種情境用，避免 renderList() 把使用者正在看的其他
 // 面板收合掉。原本只用 innerHTML 補「意思」那一行文字，結果剛加入時因為還
 // 沒有資料，原文（nativeScript）顯示、埃及文 أ 切換／字母拆解／變位按鈕、
 // Forvo 連結這些會依資料有無決定「要不要畫出來」的東西，從一開始就沒被
 // 建到 row 裡，光改文字不會讓它們補畫出來——所以改成用 createWordItem()
-// 整組重新產生，直接換掉舊的 row 跟緊接在後面的 9 個面板（renderList()／
+// 整組重新產生，直接換掉舊的 row 跟緊接在後面的 10 個面板（renderList()／
 // addWordToList() 每一列都是固定按這個順序排的：row, usagePanel,
 // antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel,
-// minimalPairsPanel, crossLangPanel, linksPanel）。這個字剛加進來，這些面板一定都還沒
+// minimalPairsPanel, crossLangPanel, linksPanel, mnemonicPanel）。這個字剛加進來，這些面板一定都還沒
 // 展開過，整組換掉不會影響使用者正在看的別的字的面板。
 function refreshWordRowDisplay(id){
   const w = allWords.find(x => x.id === id);
@@ -2205,10 +2205,10 @@ function refreshWordRowDisplay(id){
   const parent = oldRow.parentNode;
   const toRemove = [oldRow];
   let sib = oldRow.nextElementSibling;
-  for(let i = 0; i < 9 && sib; i++){ toRemove.push(sib); sib = sib.nextElementSibling; }
+  for(let i = 0; i < 10 && sib; i++){ toRemove.push(sib); sib = sib.nextElementSibling; }
   const anchor = toRemove[toRemove.length - 1].nextSibling;
-  const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel } = createWordItem(w);
-  [row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel]
+  const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel, mnemonicPanel } = createWordItem(w);
+  [row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel, mnemonicPanel]
     .forEach(el => parent.insertBefore(el, anchor));
   toRemove.forEach(el => parent.removeChild(el));
 }
@@ -2911,6 +2911,62 @@ async function getUsageExamples(text, zh, force){
   usageCache[text] = parsed.examples;
   saveUsageCache();
   return parsed.examples;
+}
+
+// 💡 諧音記憶法：用國語／台語／英文唸起來像這個字的說法，加一句把「聲音」
+// 跟「意思」串起來的記憶句。只給單字或兩個字以內的短片語（句子不適用）。
+// 學英文時英文諧音沒意義，只給國語跟台語。快取 key＝單字文字：
+// { zh:{sound,story}, tw:{sound,story}, en:{sound,story}, custom:"自己寫的版本" }
+const MNEMONIC_CACHE_LS = "flashcard_mnemonic_v1";
+let mnemonicCache = {};
+try{ mnemonicCache = JSON.parse(kvStore.getItem(lsKey(MNEMONIC_CACHE_LS))) || {}; }catch(e){ mnemonicCache = {}; }
+function saveMnemonicCache(){ kvStore.setItem(lsKey(MNEMONIC_CACHE_LS), JSON.stringify(mnemonicCache)); }
+function mnemonicEligible(w){
+  if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
+  const t = String(w.text).replace(/\s*\(\d+\)$/, "").trim();
+  return t.split(/\s+/).filter(Boolean).length <= 2;
+}
+function hasMnemonic(text){
+  const m = mnemonicCache[text];
+  return !!(m && (m.custom || (m.zh && m.zh.sound) || (m.tw && m.tw.sound) || (m.en && m.en.sound)));
+}
+// Flash Card 背面用的一行摘要（自己寫的版本優先）。
+function mnemonicSummary(text){
+  const m = mnemonicCache[text];
+  if(!m) return "";
+  if(m.custom) return "💡 " + m.custom.replace(/\s*\n\s*/g, "；");
+  const parts = [];
+  if(m.zh && m.zh.sound) parts.push(`國：${m.zh.sound}`);
+  if(m.tw && m.tw.sound) parts.push(`台：${m.tw.sound}`);
+  if(m.en && m.en.sound) parts.push(`英：${m.en.sound}`);
+  return parts.length ? "💡 " + parts.join("　") : "";
+}
+async function generateMnemonic(w){
+  const data = lookup(w.text) || {};
+  const withEn = currentLang !== "en";
+  const item = { type: "object", properties: { sound: { type: "string" }, story: { type: "string" } }, required: ["sound", "story"], additionalProperties: false };
+  const props = { zh: item, tw: item };
+  if(withEn) props.en = item;
+  const schema = { type: "object", properties: props, required: Object.keys(props), additionalProperties: false };
+  const native = data.nativeScript && data.nativeScript !== w.text ? `（原生文字：${data.nativeScript}）` : "";
+  const accent = currentLang === "vi" ? "\n發音請以越南南部（胡志明市）口音為準。" : "";
+  const prompt = `你在幫一位母語是中文（台灣人，也聽得懂台語）的學生用「諧音法」記${L().label}單字。
+
+單字：${w.text}${native}
+意思：${data.zh || "（未知）"}${data.en ? `／${data.en}` : ""}${accent}
+
+請找出唸起來「聲音很像」這個字的說法，並各寫一句把諧音跟意思串在一起、好記又有畫面的記憶句（繁體中文，一句就好）：
+- zh：用國語（華語）唸起來像的字或詞。sound 寫諧音本身（例如「感恩」），story 寫記憶句。
+- tw：用台語唸起來像的說法。sound 用台語漢字，後面括號附台羅拼音（例如「食飽（tsia̍h-pá）」），story 寫記憶句。${withEn ? "\n- en：用英文唸起來像的英文字或片語。sound 寫英文，story 用繁體中文寫記憶句。" : ""}
+
+規則：
+- 聲音要真的像（以實際發音為準，不是拼字像），寧缺勿濫：某一種語言找不到夠像的，那一項的 sound 跟 story 都回空字串，不要硬湊。
+- 記憶句要把「諧音」跟「這個字的意思」連起來，短、好記、有畫面，不要說教。`;
+  const parsed = await callClaude(prompt, schema, 1024);
+  const prev = mnemonicCache[w.text] || {};
+  mnemonicCache[w.text] = Object.assign({}, parsed, prev.custom ? { custom: prev.custom } : {});
+  saveMnemonicCache();
+  return mnemonicCache[w.text];
 }
 
 const ANTONYMS_CACHE_LS = "flashcard_antonyms_cache_v1"; // 反義詞（相反詞），所有語言通用
@@ -4772,8 +4828,9 @@ function addWordToList(text){
     const el = document.getElementById("wordList");
     const emptyMsg = el.querySelector(".empty-msg");
     if(emptyMsg) emptyMsg.remove();
-    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel } = createWordItem(newWord);
-    el.insertBefore(linksPanel, el.firstChild);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel, mnemonicPanel } = createWordItem(newWord);
+    el.insertBefore(mnemonicPanel, el.firstChild);
+    el.insertBefore(linksPanel, mnemonicPanel);
     el.insertBefore(crossLangPanel, linksPanel);
     el.insertBefore(minimalPairsPanel, crossLangPanel);
     el.insertBefore(nativeTonePanel, minimalPairsPanel);
@@ -7137,6 +7194,94 @@ function createWordItem(w){
   });
   row.appendChild(linksBtn);
 
+  // 💡 諧音記憶：只給單字／兩個字以內的片語。
+  const mnemonicPanel = document.createElement("div");
+  mnemonicPanel.className = "usage-panel hidden";
+  if(mnemonicEligible(w)){
+    const mnBtn = document.createElement("button");
+    mnBtn.type = "button";
+    mnBtn.className = "usage-btn";
+    mnBtn.textContent = "💡";
+    const refreshMnBtn = () => {
+      const has = hasMnemonic(w.text);
+      mnBtn.classList.toggle("primary", has);
+      mnBtn.title = has ? "諧音記憶（已有）" : "AI 找諧音（國語／台語" + (currentLang !== "en" ? "／英文" : "") + "）幫助記憶";
+    };
+    refreshMnBtn();
+    const renderMnemonic = () => {
+      mnemonicPanel.innerHTML = "";
+      const m = mnemonicCache[w.text] || {};
+      const box = document.createElement("div");
+      const lines = [];
+      if(m.custom){
+        lines.push(`<div style="margin-bottom:8px;"><b>✏️ 我的版本</b><div style="white-space:pre-wrap;">${escapeHtmlText(m.custom)}</div></div>`);
+      }
+      [["zh", "國語諧音"], ["tw", "台語諧音"], ["en", "英文諧音"]].forEach(([k, label]) => {
+        const it = m[k];
+        if(!it) return;
+        if(!it.sound){ lines.push(`<div style="margin-bottom:6px; color:var(--muted);">${label}：找不到夠像的</div>`); return; }
+        lines.push(`<div style="margin-bottom:6px;"><b>${label}：</b>${escapeHtmlText(it.sound)}<div class="meaning">${escapeHtmlText(it.story || "")}</div></div>`);
+      });
+      box.innerHTML = lines.join("") || '<div class="note-saved">還沒有諧音。按「✨ 生成」讓 AI 幫你找，或按「✏️ 自己寫」。</div>';
+      mnemonicPanel.appendChild(box);
+      const bar = document.createElement("div");
+      bar.style.cssText = "display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;";
+      const genBtn = document.createElement("button");
+      genBtn.type = "button";
+      genBtn.textContent = (m.zh || m.tw || m.en) ? "🔄 重新生成" : "✨ 生成";
+      genBtn.addEventListener("click", async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if(!getApiKey()){ alert("請先輸入並儲存 API Key。"); return; }
+        genBtn.disabled = true;
+        genBtn.textContent = "生成中…";
+        try{ await generateMnemonic(w); }
+        catch(err){ alert("生成失敗：" + err.message); }
+        refreshMnBtn();
+        renderMnemonic();
+      });
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.textContent = "✏️ 自己寫";
+      editBtn.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const ta = document.createElement("textarea");
+        ta.className = "note-ta";
+        ta.placeholder = "寫你自己（或老師）的諧音跟記憶句，留空＝刪掉自己的版本";
+        ta.value = (mnemonicCache[w.text] || {}).custom || "";
+        const save = document.createElement("button");
+        save.type = "button";
+        save.textContent = "儲存";
+        save.addEventListener("click", (ev) => {
+          ev.preventDefault(); ev.stopPropagation();
+          const cur = Object.assign({}, mnemonicCache[w.text] || {});
+          const v = ta.value.trim();
+          if(v) cur.custom = v; else delete cur.custom;
+          if(Object.keys(cur).length) mnemonicCache[w.text] = cur; else delete mnemonicCache[w.text];
+          saveMnemonicCache();
+          refreshMnBtn();
+          renderMnemonic();
+        });
+        bar.replaceWith(ta, save);
+        ta.focus();
+      });
+      bar.appendChild(genBtn);
+      bar.appendChild(editBtn);
+      mnemonicPanel.appendChild(bar);
+    };
+    mnBtn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if(!mnemonicPanel.classList.contains("hidden")){ mnemonicPanel.classList.add("hidden"); return; }
+      renderMnemonic();
+      mnemonicPanel.classList.remove("hidden");
+      // 第一次打開、還沒有任何資料：直接幫忙生成，不用再多按一次。
+      if(!mnemonicCache[w.text] && getApiKey()){
+        const g = mnemonicPanel.querySelector("button");
+        if(g) g.click();
+      }
+    });
+    row.appendChild(mnBtn);
+  }
+
   // 埃及阿拉伯文：一顆按鈕切換顯示/隱藏這個字的阿拉伯文原文（資料裡現成的 nativeScript，
   // 不用問 AI）。預設收起來，想對照原文再點開。
   if(currentLang === "arz" && data && data.nativeScript){
@@ -7704,7 +7849,7 @@ function createWordItem(w){
   });
   row.appendChild(crossLangBtn);
 
-  return { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel };
+  return { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel, mnemonicPanel };
 }
 
 function updatePendingSyncBar(){
@@ -7847,7 +7992,7 @@ function renderList(){
     return;
   }
   visibleWords.forEach(w => {
-    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel } = createWordItem(w);
+    const { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel, mnemonicPanel } = createWordItem(w);
     el.appendChild(row);
     el.appendChild(usagePanel);
     el.appendChild(antonymsPanel);
@@ -7858,6 +8003,7 @@ function renderList(){
     el.appendChild(minimalPairsPanel);
     el.appendChild(crossLangPanel);
     el.appendChild(linksPanel);
+    el.appendChild(mnemonicPanel);
   });
   updateCount();
   updatePendingSyncBar();
@@ -8935,7 +9081,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
-  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, HIDDEN_LS,
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, MNEMONIC_CACHE_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS
 ];
@@ -9510,7 +9656,7 @@ function renderCard(){
     document.getElementById("cardPron").textContent = nativeText || pronText.trim();
     document.getElementById("cardPron").classList.toggle("is-native", !!nativeText);
     document.getElementById("cardBack").textContent = data ? `${data.zh}（${data.en}）` : "尚無翻譯資料";
-    cardNative.textContent = replyText;
+    cardNative.textContent = [replyText, mnemonicSummary(w.text)].filter(Boolean).join("　");
   } else {
     document.getElementById("cardFront").textContent = data ? data.zh : "尚無翻譯資料";
     document.getElementById("cardPron").textContent = "";
@@ -9518,7 +9664,7 @@ function renderCard(){
     document.getElementById("cardBack").textContent = w.text + pronText;
     if(viCardHTML) document.getElementById("cardBack").innerHTML = viCardHTML + escapeHtmlText(pronText);
     // 中文回想日文時，漢字原文是答案的一部分，跟著背面一起翻開才顯示
-    cardNative.textContent = [nativeText, replyText].filter(Boolean).join("　");
+    cardNative.textContent = [nativeText, replyText, mnemonicSummary(w.text)].filter(Boolean).join("　");
   }
   document.getElementById("cardBack").classList.add("hidden");
   cardNative.classList.add("hidden");
