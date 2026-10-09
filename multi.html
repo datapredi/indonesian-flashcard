@@ -2914,8 +2914,7 @@ async function getUsageExamples(text, zh, force){
 }
 
 // 💡 諧音記憶法：用國語／台語／英文唸起來像這個字的說法，加一句把「聲音」
-// 跟「意思」串起來的記憶句。只給單一個字（試過兩個字的片語，諧音湊出來
-// 效果很差；句子更不適用）。
+// 跟「意思」串起來的記憶句。只給單字或兩個字以內的短片語（句子不適用）。
 // 學英文時英文諧音沒意義，只給國語跟台語。快取 key＝單字文字：
 // { zh:{sound,story}, tw:{sound,story}, en:{sound,story}, custom:"自己寫的版本" }
 const MNEMONIC_CACHE_LS = "flashcard_mnemonic_v1";
@@ -2925,7 +2924,7 @@ function saveMnemonicCache(){ kvStore.setItem(lsKey(MNEMONIC_CACHE_LS), JSON.str
 function mnemonicEligible(w){
   if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
   const t = String(w.text).replace(/\s*\(\d+\)$/, "").trim();
-  return t.split(/\s+/).filter(Boolean).length === 1;
+  return t.split(/\s+/).filter(Boolean).length <= 2;
 }
 function hasMnemonic(text){
   const m = mnemonicCache[text];
@@ -2934,7 +2933,7 @@ function hasMnemonic(text){
 // Flash Card 背面用的一行摘要（自己寫的版本優先）。
 function mnemonicSummary(text){
   const m = mnemonicCache[text];
-  if(!m || !mnemonicEligible({ text })) return ""; // 之前替兩個字的片語生成過的就不顯示了
+  if(!m) return "";
   if(m.custom) return "💡 " + m.custom.replace(/\s*\n\s*/g, "；");
   const parts = [];
   if(m.zh && m.zh.sound) parts.push(`國：${m.zh.sound}`);
@@ -7195,7 +7194,7 @@ function createWordItem(w){
   });
   row.appendChild(linksBtn);
 
-  // 💡 諧音記憶：只給單一個字。
+  // 💡 諧音記憶：只給單字／兩個字以內的片語。
   const mnemonicPanel = document.createElement("div");
   mnemonicPanel.className = "usage-panel hidden";
   if(mnemonicEligible(w)){
