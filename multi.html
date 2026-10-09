@@ -9266,7 +9266,23 @@ async function processConvertImportText(rawText){
       }
       return null;
     }
-    rawText.split(/\r?\n/).forEach(rawLn => {
+    // 一行裡塞了好幾組，用一大段空白（3 個以上空格或 tab）隔開：
+    // 「Phòng - room         ở trong phòng - be in the room」、
+    // 「trên máy tính - on the computer      trên YouTube    trên Italki」。
+    // 每一段各自當一行處理，不然整串（連英文）會變成同一張卡。
+    // 問答寫在同一行（「… đúng không? - Anh chưa ăn sáng. …」）：問句跟回答
+    // 拆成兩張；「 - 」後面是英文的話是意思註解，照舊交給 splitEnglishGloss。
+    function splitCompoundLine(raw){
+      const segs = raw.replace(/\r/g, "").split(/\t+| {3,}/).map(x => x.trim()).filter(Boolean);
+      const out = [];
+      segs.forEach(seg => {
+        const qa = seg.match(/^(.+?\?)\s+-\s+(.+)$/);
+        if(qa && /[\u00C0-\u1EF9]/.test(qa[2]) && !/^[A-Za-z][A-Za-z\s,'’.!?-]*$/.test(qa[2].trim())){ out.push(qa[1], qa[2]); }
+        else out.push(seg);
+      });
+      return out.length ? out : [raw];
+    }
+    rawText.split(/\r?\n/).flatMap(splitCompoundLine).forEach(rawLn => {
       if(isPatternLine(rawLn)) return;
       const gloss = splitEnglishGloss(rawLn);
       const trailing = gloss ? null : splitTrailingEnglish(rawLn);
