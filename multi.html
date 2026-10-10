@@ -25,10 +25,11 @@
   h1{font-size:1.3rem; margin:0 0 4px;}
   .sub{color:var(--muted); font-size:0.85rem; margin-bottom:18px;}
   .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
-  button{
+  button, .filebtn{
     font-family:inherit; font-size:0.9rem; padding:9px 14px; border-radius:10px;
     border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer;
   }
+  .filebtn{display:inline-block;}
   button:hover{border-color:var(--accent);}
   button.primary{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600;}
   button.secondary{background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600;}
@@ -213,6 +214,8 @@
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
       <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
       <button id="btnImportConvertPaste">📥 轉換貼上的文字</button>
+      <label class="filebtn" for="classInboxInput" style="flex:0 0 auto;">📚 匯入講義收件匣</label>
+      <input type="file" id="classInboxInput" accept=".json,application/json" style="display:none;">
     </div>
     <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
     <div class="toolbar">
@@ -9144,10 +9147,12 @@ document.getElementById("fileInputBackup").addEventListener("change", (e) => {
   reader.readAsText(file);
 });
 
+let convertResultSink = null; // 「全部匯入」時把每批的結果收起來，最後一次顯示
 function showConvertResult(msg){
   const el = document.getElementById("convertResultStatus");
   el.textContent = msg;
   el.classList.remove("hidden");
+  if(convertResultSink){ convertResultSink.push(msg); return; }
   try{ alert(msg); }catch(e){}
 }
 
@@ -9633,22 +9638,38 @@ function writeYtInbox(list){
   try{ if(list.length) localStorage.setItem(YT_INBOX_LS, JSON.stringify(list)); else localStorage.removeItem(YT_INBOX_LS); }catch(e){}
 }
 function removeYtInboxBatch(id){ writeYtInbox(readYtInbox().filter(b => b.id !== id)); }
+// 處理過（匯入或按「不要了」）的批次 id，重新選同一個講義收件匣檔案時不會再跳出來。
+const INBOX_DONE_LS = "flashcard_inbox_done_v1";
+function inboxDoneIds(){ try{ return new Set(JSON.parse(kvStore.getItem(INBOX_DONE_LS)) || []); }catch(e){ return new Set(); } }
+function markInboxDone(id){ const d = inboxDoneIds(); d.add(id); kvStore.setItem(INBOX_DONE_LS, JSON.stringify([...d])); }
 async function importYtInboxBatch(batch){
-  if(!getApiKey()){ alert("匯入需要 AI 生成資料，請先在上面輸入並儲存 Anthropic API Key。"); return; }
+  if(!getApiKey()){ alert("匯入需要 AI 生成資料，請先在上面輸入並儲存 Anthropic API Key。"); return false; }
   const groupEl = document.getElementById("convertGroupName");
   const zhEl = document.getElementById("useProvidedZh");
   const prevGroup = groupEl.value, prevZh = zhEl.checked;
   groupEl.value = batch.group || "";
-  zhEl.checked = true;
-  const text = batch.items.map(it => it.zh ? `${it.term} = ${it.zh}` : it.term).join("\n");
+  // 講義原文（rawText）照一般匯入的規則處理（「Phòng - room」、[p]、一行好幾組…），
+  // 中文讓 AI 判斷；播放器送來的（items）用播放器給的中文。
+  zhEl.checked = !batch.rawText;
+  const text = batch.rawText || batch.items.map(it => it.zh ? `${it.term} = ${it.zh}` : it.term).join("\n");
+  // 已經有分組的字不改分組（同一個字在後面的課又出現，不要被搬到新日期）。
+  const groupsBefore = Object.assign({}, wordGroups);
   try{
     await processConvertImportText(text);
   }finally{
     groupEl.value = prevGroup;
     zhEl.checked = prevZh;
   }
+  let restored = false;
+  Object.keys(groupsBefore).forEach(id => {
+    if(groupsBefore[id] && wordGroups[id] !== groupsBefore[id]){ wordGroups[id] = groupsBefore[id]; restored = true; }
+  });
+  if(restored){
+    saveWordGroups();
+    if(typeof updateGroupFilterOptions === "function") updateGroupFilterOptions();
+  }
   // 影片原句進 📝 筆記（已經有筆記的接在後面，同一句不重複加）。
-  batch.items.forEach(it => {
+  (batch.items || []).forEach(it => {
     if(!it.example) return;
     const mapped = convertedMap[String(it.term).toLowerCase()];
     if(!mapped) return;
@@ -9658,9 +9679,48 @@ async function importYtInboxBatch(batch){
     setWordNote(mapped, cur ? `${cur}\n${line}` : line);
   });
   removeYtInboxBatch(batch.id);
+  markInboxDone(batch.id);
   renderList();
   showYtInboxBanner();
+  return true;
 }
+// 一次匯入收件匣裡同一個語言的所有批次（第一次匯入講義會有二十幾批）。
+// 每批的結果先收起來，最後只跳一次總結。
+async function importAllYtInbox(){
+  const todo = readYtInbox().filter(b => b.lang === currentLang);
+  if(!todo.length) return;
+  convertResultSink = [];
+  let done = 0;
+  try{
+    for(const b of todo){
+      const banner = document.querySelector("#ytInboxBanner div");
+      if(banner) banner.textContent = `📥 匯入中… ${done + 1} / ${todo.length}：${b.title || b.group || ""}`;
+      if(!(await importYtInboxBatch(b))) break;
+      done++;
+    }
+  }finally{
+    const results = convertResultSink;
+    convertResultSink = null;
+    showConvertResult(`已匯入 ${done} / ${todo.length} 批。\n\n` + results.map((r, i) => `${i + 1}. ${r.split("\n")[0]}`).join("\n"));
+  }
+}
+document.getElementById("classInboxInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  let batches;
+  try{
+    batches = JSON.parse(await file.text());
+    if(!Array.isArray(batches)) throw new Error("格式不對");
+  }catch(err){ alert("讀不到講義收件匣：" + err.message); return; }
+  const done = inboxDoneIds();
+  const inbox = readYtInbox();
+  const fresh = batches.filter(b => b && b.id && !done.has(b.id) && !inbox.some(x => x.id === b.id));
+  if(!fresh.length){ alert("這個檔案裡的內容都已經匯入過了。"); return; }
+  writeYtInbox(inbox.concat(fresh));
+  showYtInboxBanner();
+  document.getElementById("ytInboxBanner")?.scrollIntoView({ block: "center", behavior: "smooth" });
+});
 function showYtInboxBanner(){
   document.getElementById("ytInboxBanner")?.remove();
   const inbox = readYtInbox();
@@ -9672,7 +9732,10 @@ function showYtInboxBanner(){
   bar.style.cssText = "background:var(--card); border:2px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;";
   const msg = document.createElement("div");
   msg.style.cssText = "flex:1 1 220px;";
-  msg.textContent = `📥 從逐字稿送來 ${batch.items.length} 個${langLabel}單字／片語（${batch.title || "影片"}），會加入分組「${batch.group}」` + (inbox.length > 1 ? `　（另外還有 ${inbox.length - 1} 批）` : "");
+  const what = batch.rawText
+    ? `📥 ${batch.title || "講義"}：${batch.count || batch.rawText.split("\n").length} 行${langLabel}新內容`
+    : `📥 從逐字稿送來 ${batch.items.length} 個${langLabel}單字／片語（${batch.title || "影片"}）`;
+  msg.textContent = what + (batch.group ? `，會加入分組「${batch.group}」` : "") + (inbox.length > 1 ? `　（另外還有 ${inbox.length - 1} 批）` : "");
   const go = document.createElement("button");
   go.className = "primary";
   go.textContent = currentLang === batch.lang ? "匯入" : `切到${langLabel}並匯入`;
@@ -9688,11 +9751,25 @@ function showYtInboxBanner(){
   const skip = document.createElement("button");
   skip.textContent = "不要了";
   skip.addEventListener("click", () => {
-    if(!confirm(`確定不匯入這 ${batch.items.length} 個字嗎？`)) return;
+    if(!confirm(`確定不匯入這一批（${batch.title || batch.group || ""}）嗎？`)) return;
     removeYtInboxBatch(batch.id);
+    markInboxDone(batch.id);
     showYtInboxBanner();
   });
-  bar.append(msg, go, skip);
+  bar.append(msg, go);
+  const sameLang = inbox.filter(b => b.lang === batch.lang).length;
+  if(sameLang > 1 && currentLang === batch.lang){
+    const all = document.createElement("button");
+    all.className = "primary";
+    all.textContent = `全部匯入（${sameLang} 批）`;
+    all.addEventListener("click", () => {
+      if(!confirm(`要一次匯入 ${sameLang} 批嗎？已經有的字會跳過（不會改到翻譯、筆記、錄音、分組），只有新的字會用 AI 生成。`)) return;
+      all.disabled = true; go.disabled = true;
+      importAllYtInbox();
+    });
+    bar.append(all);
+  }
+  bar.append(skip);
   const anchor = document.getElementById("wordList");
   anchor.parentNode.insertBefore(bar, anchor);
 }
