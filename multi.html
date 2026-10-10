@@ -9618,6 +9618,96 @@ document.getElementById("btnImportConvertPaste").addEventListener("click", () =>
   processConvertImportText(text);
 });
 
+// ================= 從 YouTube 逐字稿播放器送來的單字 =================
+// 播放器（datapredi.github.io/yt_sync/player.html）跟這裡同一個網域，共用
+// localStorage。播放器用 AI 挑完重點單字／片語、按「送到 Flashcard」之後，
+// 會把一批 { id, lang, group, title, items:[{term, zh, example}] } 放進這個
+// 收件匣；這裡開頁時看到就跳提示，按匯入就走一般的「匯入並自動生成資料」
+// 流程：中文意思用播放器給的（照影片裡的用法），分組自動填，影片原句放進
+// 每張卡的 📝 筆記。收件匣刻意放 localStorage（不是 kvStore），因為播放器
+// 那邊沒有 kvStore。
+const YT_INBOX_LS = "yt_sync_flashcard_inbox_v1";
+const YT_INBOX_PENDING_SS = "yt_inbox_pending_import";
+function readYtInbox(){ try{ return JSON.parse(localStorage.getItem(YT_INBOX_LS)) || []; }catch(e){ return []; } }
+function writeYtInbox(list){
+  try{ if(list.length) localStorage.setItem(YT_INBOX_LS, JSON.stringify(list)); else localStorage.removeItem(YT_INBOX_LS); }catch(e){}
+}
+function removeYtInboxBatch(id){ writeYtInbox(readYtInbox().filter(b => b.id !== id)); }
+async function importYtInboxBatch(batch){
+  if(!getApiKey()){ alert("匯入需要 AI 生成資料，請先在上面輸入並儲存 Anthropic API Key。"); return; }
+  const groupEl = document.getElementById("convertGroupName");
+  const zhEl = document.getElementById("useProvidedZh");
+  const prevGroup = groupEl.value, prevZh = zhEl.checked;
+  groupEl.value = batch.group || "";
+  zhEl.checked = true;
+  const text = batch.items.map(it => it.zh ? `${it.term} = ${it.zh}` : it.term).join("\n");
+  try{
+    await processConvertImportText(text);
+  }finally{
+    groupEl.value = prevGroup;
+    zhEl.checked = prevZh;
+  }
+  // 影片原句進 📝 筆記（已經有筆記的接在後面，同一句不重複加）。
+  batch.items.forEach(it => {
+    if(!it.example) return;
+    const mapped = convertedMap[String(it.term).toLowerCase()];
+    if(!mapped) return;
+    const line = `🎬 ${batch.title ? batch.title + "：" : ""}${it.example}`;
+    const cur = getWordNote(mapped);
+    if(cur.includes(it.example)) return;
+    setWordNote(mapped, cur ? `${cur}\n${line}` : line);
+  });
+  removeYtInboxBatch(batch.id);
+  renderList();
+  showYtInboxBanner();
+}
+function showYtInboxBanner(){
+  document.getElementById("ytInboxBanner")?.remove();
+  const inbox = readYtInbox();
+  if(!inbox.length) return;
+  const batch = inbox[0];
+  const langLabel = (LANG_INFO[batch.lang] || {}).label || batch.lang;
+  const bar = document.createElement("div");
+  bar.id = "ytInboxBanner";
+  bar.style.cssText = "background:var(--card); border:2px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;";
+  const msg = document.createElement("div");
+  msg.style.cssText = "flex:1 1 220px;";
+  msg.textContent = `📥 從逐字稿送來 ${batch.items.length} 個${langLabel}單字／片語（${batch.title || "影片"}），會加入分組「${batch.group}」` + (inbox.length > 1 ? `　（另外還有 ${inbox.length - 1} 批）` : "");
+  const go = document.createElement("button");
+  go.className = "primary";
+  go.textContent = currentLang === batch.lang ? "匯入" : `切到${langLabel}並匯入`;
+  go.addEventListener("click", () => {
+    if(currentLang !== batch.lang){
+      try{ sessionStorage.setItem(YT_INBOX_PENDING_SS, batch.id); }catch(e){}
+      setLang(batch.lang);
+      return;
+    }
+    go.disabled = true;
+    importYtInboxBatch(batch);
+  });
+  const skip = document.createElement("button");
+  skip.textContent = "不要了";
+  skip.addEventListener("click", () => {
+    if(!confirm(`確定不匯入這 ${batch.items.length} 個字嗎？`)) return;
+    removeYtInboxBatch(batch.id);
+    showYtInboxBanner();
+  });
+  bar.append(msg, go, skip);
+  const anchor = document.getElementById("wordList");
+  anchor.parentNode.insertBefore(bar, anchor);
+}
+// 切語言是重新整理頁面，切完自動接著匯入剛剛按的那批。
+{
+  showYtInboxBanner();
+  let pendingId = null;
+  try{ pendingId = sessionStorage.getItem(YT_INBOX_PENDING_SS); sessionStorage.removeItem(YT_INBOX_PENDING_SS); }catch(e){}
+  const pending = pendingId && readYtInbox().find(b => b.id === pendingId);
+  if(pending && pending.lang === currentLang) setTimeout(() => importYtInboxBatch(pending), 300);
+}
+// 播放器在別的分頁送來新的一批時，這邊切回來就看得到。
+window.addEventListener("storage", (e) => { if(e.key === YT_INBOX_LS) showYtInboxBanner(); });
+document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") showYtInboxBanner(); });
+
 // ================= Flash Card =================
 let cardSession = [];
 let cardIndex = 0;
