@@ -6614,7 +6614,8 @@ function getVisibleWords(){
   const q2El = document.getElementById("wordSearch2");
   const query2 = q2El ? foldForSearch(q2El.value.trim()) : "";
   const diffFilter = document.getElementById("difficultyFilter").value;
-  const list = allWords.filter(w => {
+  // ignoreGroup：選了分組又在搜尋時，另外用「不看分組」再找一次（見最下面）。
+  const passes = (w, ignoreGroup) => {
     if(hiddenIds.has(w.id)) return false;
     if(showSelectedOnly && !selected.has(w.id)) return false;
     if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
@@ -6626,7 +6627,7 @@ function getVisibleWords(){
     if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
     if(showTimeAdvOnly && !isTimeAdvWord(w)) return false;
     if(showConjOnly && !isConjWord(w)) return false;
-    if(groupFilter){
+    if(groupFilter && !ignoreGroup){
       const g = wordGroups[w.id] || "";
       if(g !== groupFilter && !(groupFilter2 && g === groupFilter2)) return false;
     }
@@ -6644,7 +6645,23 @@ function getVisibleWords(){
     // 兩個搜尋框：任一個命中就顯示（OR），空的那個忽略——方便同時把兩批字
     // 擺在一起看/搬。
     return (query && haystack.includes(query)) || (query2 && haystack.includes(query2));
-  });
+  };
+  const list = allWords.filter(w => passes(w, false));
+  sortVisibleList(list);
+  // 選了分組又在搜尋：分組以外符合的字也要找得到，排在這個分組的前面
+  // （畫面上會標出它們實際在哪個分組）。
+  outsideGroupSearchIds = new Set();
+  if(groupFilter && (query || query2)){
+    const inList = new Set(list.map(w => w.id));
+    const outside = allWords.filter(w => !inList.has(w.id) && passes(w, true));
+    sortVisibleList(outside);
+    outside.forEach(w => outsideGroupSearchIds.add(w.id));
+    return outside.concat(list);
+  }
+  return list;
+}
+let outsideGroupSearchIds = new Set();
+function sortVisibleList(list){
   if(sortCefr){
     // 沒標過 CEFR 的字永遠排最後面（99），不管正排倒排都一樣，只有已標的
     // A1~C2 之間才會依 sortCefrDesc 決定方向；同等級內再照字母排。
@@ -6697,6 +6714,8 @@ function createWordItem(w){
   // 只缺測驗選項發音資料的舊字不算（見 needsQuizNativeOnly）。
   row.className = "item" + (needsCoreGeneration(w) ? " no-data" : "");
   row.dataset.wordId = w.id;
+  const outsideGroupNote = outsideGroupSearchIds.has(w.id)
+    ? ` <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">（不在這個分組・📁 ${escapeHtmlText(wordGroups[w.id] || "未分組")}）</span>` : "";
   // 越南文：主標題顯示英文拼音（拆掉聲調符號的版本），帶聲調的原文放在下面
   // 那一行。就算當初是直接用越南文原文輸入、沒有另外存英文拼音也沒關係——
   // stripVietToneMarks 是純規則轉換，即時算得出來。
@@ -6717,7 +6736,7 @@ function createWordItem(w){
   row.innerHTML = `
     <input type="checkbox" data-id="${w.id}" ${selected.has(w.id) ? "checked" : ""}>
     <div>
-      <div class="id-text">${w.id}. <span class="main-text-slot">${mainText}</span>${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}${viDiffers ? ` <span style="font-size:0.7rem; color:var(--danger);" title="南北發音不同：${viDiffTitle}">🔀南北不同</span>` : ""}</div>
+      <div class="id-text">${w.id}. <span class="main-text-slot">${mainText}</span>${outsideGroupNote}${data && data.pron && data.pron !== w.text ? ` <span class="pron">[${data.pron}]</span>` : ""}${viDiffers ? ` <span style="font-size:0.7rem; color:var(--danger);" title="南北發音不同：${viDiffTitle}">🔀南北不同</span>` : ""}</div>
       ${currentLang === "ja" && data && data.nativeScript ? `<div class="native-text native-jp">${data.nativeScript}</div>` : ""}
       ${currentLang === "vi" && viNative && viNative !== viMain ? `<div class="native-text" style="color:var(--accent2); font-size:1.08rem; font-weight:600;">${viNativeHTML}</div>` : ""}
       ${currentLang === "th" && data && data.nativeScript ? `<div class="native-text native-th">${data.nativeScript}</div>` : ""}
