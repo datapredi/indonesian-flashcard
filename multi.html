@@ -1771,6 +1771,7 @@ let autoplayOpenedTonePanel = null;   // 依序播放自動展開的那個聲調
 let autoplayRunStartMs = 0;       // 這一輪（或這次繼續）開始的時間，用來估「還要多久」
 let autoplayRunStartIndex = 0;    // 開始時的 index，配合上面算實際每字花多久
 let autoplaySpeed = 1;            // 依序播放的語速倍率（1 / 1.2 / 1.5）
+let autoplayNewPhase = null;      // 「先播新字」階段：{ boundary, returnId }，見 planAutoplayNewPhase
 function autoplayReps(){
   const el = document.getElementById("autoplayReps");
   const n = el ? parseInt(el.value, 10) : 3;
@@ -8555,11 +8556,23 @@ function clearAutoplayHighlight(){
 function renderAutoplayControls(){
   const active = listAutoplayRunning || listAutoplayPaused;
   const toolBtn = document.getElementById("btnListAutoplay");
-  const total = getVisibleWords().length;
+  const visible = getVisibleWords();
+  const total = visible.length;
   if(toolBtn){
+    let idleTxt = `▶️ 依序播放發音（${total} 個字，${fmtDuration(estimateAutoplaySeconds(total))}）`;
+    if(!active && typeof planAutoplayNewPhase === "function"){
+      const startEl = document.getElementById("autoplayStartAt");
+      const n = startEl ? parseInt(startEl.value, 10) : NaN;
+      let plan = null;
+      try{ plan = planAutoplayNewPhase(visible, n > 0 ? n : null, false); }catch(e){ /* 頁面剛載入、那段程式還沒跑到 */ }
+      if(plan && plan.phase){
+        const newCount = visible.filter((w, i) => i >= plan.startIndex && w.id > plan.phase.boundary).length;
+        idleTxt = `▶️ 先播 ${newCount} 個新字，再從 #${plan.phase.returnId} 接著播`;
+      }
+    }
     toolBtn.textContent = listAutoplayRunning ? "⏸️ 暫停依序播放"
       : listAutoplayPaused ? "▶️ 繼續依序播放"
-      : `▶️ 依序播放發音（${total} 個字，${fmtDuration(estimateAutoplaySeconds(total))}）`;
+      : idleTxt;
     toolBtn.classList.toggle("primary", active);
   }
   const float = document.getElementById("autoplayFloat");
@@ -8580,8 +8593,15 @@ function renderAutoplayControls(){
       }
       etaTxt = ` · 剩 ${fmtDuration(remainSec)}`;
     }
+    let posTxt = `${Math.min(listAutoplayIndex + 1, total)} / ${total}`;
+    if(autoplayNewPhase){
+      const b = autoplayNewPhase.boundary;
+      const newTotal = visible.filter(w => w.id > b).length;
+      const newDone = visible.filter((w, i) => i <= listAutoplayIndex && w.id > b).length;
+      posTxt = `🆕 新字 ${newDone} / ${newTotal} → 再回 #${autoplayNewPhase.returnId}`;
+    }
     document.getElementById("autoplayFloatStatus").textContent =
-      `${Math.min(listAutoplayIndex + 1, total)} / ${total}${listAutoplayPaused ? "（已暫停）" : etaTxt}`;
+      `${posTxt}${listAutoplayPaused ? "（已暫停）" : etaTxt}`;
     document.getElementById("autoplayFloatToggle").textContent = listAutoplayRunning ? "⏸️" : "▶️";
     float.title = "AirPods／耳機：單按=暫停·繼續；雙按=把這個字標成待複習（停在原地繼續播）；三按=跳下一個（限 GPT 語音）";
   }
@@ -8592,6 +8612,7 @@ function stopListAutoplay(){
   listAutoplayRunning = false;
   listAutoplayPaused = false;
   listAutoplayIndex = 0;
+  autoplayNewPhase = null;
   autoplayJump = 0;
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
@@ -8701,10 +8722,12 @@ async function runListAutoplay(){
   autoplayRunStartIndex = listAutoplayIndex;
   renderAutoplayControls();
   autoplayJump = 0;
+  advanceAutoplayNewPhase(words);
   while(listAutoplayRunning && listAutoplayIndex < words.length){
     const w = words[listAutoplayIndex];
     autoplayCurrentWord = w;
     saveAutoplayResumeId(w.id);
+    if(w.id > (loadAutoplaySeenMax() || 0)) saveAutoplaySeenMax(w.id);
     const startAtEl = document.getElementById("autoplayStartAt");
     if(startAtEl && document.activeElement !== startAtEl) startAtEl.value = String(w.id);
     const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
@@ -8777,6 +8800,7 @@ async function runListAutoplay(){
     if(autoplayJump === -1) listAutoplayIndex = Math.max(0, listAutoplayIndex - 1);
     else listAutoplayIndex++;
     autoplayJump = 0;
+    advanceAutoplayNewPhase(words);
     // 🔁 循環播放：播完最後一個字就回到第一個字。重新抓一次清單（這輪中間
     // 可能有改篩選、標 ⚠️），順便刷新列表把這輪標的 ⚠️ 顯示出來。
     if(listAutoplayRunning && listAutoplayIndex >= words.length && autoplayLoopOn()){
@@ -8812,26 +8836,93 @@ function saveAutoplayResumeId(id){
   }catch(e){}
 }
 // 編號 → 目前清單裡的位置。那個編號不在目前清單裡（被篩掉、刪掉）的話，
-// 從清單順序中下一個編號比它大的字開始；都沒有就從頭。
+// 從清單順序中「它後面那個字」開始：一般順序是下一個編號比它大的字，
+// 「🆕 新單字在前」（編號由大到小）是下一個編號比它小的字；都沒有就從頭。
 function autoplayIndexForId(words, id){
   if(!id) return 0;
   const exact = words.findIndex(w => w.id === id);
   if(exact >= 0) return exact;
-  const after = words.findIndex(w => w.id > id);
+  const desc = words.length > 1 && words[0].id > words[words.length - 1].id;
+  const after = words.findIndex(w => desc ? w.id < id : w.id > id);
   return after >= 0 ? after : 0;
+}
+// ---- 先播新字，再接回上次進度 ----
+// 記住「依序播放已經知道的最大編號」（播到哪個字就更新）。上完課新增的字編號
+// 一定比它大；如果這些新字在清單裡排在上次進度前面（預設「🆕 新單字在前」就是），
+// 按播放時先把新字播完，再跳回上次那個字繼續。播新字途中停下來也會記住，
+// 下次接著播剩下的新字。每個語言各記一份。
+const AUTOPLAY_SEEN_MAX_LS = "flashcard_autoplay_seen_max_v1";
+const AUTOPLAY_NEW_PHASE_LS = "flashcard_autoplay_new_phase_v1";
+function loadAutoplaySeenMax(){
+  try{ return parseInt(kvStore.getItem(lsKey(AUTOPLAY_SEEN_MAX_LS)), 10) || null; }catch(e){ return null; }
+}
+function saveAutoplaySeenMax(id){
+  try{ kvStore.setItem(lsKey(AUTOPLAY_SEEN_MAX_LS), String(id)); }catch(e){}
+}
+function loadAutoplayNewPhase(){
+  try{
+    const v = JSON.parse(kvStore.getItem(lsKey(AUTOPLAY_NEW_PHASE_LS)) || "null");
+    return v && v.boundary > 0 && v.returnId > 0 ? v : null;
+  }catch(e){ return null; }
+}
+function saveAutoplayNewPhase(phase){
+  try{
+    if(phase) kvStore.setItem(lsKey(AUTOPLAY_NEW_PHASE_LS), JSON.stringify(phase));
+    else kvStore.removeItem(lsKey(AUTOPLAY_NEW_PHASE_LS));
+  }catch(e){}
+}
+// 從頭按播放時決定要不要先播新字。commit=false 只是算給按鈕顯示，不存任何東西。
+// 回傳 { phase, startIndex }：phase 是 null 就照原本從 startIndex 播。
+function planAutoplayNewPhase(words, startId, commit){
+  const startIndex = autoplayIndexForId(words, startId);
+  let seen = loadAutoplaySeenMax();
+  if(seen === null){
+    // 第一次用這個功能：現有的字都當作聽過了，之後新增的才算新字。
+    seen = allWords.length ? Math.max(...allWords.map(w => w.id)) : 0;
+    if(commit) saveAutoplaySeenMax(seen);
+  }
+  const saved = loadAutoplayNewPhase();
+  if(saved){
+    // 上次播新字播到一半：起點還是新字就接著播；起點被改成舊字（自己改了編號）就取消。
+    if(words[startIndex] && words[startIndex].id > saved.boundary) return { phase: saved, startIndex };
+    if(commit) saveAutoplayNewPhase(null);
+  }
+  if(!startId || !words[startIndex]) return { phase: null, startIndex };
+  const firstNew = words.findIndex(w => w.id > seen);
+  if(firstNew < 0 || firstNew >= startIndex) return { phase: null, startIndex };
+  const phase = { boundary: seen, returnId: words[startIndex].id };
+  if(commit) saveAutoplayNewPhase(phase);
+  return { phase, startIndex: firstNew };
+}
+// 播放迴圈每換一個字呼叫：先播新字階段裡，跳到下一個新字；新字都播完了就跳回上次進度。
+function advanceAutoplayNewPhase(words){
+  if(!autoplayNewPhase) return;
+  let j = listAutoplayIndex;
+  while(j < words.length && !(words[j].id > autoplayNewPhase.boundary)) j++;
+  if(j < words.length){ listAutoplayIndex = j; return; }
+  listAutoplayIndex = autoplayIndexForId(words, autoplayNewPhase.returnId);
+  autoplayNewPhase = null;
+  saveAutoplayNewPhase(null);
 }
 function syncAutoplayStartField(){
   const input = document.getElementById("autoplayStartAt");
   if(!input || document.activeElement === input) return;
   const id = loadAutoplayResumeId();
-  if(id){ input.value = String(id); return; }
-  const words = getVisibleWords();
-  input.value = words.length ? String(words[0].id) : "";
+  if(id) input.value = String(id);
+  else{
+    const words = getVisibleWords();
+    input.value = words.length ? String(words[0].id) : "";
+  }
+  // 清單變了（剛匯入新字、換篩選）→ 按鈕上的字數／「先播幾個新字」跟著更新。
+  if(!listAutoplayRunning && !listAutoplayPaused){
+    try{ renderAutoplayControls(); }catch(e){}
+  }
 }
 document.getElementById("autoplayStartAt").addEventListener("change", (e) => {
   const n = parseInt(e.target.value, 10);
   saveAutoplayResumeId(n > 0 ? n : null);
   if(!(n > 0)) syncAutoplayStartField();
+  renderAutoplayControls();   // 「先播幾個新字」的按鈕文字會跟著起點變
 });
 // 上面的 updateCount() 可能在這段程式載入前就先跑過（那時讀不到記錄），這裡補同步一次。
 syncAutoplayStartField();
@@ -8840,7 +8931,9 @@ function toggleListAutoplay(){
   // 重新開始（不是從暫停處繼續）：從「從第幾個開始」那格指定的位置播。
   if(!listAutoplayPaused){
     const n = parseInt(document.getElementById("autoplayStartAt").value, 10);
-    listAutoplayIndex = autoplayIndexForId(getVisibleWords(), n > 0 ? n : null);
+    const plan = planAutoplayNewPhase(getVisibleWords(), n > 0 ? n : null, true);
+    listAutoplayIndex = plan.startIndex;
+    autoplayNewPhase = plan.phase;
   }
   runListAutoplay();
 }
