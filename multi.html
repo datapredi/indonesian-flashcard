@@ -327,6 +327,7 @@
       <button id="btnToggleTimeAdvOnly">⏰ 只顯示時間副詞</button>
       <button id="btnToggleConjOnly">🧷 只顯示連接詞</button>
       <button id="btnToggleDegFreqOnly">📊 只顯示程度／頻率副詞</button>
+      <button id="btnToggleReduplOnly" class="hidden">🔁 只顯示疊字</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <select id="groupFilter2" class="hidden" title="同時再顯示另一個分組（兩組的字一起列出來）"><option value="">➕ 再加一組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
@@ -1055,6 +1056,7 @@ function updateLangButtons(){
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
   document.getElementById("btnIdPronBackfill").classList.toggle("hidden", currentLang !== "id");
+  document.getElementById("btnToggleReduplOnly").classList.toggle("hidden", currentLang !== "id");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
   document.getElementById("compactReadBar").classList.toggle("hidden", !isCompactReadLang());
   // 這段在頁面剛載入時就會跑，那時精簡模式的變數還沒宣告好（let 有 TDZ），
@@ -1980,6 +1982,18 @@ function isDegFreqWord(w){
   })) return true;
   if(splitMeaningParts(d.en).some(p => DEG_FREQ_EN.has(p.toLowerCase().replace(/[.!?]+$/, "")))) return true;
   return false;
+}
+// 「只顯示疊字」篩選（印尼文專用）：kata ulang 都用連字號寫——kadang-kadang、
+// bolak-balik、tolong-menolong、sebaik-baiknya——口語也常寫成 jalan2，所以看
+// 「有沒有哪個字是 字母-字母 或 字母+2」就很準。其他語言的連字號（英文
+// well-known 之類）不是疊字，所以只在印尼文顯示這個按鈕。句子不算。
+let showReduplOnly = false;
+function isReduplWord(w){
+  if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
+  return String(w.text).split(/\s+/).some(t => {
+    const bare = t.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, "");
+    return /^\p{L}{2,}(-\p{L}{2,})+$/u.test(bare) || /^\p{L}{2,}2$/u.test(bare);
+  });
 }
 // 「只顯示星期」篩選（全語言通用）：靠中英文意思找出星期一～星期日，
 // 篩選時照星期一→星期日排好。
@@ -6772,6 +6786,7 @@ function getVisibleWords(){
     if(showTimeAdvOnly && !isTimeAdvWord(w)) return false;
     if(showConjOnly && !isConjWord(w)) return false;
     if(showDegFreqOnly && !isDegFreqWord(w)) return false;
+    if(showReduplOnly && currentLang === "id" && !isReduplWord(w)) return false;
     if(groupFilter && !ignoreGroup){
       const g = wordGroups[w.id] || "";
       if(g !== groupFilter && !(groupFilter2 && g === groupFilter2)) return false;
@@ -8199,6 +8214,7 @@ function updateCount(){
   if(typeof updateTimeAdvToggleLabel === "function") updateTimeAdvToggleLabel();
   if(typeof updateConjToggleLabel === "function") updateConjToggleLabel();
   if(typeof updateDegFreqToggleLabel === "function") updateDegFreqToggleLabel();
+  if(typeof updateReduplToggleLabel === "function") updateReduplToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -8623,6 +8639,19 @@ document.getElementById("btnToggleDegFreqOnly").addEventListener("click", () => 
   renderList();
 });
 updateDegFreqToggleLabel();
+function updateReduplToggleLabel(){
+  const btn = document.getElementById("btnToggleReduplOnly");
+  if(!btn) return;
+  const n = allWords.filter(isReduplWord).length;
+  btn.textContent = showReduplOnly ? `顯示全部單字 (疊字 ${n} 個)` : `🔁 只顯示疊字 (${n})`;
+  btn.classList.toggle("primary", showReduplOnly);
+}
+document.getElementById("btnToggleReduplOnly").addEventListener("click", () => {
+  showReduplOnly = !showReduplOnly;
+  updateReduplToggleLabel();
+  renderList();
+});
+updateReduplToggleLabel();
 // 自訂分組：篩選下拉選單的選項要跟著現有的組更新
 function updateGroupFilterOptions(){
   const sel = document.getElementById("groupFilter");
