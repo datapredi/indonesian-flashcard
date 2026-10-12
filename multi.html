@@ -6372,7 +6372,7 @@ ${lines}`;
       const parsed = await callClaude(prompt, schema, 4096);
       (parsed.entries || []).forEach(e => {
         const w = chunk[e.i - 1];
-        if(!w || !e.pron || !idPronAligned(w.text, e.pron)) return;
+        if(!w || !e.pron || !idPronUsable(w.text, e.pron)) return;
         const prev = lookup(w.text) || {};
         customDB[w.text] = Object.assign({}, prev, { pron: e.pron.normalize("NFC") });
         changed++;
@@ -6389,7 +6389,7 @@ ${lines}`;
 document.getElementById("btnIdPronBackfill").onclick = async () => {
   if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
   // 有 e、但還沒有可用標音（沒有，或跟原文對不上）的字
-  const list = allWords.filter(w => /e/i.test(w.text) && !idPronAligned(w.text, (lookup(w.text) || {}).pron));
+  const list = allWords.filter(w => /e/i.test(w.text) && !idPronUsable(w.text, (lookup(w.text) || {}).pron));
   if(list.length === 0){ alert("所有有 e 的字都已經有發音標注了。"); return; }
   if(!confirm(`有 ${list.length} 個含 e 的字還沒有發音標注，要請 AI 判斷每個 e 是不是唸 ə（唸 ə 的會標成紅色）嗎？意思、例句都不會動。`)) return;
   const btn = document.getElementById("btnIdPronBackfill");
@@ -6662,21 +6662,51 @@ function viFinalsHTML(text, finals){
 }
 function escapeHtmlText(t){ return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 // 印尼文：唸央中元音 ə 的 e 標成紅色。靠 AI 產生的 KBBI 標音（data.pron）判斷——
-// pron 裡維持一般 e 的就是 ə，é／è 不是。pron 跟原文要一個字母一個字母對得上
-// （拿掉 é/è 的符號、不分大小寫後完全一樣）才標，對不上就照原樣顯示，不亂猜。
+// pron 裡維持一般 e 的就是 ə，é／è 不是。一個字一個字分開比對：那個字跟 pron
+// 裡對應的字字母對得上（拿掉 é/è 的符號、不分大小寫後一樣）才標；對不上（例如
+// 原文拼錯、AI 的標音順手改成正確拼法）就改查單字表裡這個字單獨的標音，
+// 都沒有才照原樣顯示，不亂猜。片語裡其他對得上的字照樣會標。
 function idPronAligned(text, pron){
   if(!pron) return false;
   const base = t => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const tc = [...String(text)], pc = [...String(pron).normalize("NFC")];
   return tc.length === pc.length && base(tc.join("")) === base(pc.join(""));
 }
-function idSchwaHTML(text, pron){
-  if(!idPronAligned(text, pron)) return escapeHtmlText(text);
+// 片語的 pron 至少能拿來標一部分（字數一樣，就算有個別字對不上）。
+function idPronUsable(text, pron){
+  if(!pron) return false;
+  const n = t => String(t).trim().split(/\s+/).length;
+  return n(text) === n(pron);
+}
+function idSchwaWordHTML(word, pron){
   const pc = [...String(pron).normalize("NFC")];
-  return [...String(text)].map((ch, i) =>
+  return [...String(word)].map((ch, i) =>
     (ch === "e" || ch === "E") && (pc[i] === "e" || pc[i] === "E")
       ? `<span class="schwa-e" title="唸 ə">${ch}</span>` : escapeHtmlText(ch)
   ).join("");
+}
+function idSchwaHTML(text, pron){
+  const parts = String(text).split(/(\s+)/);
+  const pronParts = pron ? String(pron).trim().split(/\s+/) : [];
+  const words = parts.filter((_, i) => i % 2 === 0);
+  const sameCount = pronParts.length === words.length;
+  let k = 0;
+  return parts.map((part, i) => {
+    if(i % 2 === 1) return part;   // 空白
+    const p = sameCount ? pronParts[k] : null;
+    k++;
+    if(p && idPronAligned(part, p)) return idSchwaWordHTML(part, p);
+    // 片語的標音對不上這個字：借用單字表裡同一個字單獨的標音（大小寫、標點不管）
+    const bare = part.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
+    if(bare && bare !== text && typeof lookup === "function"){
+      const own = lookup(bare) || lookup(bare.toLowerCase());
+      if(own && own.pron && idPronAligned(bare, own.pron)){
+        const start = part.indexOf(bare);
+        return escapeHtmlText(part.slice(0, start)) + idSchwaWordHTML(bare, own.pron) + escapeHtmlText(part.slice(start + bare.length));
+      }
+    }
+    return escapeHtmlText(part);
+  }).join("");
 }
 // finals：viSouthernFinals(原文) 的結果，跟 text 的音節一一對應（拆掉聲調的
 // 拼音版也是同樣的音節數，所以兩行都能用同一份）；不傳就不標尾音。
