@@ -114,6 +114,7 @@
   .card-area .front{font-size:1.5rem; font-weight:700;}
   .front-pron{font-size:0.95rem; color:var(--muted); margin-top:4px;}
   .item .pron{color:var(--muted); font-weight:400; font-size:0.85rem;}
+  .schwa-e{color:var(--danger); font-weight:700;}
   .card-area .back{font-size:1.05rem; color:var(--accent2); margin-top:12px;}
   /* 日文漢字假名原文：中文母語者看得懂漢字，值得直接顯示。泰文原文是使用者
      要求加的（放在英文拼音下面，用來核對發音）。其餘 hasScript 語言（韓文、
@@ -308,6 +309,7 @@
       <button id="btnGenerateAll">🚀 全部生成例句＋發音（出發前先跑一輪，離線也能用）</button>
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
       <button id="btnJaKanjiBackfill" class="hidden">🈶 幫舊字補上漢字寫法（日文）</button>
+      <button id="btnIdPronBackfill" class="hidden" title="唸 ə 的 e 會標成紅色，要靠每個字的 KBBI 標音判斷；舊字沒有標音的話用這個補">🔴 幫舊字補 e 的發音（印尼文）</button>
       <div id="chunkReview" class="hidden"></div>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
@@ -1051,6 +1053,7 @@ function updateLangButtons(){
   document.getElementById("btnGenerateAllNativeTones").classList.toggle("hidden", !toneLangActiveTop || currentLang === "vi");
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
+  document.getElementById("btnIdPronBackfill").classList.toggle("hidden", currentLang !== "id");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
   document.getElementById("compactReadBar").classList.toggle("hidden", !isCompactReadLang());
   // 這段在頁面剛載入時就會跑，那時精簡模式的變數還沒宣告好（let 有 TDZ），
@@ -6309,6 +6312,81 @@ document.getElementById("btnJaKanjiBackfill").onclick = async () => {
   }
 };
 
+// 印尼文：幫沒有 KBBI 標音（pron）的舊字補上，紅色 ə 標示要靠它。只補 pron，
+// 意思、例句都不動。AI 回的標音跟原文對不上（改了拼字）就不存。
+async function backfillIdPron(list, btn){
+  const CHUNK = 40;
+  const originalLabel = btn.textContent;
+  let done = 0, changed = 0, failCount = 0;
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { i: { type: "integer" }, pron: { type: "string" } },
+          required: ["i", "pron"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  for(let start = 0; start < list.length; start += CHUNK){
+    const chunk = list.slice(start, start + CHUNK);
+    btn.textContent = `補 e 發音中... (${done}/${list.length})`;
+    const lines = chunk.map((w, k) => `${k + 1}. i=${k + 1}｜${w.text}｜中文意思=${(lookup(w.text) || {}).zh || ""}`).join("\n");
+    const prompt = `你是印尼語老師。下面每一項是學生在背的印尼文單字/句子。**不要翻譯、不要改拼字、不要改大小寫或標點。**
+
+唯一任務：依照印尼文詞典 KBBI 的標音慣例，把每個字母 e 依照實際發音標注清楚，輸出成 pron：
+- 央中元音 schwa /ə/（弱化、輕聲的 e，例如 "besar"、"kecil"、"sekolah" 的第一個 e，以及 me-/ber-/ter-/pe-/ke-/se- 等字首的 e）維持寫成一般的 e，不用加符號
+- 閉前元音 /e/（例如 "sore"、"meja"、"kare" 的 e）標成 é
+- 開前元音 /ɛ/（例如 "enak" 的 e、"apel"、"nenek" 的第二個 e）標成 è
+其餘每個字元（包括空格、標點、大小寫）都照抄原文；沒有 e 的話 pron 就跟原文一模一樣。
+
+每一項輸出 { i（照抄輸入的 i）, pron }，數量、順序跟輸入一致。
+
+清單：
+${lines}`;
+    try{
+      const parsed = await callClaude(prompt, schema, 4096);
+      (parsed.entries || []).forEach(e => {
+        const w = chunk[e.i - 1];
+        if(!w || !e.pron || !idPronAligned(w.text, e.pron)) return;
+        const prev = lookup(w.text) || {};
+        customDB[w.text] = Object.assign({}, prev, { pron: e.pron.normalize("NFC") });
+        changed++;
+      });
+      saveCustomDB();
+    }catch(err){
+      failCount += chunk.length;
+    }
+    done += chunk.length;
+  }
+  btn.textContent = originalLabel;
+  return { done, changed, failCount };
+}
+document.getElementById("btnIdPronBackfill").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  // 有 e、但還沒有可用標音（沒有，或跟原文對不上）的字
+  const list = allWords.filter(w => /e/i.test(w.text) && !idPronAligned(w.text, (lookup(w.text) || {}).pron));
+  if(list.length === 0){ alert("所有有 e 的字都已經有發音標注了。"); return; }
+  if(!confirm(`有 ${list.length} 個含 e 的字還沒有發音標注，要請 AI 判斷每個 e 是不是唸 ə（唸 ə 的會標成紅色）嗎？意思、例句都不會動。`)) return;
+  const btn = document.getElementById("btnIdPronBackfill");
+  btn.disabled = true;
+  await acquireWakeLock();
+  try{
+    const { done, changed, failCount } = await backfillIdPron(list, btn);
+    renderList();
+    alert(`完成，處理了 ${done} 個字，補上 ${changed} 個發音標注。${failCount > 0 ? `有 ${failCount} 個失敗（網路不穩之類），可以再按一次，已補過的不會重複。` : ""}${done - failCount - changed > 0 ? `另外有 ${done - failCount - changed} 個 AI 回的標音跟原文對不上，沒有存，可以再按一次試試。` : ""}`);
+  } finally {
+    btn.disabled = false;
+    releaseWakeLock();
+  }
+};
+
 // 越南文：把每個字的 nativeScript 補上／修正成「帶聲調符號的正確越南文」。
 async function backfillViScript(list, btn){
   const CHUNK = 25;
@@ -6565,6 +6643,23 @@ function viFinalsHTML(text, finals){
   }).join("");
 }
 function escapeHtmlText(t){ return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+// 印尼文：唸央中元音 ə 的 e 標成紅色。靠 AI 產生的 KBBI 標音（data.pron）判斷——
+// pron 裡維持一般 e 的就是 ə，é／è 不是。pron 跟原文要一個字母一個字母對得上
+// （拿掉 é/è 的符號、不分大小寫後完全一樣）才標，對不上就照原樣顯示，不亂猜。
+function idPronAligned(text, pron){
+  if(!pron) return false;
+  const base = t => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const tc = [...String(text)], pc = [...String(pron).normalize("NFC")];
+  return tc.length === pc.length && base(tc.join("")) === base(pc.join(""));
+}
+function idSchwaHTML(text, pron){
+  if(!idPronAligned(text, pron)) return escapeHtmlText(text);
+  const pc = [...String(pron).normalize("NFC")];
+  return [...String(text)].map((ch, i) =>
+    (ch === "e" || ch === "E") && (pc[i] === "e" || pc[i] === "E")
+      ? `<span class="schwa-e" title="唸 ə">${ch}</span>` : escapeHtmlText(ch)
+  ).join("");
+}
 // finals：viSouthernFinals(原文) 的結果，跟 text 的音節一一對應（拆掉聲調的
 // 拼音版也是同樣的音節數，所以兩行都能用同一份）；不傳就不標尾音。
 function viHighlightRegional(text, checkTone, finals){
@@ -6731,7 +6826,8 @@ function createWordItem(w){
     viNativeHTML = nativeHi.html;
     viMainHTML = mainHi.html;
   }
-  const mainText = currentLang === "vi" ? viMainHTML : w.text;
+  const mainText = currentLang === "vi" ? viMainHTML
+    : currentLang === "id" ? idSchwaHTML(w.text, data && data.pron) : w.text;
   const viDiffers = viRegionReasons.length > 0;
   const viDiffTitle = viDiffers ? viRegionReasons.join("；").replace(/"/g, "&quot;") : "";
   row.innerHTML = `
@@ -9947,6 +10043,7 @@ function renderCard(){
   if(cardDirection === "id-zh"){
     document.getElementById("cardFront").textContent = w.text;
     if(viCardHTML) document.getElementById("cardFront").innerHTML = viCardHTML;
+    if(currentLang === "id") document.getElementById("cardFront").innerHTML = idSchwaHTML(w.text, data && data.pron);
     // 認羅馬拼音回想意思時，漢字原文一起顯示在正面當輔助（不是答案，不算洩題）
     document.getElementById("cardPron").textContent = nativeText || pronText.trim();
     document.getElementById("cardPron").classList.toggle("is-native", !!nativeText);
@@ -9958,6 +10055,7 @@ function renderCard(){
     document.getElementById("cardPron").classList.remove("is-native");
     document.getElementById("cardBack").textContent = w.text + pronText;
     if(viCardHTML) document.getElementById("cardBack").innerHTML = viCardHTML + escapeHtmlText(pronText);
+    if(currentLang === "id") document.getElementById("cardBack").innerHTML = idSchwaHTML(w.text, data && data.pron) + escapeHtmlText(pronText);
     // 中文回想日文時，漢字原文是答案的一部分，跟著背面一起翻開才顯示
     cardNative.textContent = [nativeText, replyText, mnemonicSummary(w.text)].filter(Boolean).join("　");
   }
