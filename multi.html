@@ -326,6 +326,7 @@
       <button id="btnToggleWeekdaysOnly">📅 只顯示星期</button>
       <button id="btnToggleTimeAdvOnly">⏰ 只顯示時間副詞</button>
       <button id="btnToggleConjOnly">🧷 只顯示連接詞</button>
+      <button id="btnToggleDegFreqOnly">📊 只顯示程度／頻率副詞</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <select id="groupFilter2" class="hidden" title="同時再顯示另一個分組（兩組的字一起列出來）"><option value="">➕ 再加一組</option></select>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
@@ -1961,6 +1962,23 @@ function isConjWord(w){
     return CONJ_ZH.has(t) || CONJ_ZH.has(t.replace(/[的地]$/, ""));
   })) return true;
   if(splitMeaningParts(d.en).some(p => CONJ_EN.has(p.toLowerCase().replace(/[.!?]+$/, "")))) return true;
+  return false;
+}
+// 「只顯示程度／頻率副詞」篩選（全語言通用）：同一套整段比對做法。程度（很、
+// 非常、太、有點、比較、最…）跟頻率（常常、總是、有時、偶爾、很少、從不…）
+// 放一起。頻率詞跟時間副詞會重疊，兩個篩選都抓得到沒關係。刻意不收單獨的
+// 「好」「真」（bagus＝好）、英文 so／too／pretty（jadi、juga、cantik 會被誤抓）。
+let showDegFreqOnly = false;
+const DEG_FREQ_ZH = new Set(("很 非常 十分 相當 特別 尤其 極 極了 極其 超 超級 太 太過 過於 有點 有一點 有些 稍微 稍 略 略微 比較 較 更 更加 最 挺 蠻 滿 夠 足夠 真的 實在 完全 根本 幾乎 差不多 一點 一點點 多麼 這麼 那麼 如此 頗 越來越 越 愈 愈來愈 常常 常 經常 時常 往往 通常 平常 總是 老是 一直 每次 有時 有時候 偶爾 很少 難得 從不 從來不 從來沒有 幾乎不 不常 一再 再三 不時 時時").split(" "));
+const DEG_FREQ_EN = new Set(("very|really|quite|rather|fairly|extremely|super|most|more|less|least|a little|a bit|a little bit|slightly|somewhat|kind of|sort of|almost|nearly|completely|totally|absolutely|entirely|fully|enough|especially|particularly|truly|highly|incredibly|terribly|much|very much|a lot|so much|too much|increasingly|always|often|usually|normally|generally|sometimes|occasionally|rarely|seldom|frequently|never|hardly|hardly ever|barely|scarcely|constantly|regularly|every time|from time to time|now and then|once in a while|all the time").split("|"));
+function isDegFreqWord(w){
+  if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  if(splitMeaningParts(d.zh).some(p => {
+    const t = p.replace(/[。！？!?.]+$/, "");
+    return DEG_FREQ_ZH.has(t) || DEG_FREQ_ZH.has(t.replace(/[的地了]$/, ""));
+  })) return true;
+  if(splitMeaningParts(d.en).some(p => DEG_FREQ_EN.has(p.toLowerCase().replace(/[.!?]+$/, "")))) return true;
   return false;
 }
 // 「只顯示星期」篩選（全語言通用）：靠中英文意思找出星期一～星期日，
@@ -6723,6 +6741,7 @@ function getVisibleWords(){
     if(showWeekdaysOnly && !isWeekdayWord(w)) return false;
     if(showTimeAdvOnly && !isTimeAdvWord(w)) return false;
     if(showConjOnly && !isConjWord(w)) return false;
+    if(showDegFreqOnly && !isDegFreqWord(w)) return false;
     if(groupFilter && !ignoreGroup){
       const g = wordGroups[w.id] || "";
       if(g !== groupFilter && !(groupFilter2 && g === groupFilter2)) return false;
@@ -8149,6 +8168,7 @@ function updateCount(){
   if(typeof updateWeekdaysToggleLabel === "function") updateWeekdaysToggleLabel();
   if(typeof updateTimeAdvToggleLabel === "function") updateTimeAdvToggleLabel();
   if(typeof updateConjToggleLabel === "function") updateConjToggleLabel();
+  if(typeof updateDegFreqToggleLabel === "function") updateDegFreqToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
@@ -8560,6 +8580,19 @@ document.getElementById("btnToggleConjOnly").addEventListener("click", () => {
   renderList();
 });
 updateConjToggleLabel();
+function updateDegFreqToggleLabel(){
+  const btn = document.getElementById("btnToggleDegFreqOnly");
+  if(!btn) return;
+  const n = allWords.filter(isDegFreqWord).length;
+  btn.textContent = showDegFreqOnly ? `顯示全部單字 (程度／頻率副詞 ${n} 個)` : `📊 只顯示程度／頻率副詞 (${n})`;
+  btn.classList.toggle("primary", showDegFreqOnly);
+}
+document.getElementById("btnToggleDegFreqOnly").addEventListener("click", () => {
+  showDegFreqOnly = !showDegFreqOnly;
+  updateDegFreqToggleLabel();
+  renderList();
+});
+updateDegFreqToggleLabel();
 // 自訂分組：篩選下拉選單的選項要跟著現有的組更新
 function updateGroupFilterOptions(){
   const sel = document.getElementById("groupFilter");
