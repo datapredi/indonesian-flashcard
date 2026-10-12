@@ -1986,14 +1986,15 @@ function isDegFreqWord(w){
 // 「只顯示疊字」篩選（印尼文專用）：kata ulang 都用連字號寫——kadang-kadang、
 // bolak-balik、tolong-menolong、sebaik-baiknya——口語也常寫成 jalan2，所以看
 // 「有沒有哪個字是 字母-字母 或 字母+2」就很準。其他語言的連字號（英文
-// well-known 之類）不是疊字，所以只在印尼文顯示這個按鈕。句子不算。
+// well-known 之類）不是疊字，所以只在印尼文顯示這個按鈕。沒加連字號、用空格
+// 隔開的（pagi pagi、sama sama）也算：同一個字前後連著出現兩次。句子不算。
 let showReduplOnly = false;
 function isReduplWord(w){
   if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
-  return String(w.text).split(/\s+/).some(t => {
-    const bare = t.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, "");
-    return /^\p{L}{2,}(-\p{L}{2,})+$/u.test(bare) || /^\p{L}{2,}2$/u.test(bare);
-  });
+  const bares = String(w.text).split(/\s+/).map(t => t.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, "").toLowerCase());
+  return bares.some((bare, i) =>
+    /^\p{L}{2,}(-\p{L}{2,})+$/u.test(bare) || /^\p{L}{2,}2$/u.test(bare)
+    || (i > 0 && /^\p{L}{2,}$/u.test(bare) && bare === bares[i - 1]));
 }
 // 「只顯示星期」篩選（全語言通用）：靠中英文意思找出星期一～星期日，
 // 篩選時照星期一→星期日排好。
