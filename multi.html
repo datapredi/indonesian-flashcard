@@ -32,6 +32,10 @@
   .filebtn{display:inline-block;}
   button:hover{border-color:var(--accent);}
   button.primary{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600;}
+  /* 依序播放：整排做成醒目的區塊，按鈕整排寬、放大；播放中／暫停時換成綠色 */
+  .autoplay-panel{border:2px solid var(--accent); border-radius:14px; padding:12px; margin:10px 0; background:color-mix(in srgb, var(--accent) 8%, var(--bg));}
+  .autoplay-panel #btnListAutoplay{flex:1 1 100%; font-size:1.15rem; font-weight:700; padding:14px 16px; border-radius:12px; background:var(--accent); color:#fff; border-color:var(--accent);}
+  .autoplay-panel #btnListAutoplay.primary{background:var(--accent2); border-color:var(--accent2);}
   button.secondary{background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600;}
   button:disabled{opacity:0.5; cursor:default;}
   input[type=file]{display:none;}
@@ -239,7 +243,7 @@
       <input type="text" id="fptProxyUrl" placeholder="Cloudflare Worker 網址 https://...workers.dev" style="flex:1 1 240px;">
       <span class="note" style="flex:1 1 100%; margin:2px 0 0;">照 <code>elevenlabs-tts-proxy.worker.js</code> 部署一個 Cloudflare Worker（ElevenLabs key 放 Worker secret <code>XI_API_KEY</code>），把網址貼在上面、voice ID 那格填你在 ElevenLabs 挑／克隆的越南語 voice。音檔會永久快取。</span>
     </div>
-    <div class="toolbar">
+    <div class="toolbar autoplay-panel">
       <button id="btnListAutoplay">▶️ 依序播放發音</button>
       <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;" title="下次從哪個編號（清單上每個字前面的數字）開始播。每播到一個字會自動記住，停下來、關掉網頁再回來都會從這裡接著播；播完一整輪會回到清單第一個字">
         從編號
