@@ -9516,9 +9516,11 @@ async function processConvertImportText(rawText){
     const enHintBySource = {};
     // 吃的是原始行（還沒拿掉標註）：英文後面接的括號說明（「hotel (Khách -
     // customer, …)」）要整段跟著英文進筆記，所以要在拆標註之前先切。
+    // 老師也會寫成「Polusi = pollution」：= 後面是純英文的話一樣處理（= 後面是
+    // 中文的「原文 = 中文」照舊走下面的 splitProvidedZh／一般處理）。
     function splitEnglishGloss(raw){
       const s = raw.replace(/\r/g, "").replace(/\*\*/g, "").trim();
-      const m = s.match(/^(.+?)\s+-\s+(.+)$/);
+      const m = s.match(/^(.+?)(?:\s+-\s+|\s*[=＝]+\s*)(.+)$/);
       if(!m) return null;
       // 「 - 」在括號裡面（「Tính tiền! … (tính - calculate)」）就不是這種寫法
       if((m[1].match(/\(/g) || []).length !== (m[1].match(/\)/g) || []).length) return null;
