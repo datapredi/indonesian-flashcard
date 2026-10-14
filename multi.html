@@ -10118,7 +10118,34 @@ document.getElementById("btnStartCards").onclick = () => {
   cardIndex = 0;
   showScreen("cards");
   renderCard();
+  fixViCardScripts(cardSession);
 };
+// 越南文 Flash Card 要顯示帶聲調的原文，但有些舊字存的 nativeScript 是缺的、
+// 或 AI 當初照抄了沒聲調的拼音。開始複習時把這輪裡「完全沒有越南文符號」的字
+// 挑出來，背景用 backfillViScript 補正確寫法，補完重畫目前這張卡。本來就沒有
+// 聲調的字（anh、em、cho）AI 會回 changed=false；問過的都記 viScriptChecked，
+// 之後不再問。沒 API key 就不動。
+const VI_MARK_RE = /[\u00C0-\u1EF9đĐ]/;
+let viCardFixRunning = false;
+async function fixViCardScripts(words){
+  if(currentLang !== "vi" || viCardFixRunning || !getApiKey()) return;
+  const list = words.filter(w => {
+    const d = lookup(w.text) || {};
+    return !d.viScriptChecked && !VI_MARK_RE.test(d.nativeScript || w.text);
+  });
+  if(list.length === 0) return;
+  viCardFixRunning = true;
+  try{
+    const status = { textContent: "" };   // backfillViScript 會寫進度文字，這裡不用顯示
+    const { failCount } = await backfillViScript(list, status);
+    if(failCount === 0){
+      list.forEach(w => { customDB[w.text] = Object.assign({}, lookup(w.text) || {}, { viScriptChecked: true }); });
+      saveCustomDB();
+    }
+    if(cardSession.length && currentLang === "vi") renderCard();
+  }catch(e){ /* 補不到就照舊顯示 */ }
+  finally{ viCardFixRunning = false; }
+}
 
 function renderCard(){
   const w = cardSession[cardIndex];
