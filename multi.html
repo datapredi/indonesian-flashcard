@@ -10132,12 +10132,15 @@ function renderCard(){
     ? `↩︎ 對方回：${data.reply.romanized || data.reply.nativeScript || ""}${data.reply.zh ? " · " + data.reply.zh : ""}`
     : "";
   const cardNative = document.getElementById("cardNative");
-  // 越南文：把南部尾音標色（跟單字表一樣），音節數對不上就照原樣顯示。
+  // 越南文：卡片一律顯示帶聲調符號的原文（nativeScript）——有些字當初是用
+  // 不帶聲調的拼音輸入的，w.text 只有拼音。南部尾音照單字表一樣標色，
+  // 音節數對不上就不標色、照原文顯示。
+  const viCardText = currentLang === "vi" ? ((data && data.nativeScript) || w.text) : null;
   const viCardHTML = (() => {
     if(currentLang !== "vi") return null;
-    const finals = viSouthernFinals((data && data.nativeScript) || w.text);
-    if(String(w.text).split(/\s+/).filter(Boolean).length !== finals.length || !finals.some(Boolean)) return null;
-    return viFinalsHTML(w.text, finals);
+    const finals = viSouthernFinals(viCardText);
+    if(String(viCardText).split(/\s+/).filter(Boolean).length !== finals.length || !finals.some(Boolean)) return escapeHtmlText(viCardText);
+    return viFinalsHTML(viCardText, finals);
   })();
   if(cardDirection === "id-zh"){
     document.getElementById("cardFront").textContent = w.text;
