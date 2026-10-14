@@ -10173,7 +10173,9 @@ document.getElementById("cardArea").onclick = () => {
 document.getElementById("cardSpeak").addEventListener("click", (e) => {
   e.stopPropagation();
   const w = cardSession[cardIndex];
-  speak(getSpeechText(w), e.currentTarget, null, useRecordingIds.has(w.id) ? recKeyFor(w.text) : null);
+  // 跟依序播放一樣：有自己錄的音就一律播錄音，不用先開那個字的「用我的錄音」。
+  // speak() 查不到錄音會自動退回 TTS。
+  speak(getSpeechText(w), e.currentTarget, null, recKeyFor(w.text));
 });
 document.getElementById("btnPrev").onclick = () => {
   cardIndex = (cardIndex - 1 + cardSession.length) % cardSession.length;
@@ -10403,7 +10405,7 @@ document.getElementById("spellCardArea").addEventListener("click", async () => {
 document.getElementById("spellCardSpeak").addEventListener("click", (e) => {
   e.stopPropagation();
   const w = spellCardSession[spellCardIndex];
-  speak(getSpeechText(w), e.currentTarget, null, useRecordingIds.has(w.id) ? recKeyFor(w.text) : null);
+  speak(getSpeechText(w), e.currentTarget, null, recKeyFor(w.text));   // 有錄音就播錄音（同單字 Flash Card）
 });
 document.getElementById("btnSpellPrev").onclick = () => {
   spellCardIndex = (spellCardIndex - 1 + spellCardSession.length) % spellCardSession.length;
