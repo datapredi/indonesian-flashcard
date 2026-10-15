@@ -268,7 +268,7 @@
       </label>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
         <input type="checkbox" id="autoplayIncludeZh">
-        之後加唸一次中文
+        中間加唸一次中文（前後各唸上面的次數）
       </label>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;" title="播完清單最後一個字之後，自動回到第一個字繼續播，直到按暫停或 ✕">
         <input type="checkbox" id="autoplayLoop">
@@ -1795,8 +1795,10 @@ function estimateAutoplaySeconds(count){
   const reps = autoplayReps();
   const includeZh = !!(document.getElementById("autoplayIncludeZh") && document.getElementById("autoplayIncludeZh").checked);
   const speed = autoplaySpeed || 1;
-  const speakingSec = (1.6 * reps + (includeZh ? 1.8 : 0)) / speed;
-  const pauseSec = 0.35 * (reps - 1) + 0.55 + (includeZh ? 0.3 : 0);
+  // 加唸中文時外語是「N 次 → 中文 → 再 N 次」，總共 2N 次
+  const fgReps = includeZh ? reps * 2 : reps;
+  const speakingSec = (1.6 * fgReps + (includeZh ? 1.8 : 0)) / speed;
+  const pauseSec = 0.35 * (fgReps - 1) + 0.55 + (includeZh ? 0.3 : 0);
   return Math.round(count * (speakingSec + pauseSec));
 }
 function fmtDuration(sec){
@@ -8971,13 +8973,17 @@ async function runListAutoplay(){
         }
       }
     }
-    for(let r = 0; r < reps && listAutoplayRunning && !autoplayJump; r++){
-      try{ await speak(text, btn, null, recKey); }catch(e){ /* 播不出來就跳過這次，繼續 */ }
-      if(!listAutoplayRunning || autoplayJump) break;
-      if(r < reps - 1) await delayMs(350);
-    }
+    const speakReps = async () => {
+      for(let r = 0; r < reps && listAutoplayRunning && !autoplayJump; r++){
+        try{ await speak(text, btn, null, recKey); }catch(e){ /* 播不出來就跳過這次，繼續 */ }
+        if(!listAutoplayRunning || autoplayJump) break;
+        if(r < reps - 1) await delayMs(350);
+      }
+    };
+    await speakReps();
     if(!listAutoplayRunning) break;
-    // 勾了「加唸中文」：3 次外語之後停一下、唸一次中文意思。
+    // 勾了「中間加唸中文」：外語唸 N 次 → 中文意思 → 外語再唸 N 次。中文放中間，
+    // 聽到意思之後還有機會再聽幾遍、對上發音，不會最後才知道意思就換下一個字。
     if(!autoplayJump && document.getElementById("autoplayIncludeZh").checked){
       const zh = (lookup(w.text) || {}).zh;
       if(zh){
@@ -8985,6 +8991,12 @@ async function runListAutoplay(){
         if(!listAutoplayRunning) break;
         if(!autoplayJump) await speakZhForAutoplay(zh);
         if(!listAutoplayRunning) break;
+        if(!autoplayJump){
+          await delayMs(350);
+          if(!listAutoplayRunning) break;
+          await speakReps();
+          if(!listAutoplayRunning) break;
+        }
       }
     }
     if(!autoplayJump) await delayMs(550);
