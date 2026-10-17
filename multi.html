@@ -314,6 +314,7 @@
       <button id="btnGenerateAllNativeTones" class="hidden">ก 全部生成泰文字母聲調標記</button>
       <button id="btnJaKanjiBackfill" class="hidden">🈶 幫舊字補上漢字寫法（日文）</button>
       <button id="btnIdPronBackfill" class="hidden" title="唸 ə 的 e 會標成紅色，要靠每個字的 KBBI 標音判斷；舊字沒有標音的話用這個補">🔴 幫舊字補 e 的發音（印尼文）</button>
+      <button id="btnIdPronRecheck" class="hidden" title="AI 標音時漏標 é 的話，那個 e 會被誤標成紅色（例如 sehat）。這個會請 AI 用比較嚴格的方式重查所有目前有紅色 e 的字">🔁 重新檢查紅色 e（印尼文）</button>
       <div id="chunkReview" class="hidden"></div>
     </div>
     <div class="note">幫已經有完整資料、但還沒有口語/難易度標籤（是這個功能上線後才有的欄位）的舊單字補上標籤，不會動到原本已經正確的意思/例句/測驗題。</div>
@@ -1060,6 +1061,7 @@ function updateLangButtons(){
   document.getElementById("btnGenerateAllNativeTones").textContent = currentLang === "vi" ? "Ư 全部生成原生文字聲調" : "ก 全部生成泰文字母聲調標記";
   document.getElementById("btnJaKanjiBackfill").classList.toggle("hidden", currentLang !== "ja");
   document.getElementById("btnIdPronBackfill").classList.toggle("hidden", currentLang !== "id");
+  document.getElementById("btnIdPronRecheck").classList.toggle("hidden", currentLang !== "id");
   document.getElementById("btnToggleReduplOnly").classList.toggle("hidden", currentLang !== "id");
   document.getElementById("btnToggleGreetingsOnly").classList.toggle("hidden", currentLang !== "arz");
   document.getElementById("compactReadBar").classList.toggle("hidden", !isCompactReadLang());
@@ -6407,6 +6409,85 @@ ${lines}`;
   btn.textContent = originalLabel;
   return { done, changed, failCount };
 }
+// 重新檢查：已經有紅色 e 的字，請 AI 把每個 e 都明確標成 ə／é／è（不能留一般的 e），
+// 避免「漏標 é → 被當成 ə」。還有一般 e 沒分類的就不存；存的時候 ə 換回 KBBI 的一般 e。
+async function recheckIdPron(list, btn){
+  const CHUNK = 40;
+  const originalLabel = btn.textContent;
+  let done = 0, changed = 0, failCount = 0;
+  const schema = {
+    type: "object",
+    properties: {
+      entries: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { i: { type: "integer" }, pron: { type: "string" } },
+          required: ["i", "pron"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["entries"],
+    additionalProperties: false
+  };
+  for(let start = 0; start < list.length; start += CHUNK){
+    const chunk = list.slice(start, start + CHUNK);
+    btn.textContent = `重新檢查中... (${done}/${list.length})`;
+    const lines = chunk.map((w, k) => `${k + 1}. i=${k + 1}｜${w.text}｜中文意思=${(lookup(w.text) || {}).zh || ""}`).join("\n");
+    const prompt = `你是印尼語老師，熟悉 KBBI 詞典的標音。下面每一項是學生在背的印尼文單字/句子。**不要翻譯、不要改拼字、不要改大小寫或標點。**
+
+唯一任務：把每一個字母 e（大寫 E 也算）換成它在標準印尼語裡的實際發音符號，輸出成 pron：
+- 央中元音 schwa /ə/ → 寫成 ə（大寫寫 Ə）。例如 besar → bəsar、kecil → kəcil、renang → rənang、me-/ber-/ter-/pe-/ke-/se- 字首的 e
+- 閉前元音 /e/ → 寫成 é（大寫 É）。例如 sehat → séhat、sore → soré、meja → méja、enak → énak、bebek → bébék、merah → mérah
+- 開前元音 /ɛ/ → 寫成 è（大寫 È）
+**pron 裡不可以再出現任何一般的 e/E**，每個都要分類。一個一個 e 想清楚再寫，不確定的話以 KBBI 為準（KBBI 裡標成 é 的就是 é）。
+其餘每個字元（包括空格、標點、大小寫）都照抄原文；沒有 e 的話 pron 就跟原文一模一樣。
+
+每一項輸出 { i（照抄輸入的 i）, pron }，數量、順序跟輸入一致。
+
+清單：
+${lines}`;
+    try{
+      const parsed = await callClaude(prompt, schema, 4096);
+      (parsed.entries || []).forEach(e => {
+        const w = chunk[e.i - 1];
+        if(!w || !e.pron) return;
+        const raw = e.pron.normalize("NFC");
+        if(/[eE]/.test(raw)) return;   // 還有沒分類的 e，不可靠
+        const pron = raw.replace(/ə/g, "e").replace(/Ə/g, "E");
+        if(!idPronUsable(w.text, pron)) return;
+        const prev = lookup(w.text) || {};
+        if(prev.pron === pron) return;
+        customDB[w.text] = Object.assign({}, prev, { pron });
+        changed++;
+      });
+      saveCustomDB();
+    }catch(err){
+      failCount += chunk.length;
+    }
+    done += chunk.length;
+  }
+  btn.textContent = originalLabel;
+  return { done, changed, failCount };
+}
+document.getElementById("btnIdPronRecheck").onclick = async () => {
+  if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
+  const list = allWords.filter(w => /e/i.test(w.text) && idSchwaHTML(w.text, (lookup(w.text) || {}).pron).includes("schwa-e"));
+  if(list.length === 0){ alert("目前沒有字有紅色的 e。"); return; }
+  if(!confirm(`有 ${list.length} 個字有紅色的 e，要請 AI 用比較嚴格的方式重新判斷每個 e 嗎？（例如 sehat 的 e 其實唸 é，不該是紅色）意思、例句都不會動。`)) return;
+  const btn = document.getElementById("btnIdPronRecheck");
+  btn.disabled = true;
+  await acquireWakeLock();
+  try{
+    const { done, changed, failCount } = await recheckIdPron(list, btn);
+    renderList();
+    alert(`完成，檢查了 ${done} 個字，改正了 ${changed} 個。${failCount > 0 ? `有 ${failCount} 個失敗（網路不穩之類），可以再按一次。` : ""}`);
+  } finally {
+    btn.disabled = false;
+    releaseWakeLock();
+  }
+};
 document.getElementById("btnIdPronBackfill").onclick = async () => {
   if(!getApiKey()){ alert("需要 Anthropic API Key，請先在上面輸入並儲存。"); return; }
   // 有 e、但還沒有可用標音（沒有，或跟原文對不上）的字
