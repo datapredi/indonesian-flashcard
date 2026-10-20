@@ -8225,6 +8225,37 @@ function renderEmptyState(el){
     addBtn.textContent = `➕ 新增「${q}」並生成翻譯`;
     addBtn.addEventListener("click", async () => {
       if(!getApiKey()){ alert("需要 Anthropic API Key 才能自動生成翻譯，請先在上面輸入並儲存。"); return; }
+      // 英文以外的語言：搜尋框打的常常是英文或中文（例如泰文環境打 sleepy），
+      // 不能直接當成這個語言的字存。改走一般匯入的轉換流程，AI 會判斷：本來就是
+      // 這個語言的羅馬拼音就照原文，英文／中文就翻成這個語言的羅馬拼音。
+      if(currentLang !== "en"){
+        const groupEl = document.getElementById("convertGroupName");
+        const zhEl = document.getElementById("useProvidedZh");
+        const prevGroup = groupEl.value, prevZh = zhEl.checked;
+        groupEl.value = groupFilter || "";
+        zhEl.checked = false;
+        addBtn.disabled = true;
+        addBtn.textContent = "翻譯並新增中...";
+        const idsBefore = new Set(allWords.map(w => w.id));
+        try{
+          await processConvertImportText(q);
+        }finally{
+          groupEl.value = prevGroup;
+          zhEl.checked = prevZh;
+        }
+        const added = allWords.filter(w => !idsBefore.has(w.id));
+        if(categoryFilter && added.length){
+          added.forEach(w => { wordCategories[w.id] = categoryFilter; });
+          saveWordCategories();
+        }
+        // 搜尋框換成實際存進去的字，馬上看得到它
+        const finalText = convertedMap[q.toLowerCase()];
+        if(finalText){
+          ["wordSearch", "wordSearch2"].forEach(id => { const el = document.getElementById(id); if(el && el.value.trim()) el.value = finalText; });
+        }
+        renderList();
+        return;
+      }
       if(!addWordToList(q)) return;
       // 當下如果剛好篩了分組/類別在看，新字也順便標上，符合正在瀏覽的情境。
       const newWord = allWords.find(w => w.text === q);
