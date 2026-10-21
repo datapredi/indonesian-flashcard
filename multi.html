@@ -322,7 +322,6 @@
     <div class="toolbar">
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
       <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
-      <button id="btnToggleTeacherOnly">🎓 只顯示老師講過</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
@@ -1689,12 +1688,11 @@ const PRON_FLAG_LS = "flashcard_pron_flag_v1";
 let pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
 function savePronFlag(){ saveMasteredSet(lsKey(PRON_FLAG_LS), pronFlagIds); }
 
-// 「上課老師特別講過的字」標記——標完可以用「🎓 只顯示老師講過」一次看／選出來練。
-// 分語言各存一份，也進備份。
+// 「上課老師特別講過的字」標記：功能已經拿掉（列上的 🎓 和篩選都刪了），
+// 舊資料留著繼續跟著備份／編號重排走，不刪使用者的資料。
 const TEACHER_FLAG_LS = "flashcard_teacher_flag_v1";
 let teacherFlagIds = loadMasteredSet(lsKey(TEACHER_FLAG_LS));
 function saveTeacherFlag(){ saveMasteredSet(lsKey(TEACHER_FLAG_LS), teacherFlagIds); }
-let showTeacherOnly = false;
 
 // 單字自己選的「重要程度」顏色（無／黃／紅／綠），整列變色。跟 pron/teacher 那種
 // 是非題不一樣，這個是多選一，所以存成 { id: "yellow"|"red"|"green" } 而不是 Set。
@@ -6880,7 +6878,6 @@ function getVisibleWords(){
     if(hiddenIds.has(w.id)) return false;
     if(showSelectedOnly && !selected.has(w.id)) return false;
     if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
-    if(showTeacherOnly && !teacherFlagIds.has(w.id)) return false;
     if(showNumbersOnly && !isNumberWord(w)) return false;
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
     if(showSentencesOnly && !isSentenceWord(w)) return false;
@@ -7926,28 +7923,6 @@ function createWordItem(w){
   refreshPronFlagBtn();
   row.appendChild(pronFlagBtn);
 
-  const teacherBtn = document.createElement("button");
-  teacherBtn.type = "button";
-  teacherBtn.className = "diff-chip";
-  function refreshTeacherBtn(){
-    const flagged = teacherFlagIds.has(w.id);
-    teacherBtn.classList.toggle("diff-E", flagged);
-    teacherBtn.textContent = "🎓";
-    teacherBtn.style.opacity = flagged ? "1" : "0.35";
-    teacherBtn.setAttribute("aria-label", `${w.text}${flagged ? "（已標記：老師講過，點一下取消）" : "（點一下標記：這個字上課老師特別講過）"}`);
-    teacherBtn.title = flagged ? "老師講過（點一下取消標記）" : "標記：上課老師特別講過的字";
-  }
-  teacherBtn.addEventListener("click", (e) => {
-    e.preventDefault(); e.stopPropagation();
-    if(teacherFlagIds.has(w.id)) teacherFlagIds.delete(w.id); else teacherFlagIds.add(w.id);
-    saveTeacherFlag();
-    refreshTeacherBtn();
-    updateTeacherToggleLabel();
-    if(showTeacherOnly) renderList();
-  });
-  refreshTeacherBtn();
-  row.appendChild(teacherBtn);
-
   const colorSelect = document.createElement("select");
   colorSelect.className = "color-flag-select";
   colorSelect.innerHTML = `
@@ -8352,7 +8327,6 @@ function updateCount(){
   if(typeof updateVerbToggleLabel === "function") updateVerbToggleLabel();
   if(typeof updateReduplToggleLabel === "function") updateReduplToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
-  if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
 }
 function deleteWord(id){
   const target = allWords.find(w => w.id === id);
@@ -8649,18 +8623,6 @@ function updatePronFlagToggleLabel(){
   btn.textContent = showPronFlagOnly ? `顯示全部單字 (發音待複習 ${pronFlagIds.size} 個)` : `⚠️ 只顯示發音待複習 (${pronFlagIds.size})`;
   btn.classList.toggle("primary", showPronFlagOnly);
 }
-function updateTeacherToggleLabel(){
-  const btn = document.getElementById("btnToggleTeacherOnly");
-  btn.textContent = showTeacherOnly ? `顯示全部單字 (老師講過 ${teacherFlagIds.size} 個)` : `🎓 只顯示老師講過 (${teacherFlagIds.size})`;
-  btn.classList.toggle("primary", showTeacherOnly);
-  btn.classList.toggle("hidden", teacherFlagIds.size === 0 && !showTeacherOnly);
-}
-document.getElementById("btnToggleTeacherOnly").addEventListener("click", () => {
-  showTeacherOnly = !showTeacherOnly;
-  updateTeacherToggleLabel();
-  renderList();
-});
-updateTeacherToggleLabel();
 updatePronFlagToggleLabel();
 function updateNumbersToggleLabel(){
   const btn = document.getElementById("btnToggleNumbersOnly");
