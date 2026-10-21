@@ -989,6 +989,9 @@ function L(){ return LANG_INFO[currentLang]; } // 目前語言的設定物件（
 // 埃及口語沒有自己的代碼、只能借用整個 Arabic（ar）；其他都是 Forvo 本身用的代碼。
 // 沒列在這裡的語言（目前是英文）就不加語言範圍，維持全站搜尋。
 const FORVO_LANG_CODE = { id: "id", th: "th", vi: "vi", ja: "ja", ko: "ko", yue: "yue", arz: "ar" };
+// 英文維基詞典（en.wiktionary.org）每種語言一節，網址加 #語言 直接跳到那一節。
+// 粵語收在 Chinese 那一節底下。
+const WIKT_SECTION = { id: "Indonesian", th: "Thai", vi: "Vietnamese", ja: "Japanese", ko: "Korean", yue: "Chinese", arz: "Egyptian_Arabic", en: "English" };
 
 // 有些語言的代名詞/語氣詞會依說話者（有時候還要看對方）的性別、年齡而不同，
 // 所有會生成該語言句子的 AI 提示都要附上對應的設定，確保生成的版本符合使用者
@@ -7204,6 +7207,27 @@ function createWordItem(w){
     window.open(url, `forvo_${Date.now()}`, "noopener");
   });
   row.appendChild(forvoBtn);
+
+  // 維基詞典：只給單字／短片語，句子查不到就不放。hasScript 語言用原生文字查
+  // （日文的「漢字（かな）」只取前面的漢字）；拉丁字母的語言轉小寫，詞條名稱是小寫的。
+  if(!isSentenceWord(w)){
+    const wiktBtn = document.createElement("button");
+    wiktBtn.type = "button";
+    wiktBtn.className = "speak-btn";
+    wiktBtn.textContent = "📖";
+    wiktBtn.title = `在維基詞典查這個字（開新分頁，跳到${L().label}那一節）`;
+    wiktBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const d = lookup(w.text);
+      let q = (L().hasScript && d && d.nativeScript) || w.text.replace(/\s*\(\d+\)$/, "");
+      q = q.replace(/[（(].*$/, "").replace(/[,，.。!！?？]+$/, "").trim();
+      if(!L().hasScript || /^[\p{Script=Latin}\s'-]+$/u.test(q)) q = q.toLowerCase();
+      const sec = WIKT_SECTION[currentLang];
+      const url = `https://en.wiktionary.org/wiki/${encodeURIComponent(q.replace(/ /g, "_"))}${sec ? "#" + sec : ""}`;
+      window.open(url, `wikt_${Date.now()}`, "noopener");
+    });
+    row.appendChild(wiktBtn);
+  }
 
   const hideBtn = document.createElement("button");
   hideBtn.type = "button";
