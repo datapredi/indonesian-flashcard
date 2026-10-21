@@ -332,6 +332,7 @@
       <button id="btnToggleTimeAdvOnly">⏰ 只顯示時間副詞</button>
       <button id="btnToggleConjOnly">🧷 只顯示連接詞</button>
       <button id="btnToggleDegFreqOnly">📊 只顯示程度／頻率副詞</button>
+      <button id="btnToggleVerbOnly">🏃 只顯示動詞</button>
       <button id="btnToggleReduplOnly" class="hidden">🔁 只顯示疊字</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <select id="groupFilter2" class="hidden" title="同時再顯示另一個分組（兩組的字一起列出來）"><option value="">➕ 再加一組</option></select>
@@ -1990,6 +1991,20 @@ function isDegFreqWord(w){
   })) return true;
   if(splitMeaningParts(d.en).some(p => DEG_FREQ_EN.has(p.toLowerCase().replace(/[.!?]+$/, "")))) return true;
   return false;
+}
+// 「只顯示動詞」篩選（全語言通用）：AI 生成的英文意思，動詞一律寫成「to ＋
+// 原形」（to eat、to look for、closed / to close），所以看英文意思裡有沒有哪
+// 一段是 to 開頭就很準。排除 to 後面接冠詞／代名詞／地點的介系詞片語（to the
+// market、to school、to me）。句子不算。
+let showVerbOnly = false;
+const VERB_TO_NOT = new Set("the a an my your his her its our their this that these those me you him us them school work bed home there here".split(" "));
+function isVerbWord(w){
+  if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
+  const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  return splitMeaningParts(d.en).some(p => {
+    const m = p.toLowerCase().match(/^to\s+([a-z'-]+)/);
+    return !!m && !VERB_TO_NOT.has(m[1]);
+  });
 }
 // 「只顯示疊字」篩選（印尼文專用）：kata ulang 都用連字號寫——kadang-kadang、
 // bolak-balik、tolong-menolong、sebaik-baiknya——口語也常寫成 jalan2，所以看
@@ -6874,6 +6889,7 @@ function getVisibleWords(){
     if(showTimeAdvOnly && !isTimeAdvWord(w)) return false;
     if(showConjOnly && !isConjWord(w)) return false;
     if(showDegFreqOnly && !isDegFreqWord(w)) return false;
+    if(showVerbOnly && !isVerbWord(w)) return false;
     if(showReduplOnly && currentLang === "id" && !isReduplWord(w)) return false;
     if(groupFilter && !ignoreGroup){
       const g = wordGroups[w.id] || "";
@@ -8333,6 +8349,7 @@ function updateCount(){
   if(typeof updateTimeAdvToggleLabel === "function") updateTimeAdvToggleLabel();
   if(typeof updateConjToggleLabel === "function") updateConjToggleLabel();
   if(typeof updateDegFreqToggleLabel === "function") updateDegFreqToggleLabel();
+  if(typeof updateVerbToggleLabel === "function") updateVerbToggleLabel();
   if(typeof updateReduplToggleLabel === "function") updateReduplToggleLabel();
   if(typeof updateHiddenToggleLabel === "function") updateHiddenToggleLabel();
   if(typeof updateTeacherToggleLabel === "function") updateTeacherToggleLabel();
@@ -8758,6 +8775,19 @@ document.getElementById("btnToggleDegFreqOnly").addEventListener("click", () => 
   renderList();
 });
 updateDegFreqToggleLabel();
+function updateVerbToggleLabel(){
+  const btn = document.getElementById("btnToggleVerbOnly");
+  if(!btn) return;
+  const n = allWords.filter(isVerbWord).length;
+  btn.textContent = showVerbOnly ? `顯示全部單字 (動詞 ${n} 個)` : `🏃 只顯示動詞 (${n})`;
+  btn.classList.toggle("primary", showVerbOnly);
+}
+document.getElementById("btnToggleVerbOnly").addEventListener("click", () => {
+  showVerbOnly = !showVerbOnly;
+  updateVerbToggleLabel();
+  renderList();
+});
+updateVerbToggleLabel();
 function updateReduplToggleLabel(){
   const btn = document.getElementById("btnToggleReduplOnly");
   if(!btn) return;
