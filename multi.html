@@ -1996,9 +1996,11 @@ function isDegFreqWord(w){
 // market、to school、to me）。句子不算。
 let showVerbOnly = false;
 const VERB_TO_NOT = new Set("the a an my your his her its our their this that these those me you him us them school work bed home there here".split(" "));
+// AI 判斷過的（d.isVerb，按下篩選時在背景補）優先；還沒判斷的才用 to 規則。
 function isVerbWord(w){
   if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
   const d = (typeof lookup === "function" ? lookup(w.text) : null) || {};
+  if(typeof d.isVerb === "boolean") return d.isVerb;
   return splitMeaningParts(d.en).some(p => {
     const m = p.toLowerCase().match(/^to\s+([a-z'-]+)/);
     return !!m && !VERB_TO_NOT.has(m[1]);
@@ -8739,15 +8741,71 @@ document.getElementById("btnToggleDegFreqOnly").addEventListener("click", () => 
 updateDegFreqToggleLabel();
 function updateVerbToggleLabel(){
   const btn = document.getElementById("btnToggleVerbOnly");
-  if(!btn) return;
+  if(!btn || verbClassifyRunning) return;
   const n = allWords.filter(isVerbWord).length;
   btn.textContent = showVerbOnly ? `顯示全部單字 (動詞 ${n} 個)` : `🏃 只顯示動詞 (${n})`;
   btn.classList.toggle("primary", showVerbOnly);
+}
+// 英文意思沒寫成「to …」的動詞（例如只寫 eat）規則抓不到，所以打開篩選時
+// 在背景請 AI 把還沒判斷過的字逐一標 isVerb，判斷完自動更新列表。
+let verbClassifyRunning = false;
+async function classifyVerbs(){
+  if(verbClassifyRunning || !getApiKey()) return;
+  const list = allWords.filter(w => {
+    if(isSentenceWord(w)) return false;
+    const d = lookup(w.text);
+    return d && typeof d.isVerb !== "boolean";
+  });
+  if(!list.length) return;
+  verbClassifyRunning = true;
+  const lang = currentLang;
+  const btn = document.getElementById("btnToggleVerbOnly");
+  const schema = {
+    type: "object",
+    properties: { entries: { type: "array", items: {
+      type: "object",
+      properties: { i: { type: "integer" }, isVerb: { type: "boolean" } },
+      required: ["i", "isVerb"], additionalProperties: false
+    } } },
+    required: ["entries"], additionalProperties: false
+  };
+  try{
+    for(let start = 0; start < list.length; start += 80){
+      if(currentLang !== lang) break;
+      const chunk = list.slice(start, start + 80);
+      if(btn) btn.textContent = `🏃 AI 判斷動詞中… (${start}/${list.length})`;
+      const lines = chunk.map((w, k) => {
+        const d = lookup(w.text) || {};
+        return `${k + 1}. ${w.text}${d.nativeScript && d.nativeScript !== w.text ? `（${d.nativeScript}）` : ""}｜中文：${d.zh || ""}｜英文：${d.en || ""}`;
+      }).join("\n");
+      const prompt = `下面是學生在背的${L().label}單字／片語，附上中文和英文意思（括號裡是原生文字寫法）。判斷每一項照它的意思來看是不是動詞或動詞片語（例如吃、去、找、喜歡、 làm việc、pergi、ไป），是的話 isVerb=true。名詞、形容詞、副詞、介系詞、代名詞、問候語、整句話都是 false。同一個字有動詞也有別的詞性時，照附上的意思判斷；附上的意思裡有動詞意思就算 true。
+
+每一項輸出 { i（第幾項）, isVerb }，數量跟輸入一致。
+
+${lines}`;
+      try{
+        const parsed = await callClaude(prompt, schema, 4096);
+        (parsed.entries || []).forEach(e => {
+          const w = chunk[e.i - 1];
+          if(!w || typeof e.isVerb !== "boolean") return;
+          customDB[w.text] = Object.assign({}, lookup(w.text) || {}, { isVerb: e.isVerb });
+        });
+        saveCustomDB();
+      }catch(err){ /* 這批沒判斷到就先用 to 規則，下次打開篩選再補 */ }
+    }
+  }finally{
+    verbClassifyRunning = false;
+    if(currentLang === lang){
+      updateVerbToggleLabel();
+      if(showVerbOnly) renderList();
+    }
+  }
 }
 document.getElementById("btnToggleVerbOnly").addEventListener("click", () => {
   showVerbOnly = !showVerbOnly;
   updateVerbToggleLabel();
   renderList();
+  if(showVerbOnly) classifyVerbs();
 });
 updateVerbToggleLabel();
 function updateReduplToggleLabel(){
