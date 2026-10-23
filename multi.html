@@ -252,11 +252,8 @@
       </label>
       <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;">
         每字唸
-        <select id="autoplayReps">
-          <option value="1">1 次</option>
-          <option value="2">2 次</option>
-          <option value="3" selected>3 次</option>
-        </select>
+        <input type="number" id="autoplayReps" min="1" max="10" value="3" style="width:3.5em;">
+        次
       </label>
       <label style="display:flex; align-items:center; gap:4px; flex:0 0 auto;">
         速度
@@ -268,7 +265,9 @@
       </label>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
         <input type="checkbox" id="autoplayIncludeZh">
-        中間加唸一次中文（前後各唸上面的次數）
+        再唸一次中文，之後再唸
+        <input type="number" id="autoplayRepsAfter" min="0" max="10" value="3" style="width:3.5em;">
+        次
       </label>
       <label style="display:flex; align-items:center; gap:6px; flex:0 0 auto;" title="播完清單最後一個字之後，自動回到第一個字繼續播，直到按暫停或 ✕">
         <input type="checkbox" id="autoplayLoop">
@@ -1786,10 +1785,18 @@ let autoplayRunStartMs = 0;       // 這一輪（或這次繼續）開始的時�
 let autoplayRunStartIndex = 0;    // 開始時的 index，配合上面算實際每字花多久
 let autoplaySpeed = 1;            // 依序播放的語速倍率（1 / 1.2 / 1.5）
 let autoplayNewPhase = null;      // 「先播新字」階段：{ boundary, returnId }，見 planAutoplayNewPhase
+// 每字唸幾次（中文前面）／中文之後再唸幾次，都是數字框，1～10、0～10。
+function clampReps(v, min, fallback){
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? Math.min(10, Math.max(min, n)) : fallback;
+}
 function autoplayReps(){
   const el = document.getElementById("autoplayReps");
-  const n = el ? parseInt(el.value, 10) : 3;
-  return (n === 1 || n === 2 || n === 3) ? n : 3;
+  return clampReps(el && el.value, 1, 3);
+}
+function autoplayRepsAfter(){
+  const el = document.getElementById("autoplayRepsAfter");
+  return clampReps(el && el.value, 0, autoplayReps());
 }
 // 依序播放時間估計：一個字唸 N 次 + 中間停頓 + 收尾停頓；勾了「加唸中文」再加一段。
 // 唸的部分會被語速倍率縮短，停頓不變。這是「還沒開始播」時的粗估，實際播起來
@@ -1799,8 +1806,8 @@ function estimateAutoplaySeconds(count){
   const reps = autoplayReps();
   const includeZh = !!(document.getElementById("autoplayIncludeZh") && document.getElementById("autoplayIncludeZh").checked);
   const speed = autoplaySpeed || 1;
-  // 加唸中文時外語是「N 次 → 中文 → 再 N 次」，總共 2N 次
-  const fgReps = includeZh ? reps * 2 : reps;
+  // 加唸中文時外語是「N 次 → 中文 → 再 M 次」
+  const fgReps = includeZh ? reps + autoplayRepsAfter() : reps;
   const speakingSec = (1.6 * fgReps + (includeZh ? 1.8 : 0)) / speed;
   const pauseSec = 0.35 * (fgReps - 1) + 0.55 + (includeZh ? 0.3 : 0);
   return Math.round(count * (speakingSec + pauseSec));
@@ -9159,16 +9166,16 @@ async function runListAutoplay(){
         }
       }
     }
-    const speakReps = async () => {
-      for(let r = 0; r < reps && listAutoplayRunning && !autoplayJump; r++){
+    const speakReps = async (n) => {
+      for(let r = 0; r < n && listAutoplayRunning && !autoplayJump; r++){
         try{ await speak(text, btn, null, recKey); }catch(e){ /* 播不出來就跳過這次，繼續 */ }
         if(!listAutoplayRunning || autoplayJump) break;
-        if(r < reps - 1) await delayMs(350);
+        if(r < n - 1) await delayMs(350);
       }
     };
-    await speakReps();
+    await speakReps(reps);
     if(!listAutoplayRunning) break;
-    // 勾了「中間加唸中文」：外語唸 N 次 → 中文意思 → 外語再唸 N 次。中文放中間，
+    // 勾了「加唸中文」：外語唸 N 次 → 中文意思 → 外語再唸 M 次（M 可以是 0）。中文放中間，
     // 聽到意思之後還有機會再聽幾遍、對上發音，不會最後才知道意思就換下一個字。
     if(!autoplayJump && document.getElementById("autoplayIncludeZh").checked){
       const zh = (lookup(w.text) || {}).zh;
@@ -9177,10 +9184,11 @@ async function runListAutoplay(){
         if(!listAutoplayRunning) break;
         if(!autoplayJump) await speakZhForAutoplay(zh);
         if(!listAutoplayRunning) break;
-        if(!autoplayJump){
+        const after = autoplayRepsAfter();
+        if(!autoplayJump && after > 0){
           await delayMs(350);
           if(!listAutoplayRunning) break;
-          await speakReps();
+          await speakReps(after);
           if(!listAutoplayRunning) break;
         }
       }
@@ -9349,13 +9357,21 @@ document.getElementById("autoplayLoop").addEventListener("change", (e) => {
 });
 // 「每字唸幾次」記起來（全語言通用），改了也重算估計時間
 const AUTOPLAY_REPS_LS = "flashcard_autoplay_reps_v1";
+// 中文之後再唸幾次另外存；沒存過就跟前面一樣（以前固定是前後同樣次數）。
+const AUTOPLAY_REPS_AFTER_LS = "flashcard_autoplay_reps_after_v1";
 {
   const saved = kvStore.getItem(AUTOPLAY_REPS_LS);
-  if(saved === "1" || saved === "2" || saved === "3") document.getElementById("autoplayReps").value = saved;
+  if(saved) document.getElementById("autoplayReps").value = String(clampReps(saved, 1, 3));
+  const savedAfter = kvStore.getItem(AUTOPLAY_REPS_AFTER_LS);
+  document.getElementById("autoplayRepsAfter").value = String(savedAfter !== null && savedAfter !== "" ? clampReps(savedAfter, 0, autoplayReps()) : autoplayReps());
 }
-document.getElementById("autoplayReps").addEventListener("change", (e) => {
-  kvStore.setItem(AUTOPLAY_REPS_LS, e.target.value);
-  renderAutoplayControls();
+[["autoplayReps", AUTOPLAY_REPS_LS, 1], ["autoplayRepsAfter", AUTOPLAY_REPS_AFTER_LS, 0]].forEach(([id, key, min]) => {
+  const el = document.getElementById(id);
+  el.addEventListener("change", () => {
+    el.value = String(clampReps(el.value, min, min === 1 ? 3 : autoplayReps()));
+    kvStore.setItem(key, el.value);
+    renderAutoplayControls();
+  });
 });
 // 依序播放語速（1 / 1.2 / 1.5）記起來
 const AUTOPLAY_SPEED_LS = "flashcard_autoplay_speed_v1";
