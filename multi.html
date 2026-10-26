@@ -2047,8 +2047,11 @@ let showSentencesOnly = false;
 let showNonSentencesOnly = false; // 跟「只顯示句子」相反，兩個一次只會開一個
 function isSentenceWord(w){
   const t = w.text.replace(/\s*\(\d+\)$/, "").trim();   // 去掉撞名時加的 (2)
-  if(/[.!?。！？]["”’」]?$/.test(t)) return true;
-  return t.split(/\s+/).filter(Boolean).length >= 6;
+  const n = t.split(/\s+/).filter(Boolean).length;
+  // 結尾有標點才算句子的規則，只套用在 3 個字以上：「Thôi.」「Cảm ơn!」這種
+  // 一兩個字加個標點的是單字／招呼語，不是句子。中日泰文不用空格分字，照舊。
+  if(/[.!?。！？]["”’」]?$/.test(t) && (n >= 3 || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Hangul}]/u.test(t))) return true;
+  return n >= 6;
 }
 
 // 「只顯示數字」篩選用：靠中英文意思判斷這個字是不是數字/數量詞（1、2…、100、
