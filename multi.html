@@ -293,6 +293,7 @@
     <div class="toolbar" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製所有單字</button>
       <button id="btnCopyZhForQuiz">📋 複製中文意思（測驗用，照目前篩選）</button>
+      <button id="btnCopyVisibleForAI">🤖 複製目前顯示的單字（給 AI 出題）</button>
     </div>
     <div class="toolbar">
       <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
@@ -8195,6 +8196,30 @@ document.getElementById("btnCopyZhForQuiz").addEventListener("click", async () =
     alert(`已複製 ${withZh.length} 個中文意思${skipNote}，可以貼到別的地方當測驗題目。`);
   }catch(e){
     prompt(`自動複製失敗，請手動全選複製以下內容：${skipNote}`, text);
+  }
+});
+
+// 複製「目前畫面上看得到的字」（照搜尋／篩選），每行「原文 — 中文」，最前面
+// 加一段請 AI 出題的說明，整段貼給 AI 就能直接考。hasScript 語言用原生文字
+// （越南文帶聲調、泰文用泰文字），日文以外的羅馬拼音一併附上方便對照。
+document.getElementById("btnCopyVisibleForAI").addEventListener("click", async () => {
+  const words = getVisibleWords();
+  if(words.length === 0){ alert("目前篩選/搜尋出來沒有任何字。"); return; }
+  const hasScript = L().hasScript;
+  const lines = words.map(w => {
+    const d = lookup(w.text) || {};
+    const native = hasScript && d.nativeScript && d.nativeScript !== w.text ? d.nativeScript : "";
+    const head = native ? (currentLang === "vi" ? native : `${native}（${w.text}）`) : w.text;
+    return d.zh ? `${head} — ${d.zh}` : head;
+  });
+  const text = `以下是我正在學的${L().label}單字／片語（共 ${words.length} 個），請用這些字出題考我，一次出一題，等我回答後再告訴我對錯並出下一題。題型可以混合：看中文說${L().label}、看${L().label}說中文、用這個字造句或填空。
+
+${lines.join("\n")}`;
+  try{
+    await navigator.clipboard.writeText(text);
+    alert(`已複製 ${words.length} 個${L().label}單字（含出題說明），貼給 AI 就可以開始考了。`);
+  }catch(e){
+    prompt("自動複製失敗，請手動全選複製以下內容：", text);
   }
 });
 
