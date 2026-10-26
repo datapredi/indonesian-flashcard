@@ -2048,9 +2048,12 @@ let showNonSentencesOnly = false; // 跟「只顯示句子」相反，兩個一�
 function isSentenceWord(w){
   const t = w.text.replace(/\s*\(\d+\)$/, "").trim();   // 去掉撞名時加的 (2)
   const n = t.split(/\s+/).filter(Boolean).length;
-  // 結尾有標點才算句子的規則，只套用在 3 個字以上：「Thôi.」「Cảm ơn!」這種
-  // 一兩個字加個標點的是單字／招呼語，不是句子。中日泰文不用空格分字，照舊。
-  if(/[.!?。！？]["”’」]?$/.test(t) && (n >= 3 || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Hangul}]/u.test(t))) return true;
+  // 不到 5 個字的一律不算句子（「Thôi.」「Sao vậy?」「Tôi đi học.」都算單字／
+  // 短語）；5 個字要結尾有標點才算，6 個字以上一律算。中日泰韓文不用空格分字、
+  // 算不出字數，照舊看結尾標點。
+  if(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Hangul}]/u.test(t)) return /[.!?。！？]["”’」]?$/.test(t) || n >= 6;
+  if(n < 5) return false;
+  if(/[.!?。！？]["”’」]?$/.test(t)) return true;
   return n >= 6;
 }
 
