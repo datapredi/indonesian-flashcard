@@ -290,7 +290,7 @@
       <button id="btnImportBackupTrigger">📥 選擇備份檔還原</button>
       <input type="file" id="fileInputBackup" accept=".json">
     </div>
-    <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。不含 API Key（安全考量，換裝置要自己重新輸入）、不含你自己的錄音（IndexedDB 音檔太大，錄音本來就是重錄就好）。還原會直接覆蓋目前資料，請小心操作。手機換到 Mac：手機按「📤 分享備份」選 AirDrop 傳到 Mac（檔案會在「下載項目」），再到 Mac Safari 按「📥 選擇備份檔還原」選那個檔。</div>
+    <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。也包含你自己的錄音。不含 API Key（安全考量，換裝置要自己重新輸入）。還原會直接覆蓋目前資料（錄音是同一個字的才會被蓋掉，其他錄音保留），請小心操作。手機換到 Mac：手機按「📤 分享備份」選 AirDrop 傳到 Mac（檔案會在「下載項目」），再到 Mac Safari 按「📥 選擇備份檔還原」選那個檔。</div>
     <div class="toolbar" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製目前顯示的單字</button>
       <button id="btnCopyZhForQuiz">📋 複製中文意思（測驗用，照目前篩選）</button>
@@ -1604,6 +1604,21 @@ async function setUserRecording(key, blob){
     tx.objectStore(REC_STORE_NAME).put(blob, key);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+  });
+}
+async function getAllUserRecordings(){
+  const db = await openRecDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(REC_STORE_NAME, "readonly");
+    const out = [];
+    const req = tx.objectStore(REC_STORE_NAME).openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if(!cur){ resolve(out); return; }
+      out.push([cur.key, cur.value]);
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error);
   });
 }
 function recKeyFor(text){ return `${currentLang}::${text.toLowerCase()}`; }
@@ -9636,8 +9651,8 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 // 結果訊息寫進畫面上一個不會自動消失的區塊，一直留著到下次轉換才會被換掉。
 // ================= 備份／還原 =================
 // 匯出所有語言的資料（單字表、翻譯快取、例句快取、聲調標記、⚠️ 標記、已學會進度等），
-// 存成一個 JSON 檔下載。刻意不含 API Key（安全考量）、不含錄音（IndexedDB 存的音檔，
-// 太大也沒必要備份，重錄就好）。
+// 加上自己的錄音（轉成 data URL 放進 recordings），存成一個 JSON 檔下載。
+// 刻意不含 API Key（安全考量）。
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
@@ -9647,8 +9662,21 @@ const BACKUP_PER_LANG_BASES = [
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS, ARABIC_EXAMPLES_CACHE_LS];
 
-function buildBackupData(){
-  const data = { version: 1, exportedAt: new Date().toISOString(), keys: {} };
+function blobToDataURL(blob){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+async function buildBackupData(){
+  const data = { version: 1, exportedAt: new Date().toISOString(), keys: {}, recordings: {} };
+  try{
+    for(const [k, blob] of await getAllUserRecordings()){
+      if(blob instanceof Blob) data.recordings[k] = await blobToDataURL(blob);
+    }
+  }catch(e){ console.warn("讀取錄音失敗，備份不含錄音", e); }
   BACKUP_GLOBAL_KEYS.forEach(k => {
     const v = kvStore.getItem(k);
     if(v !== null) data.keys[k] = v;
@@ -9665,8 +9693,8 @@ function buildBackupData(){
 function backupFileName(){
   return `flashcard_backup_${new Date().toISOString().slice(0, 10)}.json`;
 }
-function exportBackup(){
-  const blob = new Blob([JSON.stringify(buildBackupData(), null, 2)], { type: "application/json" });
+async function exportBackup(){
+  const blob = new Blob([JSON.stringify(await buildBackupData())], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -9680,8 +9708,24 @@ document.getElementById("btnExportBackup").addEventListener("click", exportBacku
 
 // 手機 → Mac：用系統分享面板（iPhone 上可以直接選 AirDrop）把備份檔傳過去，
 // 不用先下載到「檔案」再找出來分享。瀏覽器不支援分享檔案時退回一般下載。
-document.getElementById("btnShareBackup").addEventListener("click", async () => {
-  const file = new File([JSON.stringify(buildBackupData())], backupFileName(), { type: "application/json" });
+// 打包錄音要花時間，Safari 等太久會認為已經不是「使用者按的」而拒絕分享；
+// 這時先把檔案留著，請使用者再按一次直接分享。
+let preparedShareFile = null;
+document.getElementById("btnShareBackup").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  let file = preparedShareFile;
+  preparedShareFile = null;
+  btn.textContent = "📤 分享備份（AirDrop 到 Mac）";
+  if(!file){
+    btn.disabled = true;
+    btn.textContent = "⏳ 打包中（含錄音）…";
+    try{
+      file = new File([JSON.stringify(await buildBackupData())], backupFileName(), { type: "application/json" });
+    }finally{
+      btn.disabled = false;
+      btn.textContent = "📤 分享備份（AirDrop 到 Mac）";
+    }
+  }
   if(!navigator.canShare || !navigator.canShare({ files: [file] })){
     alert("這個瀏覽器不支援直接分享檔案，改成下載備份檔。");
     exportBackup();
@@ -9689,8 +9733,11 @@ document.getElementById("btnShareBackup").addEventListener("click", async () => 
   }
   try{
     await navigator.share({ files: [file], title: "Flash Card 備份" });
-  }catch(e){
-    if(e.name !== "AbortError") alert("分享失敗：" + e.message);
+  }catch(err){
+    if(err.name === "NotAllowedError"){
+      preparedShareFile = file;
+      btn.textContent = "📤 檔案準備好了，再按一次分享";
+    }else if(err.name !== "AbortError") alert("分享失敗：" + err.message);
   }
 });
 
@@ -9706,7 +9753,7 @@ document.getElementById("fileInputBackup").addEventListener("change", (e) => {
   e.target.value = "";
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     let data;
     try{
       data = JSON.parse(reader.result);
@@ -9716,8 +9763,15 @@ document.getElementById("fileInputBackup").addEventListener("change", (e) => {
       return;
     }
     const keys = Object.keys(data.keys);
-    if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key、不影響錄音），共 ${keys.length} 筆資料。這個動作沒辦法復原，確定要還原嗎？`)) return;
+    const recs = Object.entries(data.recordings || {});
+    if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key），共 ${keys.length} 筆資料${recs.length ? `，另外還原 ${recs.length} 個錄音` : ""}。這個動作沒辦法復原，確定要還原嗎？`)) return;
     keys.forEach(k => kvStore.setItem(k, data.keys[k]));
+    let recFailed = 0;
+    for(const [k, dataUrl] of recs){
+      try{ await setUserRecording(k, await (await fetch(dataUrl)).blob()); }
+      catch(err){ recFailed++; console.warn("還原錄音失敗", k, err); }
+    }
+    if(recFailed) alert(`有 ${recFailed} 個錄音沒有還原成功，其他資料照常還原。`);
     kvStore.flush().then(() => {
       alert("還原完成，頁面即將重新整理套用新資料。");
       location.reload();
