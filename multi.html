@@ -286,10 +286,11 @@
     <div class="list hidden" id="dedupReviewPanel" style="padding:14px;"></div>
     <div class="toolbar">
       <button id="btnExportBackup">💾 匯出全部語言資料備份</button>
+      <button id="btnShareBackup">📤 分享備份（AirDrop 到 Mac）</button>
       <button id="btnImportBackupTrigger">📥 選擇備份檔還原</button>
       <input type="file" id="fileInputBackup" accept=".json">
     </div>
-    <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。不含 API Key（安全考量，換裝置要自己重新輸入）、不含你自己的錄音（IndexedDB 音檔太大，錄音本來就是重錄就好）。還原會直接覆蓋目前資料，請小心操作。</div>
+    <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。不含 API Key（安全考量，換裝置要自己重新輸入）、不含你自己的錄音（IndexedDB 音檔太大，錄音本來就是重錄就好）。還原會直接覆蓋目前資料，請小心操作。手機換到 Mac：手機按「📤 分享備份」選 AirDrop 傳到 Mac（檔案會在「下載項目」），再到 Mac Safari 按「📥 選擇備份檔還原」選那個檔。</div>
     <div class="toolbar" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製目前顯示的單字</button>
       <button id="btnCopyZhForQuiz">📋 複製中文意思（測驗用，照目前篩選）</button>
@@ -9646,7 +9647,7 @@ const BACKUP_PER_LANG_BASES = [
 ];
 const BACKUP_GLOBAL_KEYS = [LANG_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS, ARABIC_EXAMPLES_CACHE_LS];
 
-function exportBackup(){
+function buildBackupData(){
   const data = { version: 1, exportedAt: new Date().toISOString(), keys: {} };
   BACKUP_GLOBAL_KEYS.forEach(k => {
     const v = kvStore.getItem(k);
@@ -9659,17 +9660,39 @@ function exportBackup(){
       if(v !== null) data.keys[key] = v;
     });
   });
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  return data;
+}
+function backupFileName(){
+  return `flashcard_backup_${new Date().toISOString().slice(0, 10)}.json`;
+}
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(buildBackupData(), null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `flashcard_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = backupFileName();
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
 }
 document.getElementById("btnExportBackup").addEventListener("click", exportBackup);
+
+// 手機 → Mac：用系統分享面板（iPhone 上可以直接選 AirDrop）把備份檔傳過去，
+// 不用先下載到「檔案」再找出來分享。瀏覽器不支援分享檔案時退回一般下載。
+document.getElementById("btnShareBackup").addEventListener("click", async () => {
+  const file = new File([JSON.stringify(buildBackupData())], backupFileName(), { type: "application/json" });
+  if(!navigator.canShare || !navigator.canShare({ files: [file] })){
+    alert("這個瀏覽器不支援直接分享檔案，改成下載備份檔。");
+    exportBackup();
+    return;
+  }
+  try{
+    await navigator.share({ files: [file], title: "Flash Card 備份" });
+  }catch(e){
+    if(e.name !== "AbortError") alert("分享失敗：" + e.message);
+  }
+});
 
 // 把目前語言的單字清單複製到剪貼簿（一行一個字，hasScript 語言用原生
 // 文字，這樣拿去給另一個語言的「匯入並自動生成資料」用時，AI 才能直接
