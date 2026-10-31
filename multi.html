@@ -38,7 +38,9 @@
   .autoplay-panel #btnListAutoplay.primary{background:var(--accent2); border-color:var(--accent2);}
   button.secondary{background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600;}
   button:disabled{opacity:0.5; cursor:default;}
-  input[type=file]{display:none;}
+  /* 不用 display:none：iPad/iPhone Safari 對隱藏起來的 file input 呼叫 .click() 常常
+     什麼都不會跳出來，改成看不見但還在頁面上。 */
+  input[type=file]{position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; pointer-events:none;}
   input[type=text], input[type=password], input[type=number], textarea, select{
     font-family:inherit; font-size:0.9rem; padding:9px 12px; border-radius:10px;
     border:1px solid var(--border); background:var(--card); color:var(--text); flex:1; min-width:200px;
@@ -220,7 +222,7 @@
       <textarea id="convertPasteInput" placeholder="也可以直接貼上文字（不限幾行），不用先存成檔案再匯入。要貼中文的話，勾上面那個「貼上的內容含中文」" rows="4" style="flex:1 1 260px;"></textarea>
       <button id="btnImportConvertPaste">📥 轉換貼上的文字</button>
       <label class="filebtn" for="classInboxInput" style="flex:0 0 auto;">📚 匯入講義收件匣</label>
-      <input type="file" id="classInboxInput" accept=".json,application/json" style="display:none;">
+      <input type="file" id="classInboxInput" accept=".json,application/json">
     </div>
     <div class="note hidden" id="convertResultStatus" style="white-space:pre-wrap; user-select:text;"></div>
     <div class="toolbar">
@@ -288,7 +290,7 @@
       <button id="btnExportBackup">💾 匯出全部語言資料備份</button>
       <button id="btnShareBackup">📤 分享備份（AirDrop 到 Mac）</button>
       <button id="btnImportBackupTrigger">📥 選擇備份檔還原</button>
-      <input type="file" id="fileInputBackup" accept=".json">
+      <input type="file" id="fileInputBackup" accept=".json,application/json">
     </div>
     <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。也包含你自己的錄音。不含 API Key（安全考量，換裝置要自己重新輸入）。還原會直接覆蓋目前資料（錄音是同一個字的才會被蓋掉，其他錄音保留），請小心操作。手機換到 Mac：手機按「📤 分享備份」選 AirDrop 傳到 Mac（檔案會在「下載項目」），再到 Mac Safari 按「📥 選擇備份檔還原」選那個檔。</div>
     <div class="toolbar" id="pendingSyncBar">
