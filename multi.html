@@ -291,8 +291,7 @@
     <div class="toolbar">
       <button id="btnExportBackup">💾 匯出全部語言資料備份</button>
       <button id="btnShareBackup">📤 分享備份（AirDrop 到 Mac）</button>
-      <label class="filebtn" id="btnImportBackupTrigger" for="fileInputBackup">📥 選擇備份檔還原</label>
-      <input type="file" id="fileInputBackup" accept=".json,application/json">
+      <span class="filewrap"><span class="filebtn" id="btnImportBackupTrigger">📥 選擇備份檔還原</span><input type="file" id="fileInputBackup" accept=".json,application/json"></span>
     </div>
     <div class="note hidden" id="restorePanel" style="white-space:pre-wrap; user-select:text; border:1px solid var(--accent); border-radius:10px; padding:10px 12px;"></div>
     <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。也包含你自己的錄音。不含 API Key（安全考量，換裝置要自己重新輸入）。還原會直接覆蓋目前資料（錄音是同一個字的才會被蓋掉，其他錄音保留），請小心操作。手機換到 Mac：手機按「📤 分享備份」選 AirDrop 傳到 Mac（檔案會在「下載項目」），再到 Mac Safari 按「📥 選擇備份檔還原」選那個檔。</div>
@@ -9805,6 +9804,16 @@ async function applyBackup(data){
   setTimeout(() => location.reload(), 1200);
 }
 
+// 診斷用：iPad 上選了檔案卻沒有任何反應時，看得出是哪一步沒發生。
+document.getElementById("fileInputBackup").addEventListener("click", () => {
+  showRestoreStatus("已打開選檔，選好備份檔後這裡會顯示讀取進度。（如果選完檔案這段文字都沒變，代表 Safari 沒有把檔案交給網頁）");
+});
+document.getElementById("fileInputBackup").addEventListener("cancel", () => {
+  showRestoreStatus("選檔被取消了，沒有選到檔案。");
+});
+document.getElementById("fileInputBackup").addEventListener("input", (e) => {
+  if(!e.target.files.length) showRestoreStatus("Safari 回報有變動，但沒有拿到檔案。");
+});
 document.getElementById("fileInputBackup").addEventListener("change", (e) => {
   const input = e.target;
   const file = input.files[0];
