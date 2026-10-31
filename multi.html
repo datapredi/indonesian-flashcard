@@ -28,24 +28,9 @@
     const r = e.reason;
     show("⚠️ 程式錯誤（非同步）：" + (r && r.message ? r.message : r));
   });
-  // 暫時常駐的狀態列：每秒更新，直接看得出卡在哪一步。
-  const t0 = Date.now();
-  window.__diagStep = "頁面載入";
-  setInterval(function(){
-    if(!document.body) return;
-    let st = document.getElementById("__diagStatus");
-    if(!st){
-      st = document.createElement("div");
-      st.id = "__diagStatus";
-      st.style.cssText = "position:fixed; left:0; right:0; bottom:0; z-index:99998; background:#222; color:#0f0; font:12px monospace; padding:4px 8px; white-space:pre-wrap; user-select:text;";
-      document.body.appendChild(st);
-    }
-    const wl = document.getElementById("wordList");
-    st.textContent = "診斷 v7 ｜ " + Math.round((Date.now() - t0) / 1000) + " 秒 ｜ 步驟：" + window.__diagStep +
-      " ｜ 主程式：" + (window.__mainScriptDone ? "完成" : window.__mainScriptStarted ? "跑到一半" : "未開始") +
-      " ｜ 清單項目：" + (wl ? wl.children.length : "無") +
-      "\n" + navigator.userAgent;
-  }, 1000);
+  setTimeout(function(){
+    if(!window.__mainScriptDone) show("⚠️ 主程式 15 秒內沒有啟動完成" + (window.__mainScriptStarted ? "（有開始跑，但中途停了）" : "（根本沒開始跑，可能卡在讀取資料庫）") + "。\n" + navigator.userAgent);
+  }, 15000);
 })();
 </script>
 <script src="words.js"></script>
@@ -807,11 +792,8 @@ const kvStore = (() => {
     }).finally(() => clearInterval(timer));
   }
   async function openAndLoad(){
-    window.__diagStep = "喚醒資料庫";
     await withTimeout(idbWake(), 1500, "IndexedDB 喚醒").catch(() => {});
-    window.__diagStep = "開啟資料庫";
     const { d, upgraded } = await withTimeout(openDB(), 3000, "開啟 IndexedDB");
-    window.__diagStep = "讀取資料庫";
     const all = await withTimeout(readAll(d), 8000, "讀取 IndexedDB");
     // 資料庫本來就存在（不是第一次建立），卻一筆資料都讀不到——正常情況不可能
     // （至少會有搬家完成的標記），代表 Safari 這次讀取出問題。當作失敗，
@@ -867,9 +849,7 @@ const kvStore = (() => {
       try{
         const { d, all } = await openAndLoad();
         all.forEach((v, k) => mem.set(k, v));
-        window.__diagStep = "搬移舊資料";
         if(!mem.has(MIGRATED_KEY)) await migrateFromLocalStorage(d);
-        window.__diagStep = "檢查備份副本";
         rev = Number(mem.get(REV_KEY)) || 0;
         // 還沒有版本號（剛加這個機制）：從 1 開始，副本才認得出是完整的一份。
         let needRevWrite = false;
@@ -894,7 +874,6 @@ const kvStore = (() => {
         attachDB(d);
         if(needRevWrite) idbWrite([REV_KEY]);
         freeLocalStorage();
-        window.__diagStep = "資料庫就緒";
         return;
       }catch(e){
         lastErr = e;
@@ -968,11 +947,10 @@ const kvStore = (() => {
   if(wl && !wl.children.length) wl.innerHTML = '<div class="empty-msg" style="padding:20px; text-align:center; color:var(--muted);">讀取單字資料中…</div>';
 }
 kvStore.ready.then(() => {
-  window.__diagStep = "啟動主程式";
   const s = document.createElement("script");
   s.textContent = document.getElementById("mainScript").textContent;
   document.body.appendChild(s);
-}, (e) => { window.__diagStep = "資料庫失敗：" + (e && e.message || e); }); // 失敗時 showLoadError 已經顯示提示，不啟動主程式（避免存到錯的地方）
+}, () => {}); // 失敗時 showLoadError 已經顯示提示，不啟動主程式（避免存到錯的地方）
 </script>
 
 <script type="text/plain" id="mainScript">
@@ -9727,7 +9705,9 @@ const BACKUP_PER_LANG_BASES = [
   ANTONYMS_CACHE_LS, CHUNKS_CACHE_LS, GRAMMAR_BREAKDOWN_CACHE_LS, MINIMAL_PAIRS_CACHE_LS, WORD_IN_CONTEXT_CACHE_LS,
   VI_TONE_MARKS_CACHE_LS, VI_NATIVE_TONE_MARKS_CACHE_LS, USE_RECORDING_LS, COMPARE_SET_LS
 ];
-const BACKUP_GLOBAL_KEYS = [LANG_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS, ARABIC_EXAMPLES_CACHE_LS, ALPHA_MASTERED_LS];
+// 寫成函式、匯出時才取值：ALPHA_MASTERED_LS 定義在後面（字母練習那段），在這裡直接
+// 放進陣列會在載入時就丟 ReferenceError，整個主程式停在這一行。
+const backupGlobalKeys = () => [LANG_LS, SOURCE_MEANING_CACHE_LS, MASTERED_LEGACY_LS, LETTER_NOTES_LS, LETTER_COLORS_LS, ARABIC_EXAMPLES_CACHE_LS, ALPHA_MASTERED_LS];
 
 function blobToDataURL(blob){
   return new Promise((resolve, reject) => {
@@ -9744,7 +9724,7 @@ async function buildBackupData(){
       if(blob instanceof Blob) data.recordings[k] = await blobToDataURL(blob);
     }
   }catch(e){ console.warn("讀取錄音失敗，備份不含錄音", e); }
-  BACKUP_GLOBAL_KEYS.forEach(k => {
+  backupGlobalKeys().forEach(k => {
     const v = kvStore.getItem(k);
     if(v !== null) data.keys[k] = v;
   });
