@@ -4,6 +4,35 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>語言 Flash Card</title>
+<script>
+// 診斷用：在手機/iPad 上看不到開發者工具，程式出錯或主程式沒啟動時直接顯示在畫面上。
+(function(){
+  function show(msg){
+    function add(){
+      let bar = document.getElementById("__diagBar");
+      if(!bar){
+        bar = document.createElement("div");
+        bar.id = "__diagBar";
+        bar.style.cssText = "position:fixed; left:8px; right:8px; bottom:8px; z-index:99999; background:#b23a2f; color:#fff; padding:10px 12px; border-radius:10px; font-size:13px; white-space:pre-wrap; user-select:text; max-height:40vh; overflow:auto;";
+        document.body.appendChild(bar);
+      }
+      bar.textContent += (bar.textContent ? "\n" : "") + msg;
+    }
+    if(document.body) add(); else document.addEventListener("DOMContentLoaded", add);
+  }
+  window.__diagShow = show;
+  window.addEventListener("error", function(e){
+    show("⚠️ 程式錯誤：" + (e.message || e) + (e.lineno ? "（第 " + e.lineno + " 行）" : ""));
+  });
+  window.addEventListener("unhandledrejection", function(e){
+    const r = e.reason;
+    show("⚠️ 程式錯誤（非同步）：" + (r && r.message ? r.message : r));
+  });
+  setTimeout(function(){
+    if(!window.__mainScriptDone) show("⚠️ 主程式 15 秒內沒有啟動完成" + (window.__mainScriptStarted ? "（有開始跑，但中途停了）" : "（根本沒開始跑，可能卡在讀取資料庫）") + "。\n" + navigator.userAgent);
+  }, 15000);
+})();
+</script>
 <script src="words.js"></script>
 <style>
   :root{
@@ -925,6 +954,7 @@ kvStore.ready.then(() => {
 </script>
 
 <script type="text/plain" id="mainScript">
+window.__mainScriptStarted = true;
 // ================= 語言切換 =================
 // 印尼文維持完全不加後綴的舊 key（沿用最早純印尼文版的資料，不用搬家）。
 // 其他語言（泰文、越南文...）所有 localStorage key 都加 "_語言代碼" 後綴，
@@ -11407,6 +11437,7 @@ function showScreen(name){
 
 renderList();
 updateResumeListenBtn();
+window.__mainScriptDone = true;
 </script>
 </body>
 </html>
