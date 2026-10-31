@@ -886,6 +886,16 @@ const kvStore = (() => {
     ready,
     // 最多等 3 秒，寫入真的卡住也不要讓切換語言永遠沒反應。
     flush(){ return Promise.race([Promise.all([...pending, reconnecting, mirrorChain]), new Promise(r => setTimeout(r, 3000))]); },
+    // 還原備份一次寫很多又很大的資料，iPad 上 3 秒常常寫不完，重新整理就把寫到一半的
+    // 交易砍掉、資料全沒了。這裡一直等到真的寫完（包含重連後補寫的），最多等 ms。
+    async flushAll(ms){
+      const deadline = Date.now() + ms;
+      while(pending.size || reconnecting || dirty.size){
+        if(Date.now() > deadline) throw new Error("存檔逾時");
+        await Promise.race([Promise.all([...pending, reconnecting]), new Promise(r => setTimeout(r, 500))]);
+      }
+      await withTimeout(mirrorChain, Math.max(1000, deadline - Date.now()), "備份副本存檔");
+    },
     getItem(k){
       if(fallback) return lsGet(k);
       return mem.has(k) ? mem.get(k) : null;
@@ -9751,33 +9761,52 @@ document.getElementById("btnShareBackup").addEventListener("click", async (e) =>
 // 讀懂原本的字是什麼、準確翻成新語言，不用只靠羅馬拼音自己猜）。直接複製
 // 貼到 Obsidian 或另一個語言的匯入檔案就好，不用另外下載檔案再開檔複製。
 document.getElementById("fileInputBackup").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  e.target.value = "";
-  if(!file) return;
+  const input = e.target;
+  const file = input.files[0];
+  if(!file){ input.value = ""; return; }
+  const label = document.getElementById("btnImportBackupTrigger");
+  const labelText = label.textContent;
+  const setStatus = (t) => { label.textContent = t || labelText; };
+  setStatus("⏳ 讀取備份檔中…");
   const reader = new FileReader();
+  reader.onerror = () => {
+    input.value = "";
+    setStatus();
+    alert("還原失敗：讀不到這個檔案（" + (reader.error && reader.error.message || "未知錯誤") + "）");
+  };
   reader.onload = async () => {
+    input.value = "";
     let data;
     try{
       data = JSON.parse(reader.result);
       if(!data || typeof data.keys !== "object") throw new Error("檔案格式不對，不是這個工具匯出的備份檔。");
     }catch(err){
+      setStatus();
       alert("還原失敗：" + err.message);
       return;
     }
     const keys = Object.keys(data.keys);
     const recs = Object.entries(data.recordings || {});
-    if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key），共 ${keys.length} 筆資料${recs.length ? `，另外還原 ${recs.length} 個錄音` : ""}。這個動作沒辦法復原，確定要還原嗎？`)) return;
+    if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key），共 ${keys.length} 筆資料${recs.length ? `，另外還原 ${recs.length} 個錄音` : ""}。這個動作沒辦法復原，確定要還原嗎？`)){ setStatus(); return; }
+    setStatus("⏳ 還原中，請不要關掉頁面…");
     keys.forEach(k => kvStore.setItem(k, data.keys[k]));
     let recFailed = 0;
-    for(const [k, dataUrl] of recs){
+    for(let i = 0; i < recs.length; i++){
+      const [k, dataUrl] = recs[i];
+      setStatus(`⏳ 還原錄音 ${i + 1}/${recs.length}…`);
       try{ await setUserRecording(k, await (await fetch(dataUrl)).blob()); }
       catch(err){ recFailed++; console.warn("還原錄音失敗", k, err); }
     }
-    if(recFailed) alert(`有 ${recFailed} 個錄音沒有還原成功，其他資料照常還原。`);
-    kvStore.flush().then(() => {
-      alert("還原完成，頁面即將重新整理套用新資料。");
-      location.reload();
-    });
+    setStatus("⏳ 存檔中，請不要關掉頁面…");
+    try{
+      await kvStore.flushAll(60000);
+    }catch(err){
+      setStatus();
+      alert("還原失敗：資料還沒存完（" + err.message + "）。請不要重新整理，再按一次還原試試。");
+      return;
+    }
+    alert(`還原完成${recFailed ? `（有 ${recFailed} 個錄音沒有還原成功）` : ""}，頁面即將重新整理套用新資料。`);
+    location.reload();
   };
   reader.readAsText(file);
 });
