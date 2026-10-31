@@ -294,6 +294,7 @@
       <label class="filebtn" id="btnImportBackupTrigger" for="fileInputBackup">📥 選擇備份檔還原</label>
       <input type="file" id="fileInputBackup" accept=".json,application/json">
     </div>
+    <div class="note hidden" id="restorePanel" style="white-space:pre-wrap; user-select:text; border:1px solid var(--accent); border-radius:10px; padding:10px 12px;"></div>
     <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。也包含你自己的錄音。不含 API Key（安全考量，換裝置要自己重新輸入）。還原會直接覆蓋目前資料（錄音是同一個字的才會被蓋掉，其他錄音保留），請小心操作。手機換到 Mac：手機按「📤 分享備份」選 AirDrop 傳到 Mac（檔案會在「下載項目」），再到 Mac Safari 按「📥 選擇備份檔還原」選那個檔。</div>
     <div class="toolbar" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製目前顯示的單字</button>
@@ -9760,53 +9761,77 @@ document.getElementById("btnShareBackup").addEventListener("click", async (e) =>
 // 文字，這樣拿去給另一個語言的「匯入並自動生成資料」用時，AI 才能直接
 // 讀懂原本的字是什麼、準確翻成新語言，不用只靠羅馬拼音自己猜）。直接複製
 // 貼到 Obsidian 或另一個語言的匯入檔案就好，不用另外下載檔案再開檔複製。
+// 還原的每一步都寫在頁面上的 restorePanel，確認也用頁面上的按鈕，不用 alert/confirm：
+// iPad Safari 的跳出視窗有時候不會出現，使用者就完全不知道卡在哪一步。
+function showRestoreStatus(text, buttons){
+  const panel = document.getElementById("restorePanel");
+  panel.classList.remove("hidden");
+  panel.textContent = text;
+  if(buttons){
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;";
+    buttons.forEach(([label, onClick]) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.onclick = onClick;
+      row.appendChild(b);
+    });
+    panel.appendChild(row);
+  }
+  panel.scrollIntoView({ block: "nearest" });
+}
+function hideRestoreStatus(){ document.getElementById("restorePanel").classList.add("hidden"); }
+
+async function applyBackup(data){
+  const keys = Object.keys(data.keys);
+  const recs = Object.entries(data.recordings || {});
+  showRestoreStatus("⏳ 還原中，請不要關掉頁面…");
+  keys.forEach(k => kvStore.setItem(k, data.keys[k]));
+  let recFailed = 0;
+  for(let i = 0; i < recs.length; i++){
+    const [k, dataUrl] = recs[i];
+    showRestoreStatus(`⏳ 還原錄音 ${i + 1}/${recs.length}，請不要關掉頁面…`);
+    try{ await setUserRecording(k, await (await fetch(dataUrl)).blob()); }
+    catch(err){ recFailed++; console.warn("還原錄音失敗", k, err); }
+  }
+  showRestoreStatus("⏳ 存檔中，請不要關掉頁面…");
+  try{
+    await kvStore.flushAll(60000);
+  }catch(err){
+    showRestoreStatus("❌ 還原失敗：資料還沒存完（" + err.message + "）。請不要重新整理，再選一次備份檔試試。");
+    return;
+  }
+  showRestoreStatus(`✅ 還原完成${recFailed ? `（有 ${recFailed} 個錄音沒有還原成功）` : ""}，頁面馬上重新整理…`);
+  setTimeout(() => location.reload(), 1200);
+}
+
 document.getElementById("fileInputBackup").addEventListener("change", (e) => {
   const input = e.target;
   const file = input.files[0];
-  if(!file){ input.value = ""; return; }
-  const label = document.getElementById("btnImportBackupTrigger");
-  const labelText = label.textContent;
-  const setStatus = (t) => { label.textContent = t || labelText; };
-  setStatus("⏳ 讀取備份檔中…");
+  if(!file){ input.value = ""; showRestoreStatus("沒有選到檔案。"); return; }
+  const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+  showRestoreStatus(`⏳ 讀取備份檔中：${file.name}（${sizeMB} MB）…`);
   const reader = new FileReader();
   reader.onerror = () => {
     input.value = "";
-    setStatus();
-    alert("還原失敗：讀不到這個檔案（" + (reader.error && reader.error.message || "未知錯誤") + "）");
+    showRestoreStatus(`❌ 還原失敗：讀不到這個檔案 ${file.name}（${reader.error && reader.error.message || "未知錯誤"}）`);
   };
-  reader.onload = async () => {
+  reader.onload = () => {
     input.value = "";
     let data;
     try{
       data = JSON.parse(reader.result);
       if(!data || typeof data.keys !== "object") throw new Error("檔案格式不對，不是這個工具匯出的備份檔。");
     }catch(err){
-      setStatus();
-      alert("還原失敗：" + err.message);
+      showRestoreStatus(`❌ 還原失敗（${file.name}，${sizeMB} MB）：${err.message}`);
       return;
     }
     const keys = Object.keys(data.keys);
-    const recs = Object.entries(data.recordings || {});
-    if(!confirm(`即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}，會覆蓋目前所有語言的單字表、翻譯、例句、聲調標記、⚠️ 標記、已學會進度（不影響 API Key），共 ${keys.length} 筆資料${recs.length ? `，另外還原 ${recs.length} 個錄音` : ""}。這個動作沒辦法復原，確定要還原嗎？`)){ setStatus(); return; }
-    setStatus("⏳ 還原中，請不要關掉頁面…");
-    keys.forEach(k => kvStore.setItem(k, data.keys[k]));
-    let recFailed = 0;
-    for(let i = 0; i < recs.length; i++){
-      const [k, dataUrl] = recs[i];
-      setStatus(`⏳ 還原錄音 ${i + 1}/${recs.length}…`);
-      try{ await setUserRecording(k, await (await fetch(dataUrl)).blob()); }
-      catch(err){ recFailed++; console.warn("還原錄音失敗", k, err); }
-    }
-    setStatus("⏳ 存檔中，請不要關掉頁面…");
-    try{
-      await kvStore.flushAll(60000);
-    }catch(err){
-      setStatus();
-      alert("還原失敗：資料還沒存完（" + err.message + "）。請不要重新整理，再按一次還原試試。");
-      return;
-    }
-    alert(`還原完成${recFailed ? `（有 ${recFailed} 個錄音沒有還原成功）` : ""}，頁面即將重新整理套用新資料。`);
-    location.reload();
+    const recs = Object.keys(data.recordings || {});
+    showRestoreStatus(
+      `即將還原備份${data.exportedAt ? `（匯出時間：${data.exportedAt}）` : ""}：共 ${keys.length} 筆資料${recs.length ? `、${recs.length} 個錄音` : ""}。\n會覆蓋目前所有語言的單字表、翻譯、例句、標記、已學會進度（不影響 API Key），沒辦法復原。`,
+      [["✅ 確定還原", () => applyBackup(data)], ["取消", hideRestoreStatus]]
+    );
   };
   reader.readAsText(file);
 });
