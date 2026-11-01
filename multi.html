@@ -364,6 +364,7 @@
     <div class="toolbar" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製目前顯示的單字</button>
       <button id="btnCopyZhForQuiz">📋 複製中文意思（測驗用，照目前篩選）</button>
+      <button id="btnCopyVisibleForAIReview">📖 複製目前顯示的單字（給 AI 帶我複習）</button>
       <button id="btnCopyVisibleForAI">🤖 複製目前顯示的單字（給 AI 出題）</button>
     </div>
     <div class="toolbar">
@@ -8303,6 +8304,34 @@ ${lines.join("\n")}`;
   try{
     await navigator.clipboard.writeText(text);
     alert(`已複製 ${words.length} 個${L().label}單字（含出題說明），貼給 AI 就可以開始考了。`);
+  }catch(e){
+    prompt("自動複製失敗，請手動全選複製以下內容：", text);
+  }
+});
+
+// 跟上面出題版一樣照目前畫面上的字，但這是考之前先複習用的：每行附上中文意思
+// （複習本來就要看得到意思），請 AI 一次帶幾個字講解、讓我練習，最後才考。
+document.getElementById("btnCopyVisibleForAIReview").addEventListener("click", async () => {
+  const words = getVisibleWords();
+  if(words.length === 0){ alert("目前篩選/搜尋出來沒有任何字。"); return; }
+  const hasScript = L().hasScript;
+  const lines = words.map(w => {
+    const d = lookup(w.text) || {};
+    const native = hasScript && d.nativeScript && d.nativeScript !== w.text ? d.nativeScript : "";
+    const head = native ? (currentLang === "vi" ? native : `${native}（${w.text}）`) : w.text;
+    return d.zh ? `${head} = ${d.zh}` : head;
+  });
+  const text = `以下是我正在學的${L().label}單字／片語（共 ${words.length} 個），請先帶我複習，不要一開始就考我。
+
+複習方式：
+1. 一次只帶 5 個字。每個字告訴我意思、發音重點、一個簡單的日常例句（附中文翻譯），如果有容易搞混的字也提醒我。
+2. 講完這 5 個，請我用其中幾個字各造一個句子，幫我改錯，再繼續下一批。
+3. 全部複習完之後，問我要不要開始小測驗；我說要再一題一題考我。
+
+${lines.join("\n")}`;
+  try{
+    await navigator.clipboard.writeText(text);
+    alert(`已複製 ${words.length} 個${L().label}單字（含複習說明），貼給 AI 就可以開始複習了。`);
   }catch(e){
     prompt("自動複製失敗，請手動全選複製以下內容：", text);
   }
