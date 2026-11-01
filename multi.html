@@ -5,6 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>語言 Flash Card</title>
 <script>
+// 自動換成最新版：GitHub Pages 讓瀏覽器把網頁暫存 10 分鐘，Safari 有時更久，
+// 改版後常常還在跑舊的（之前得手動在網址後面加 ?v=數字）。打開時用 no-store
+// 抓一份伺服器上的最新版，主程式內容跟現在跑的不一樣就換成新版。換頁時加
+// ?r=時間 確保真的拿到新檔，載入後再把這段從網址拿掉，網址永遠是同一個。
+(function(){
+  try{
+    const u = new URL(location.href);
+    if(u.searchParams.has("r") || u.searchParams.has("v")){
+      u.searchParams.delete("r");
+      u.searchParams.delete("v");
+      history.replaceState(null, "", u.pathname + u.search + u.hash);
+    }
+  }catch(e){}
+  function mainText(html){
+    const m = html.match(/<script type="text\/plain" id="mainScript">([\s\S]*?)<\/script>/);
+    return m ? m[1] : null;
+  }
+  window.addEventListener("DOMContentLoaded", function(){
+    const el = document.getElementById("mainScript");
+    if(!el || !window.fetch) return;
+    fetch(location.pathname + "?r=" + Date.now(), { cache: "no-store" }).then(function(res){
+      return res.ok ? res.text() : null;
+    }).then(function(html){
+      // 伺服器正在發布新版時可能拿到不完整的檔案（沒有主程式結尾），這種就不要換。
+      const latest = html && html.indexOf("</html>") !== -1 ? mainText(html) : null;
+      if(latest === null || latest === el.textContent) return;
+      // 避免伺服器兩邊版本不一致時一直跳來跳去：2 分鐘內最多自動換一次。
+      let last = 0;
+      try{ last = Number(sessionStorage.getItem("__autoUpdateAt")) || 0; }catch(e){}
+      if(Date.now() - last < 120000) return;
+      try{ sessionStorage.setItem("__autoUpdateAt", String(Date.now())); }catch(e){}
+      location.replace(location.pathname + "?r=" + Date.now() + location.hash);
+    }).catch(function(){});
+  });
+})();
+</script>
+<script>
 // 診斷用：在手機/iPad 上看不到開發者工具，程式出錯或主程式沒啟動時直接顯示在畫面上。
 (function(){
   function show(msg){
