@@ -392,7 +392,7 @@
     <div class="note">會依序處理目前勾選的每個字：補上例句、把發音（含中文意思的發音）都先生成好存起來。已經生成過的字會自動跳過，不會重複花錢。字多的話會跑很久，建議連 WiFi、出發前先跑完。</div>
     <div class="toolbar">
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
-      <button id="btnToggleCompareOnly">📌 只顯示比對清單</button>
+      <button id="btnTogglePronFlagOnly">⚠️ 只顯示 ⚠️ 標記</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
@@ -1790,9 +1790,8 @@ if(currentLang === "id" && !kvStore.getItem(lsKey(MASTERED_CARDS_LS)) && !kvStor
 function saveCardMastered(){ saveMasteredSet(lsKey(MASTERED_CARDS_LS), cardMasteredIds); }
 function saveQuizMastered(){ saveMasteredSet(lsKey(MASTERED_QUIZ_LS), quizMasteredIds); }
 
-// 發音常常搞混、需要反覆用錄音/Forvo比對的字——跟「比對清單」不一樣的地方是
-// 這個會存起來（重新整理、關掉再打開都還在），標記完可以隨時用「只顯示待複習
-// 發音」叫出來繼續練，等真的聽熟了、比對過都沒問題了，再自己點掉標記。
+// 發音常常搞混、需要反覆用錄音/Forvo比對的字（以前的「📌 比對清單」也併進來了）。
+// 標記完可以隨時用「只顯示 ⚠️ 標記」叫出來比對，等真的聽熟了再自己點掉標記。
 const PRON_FLAG_LS = "flashcard_pron_flag_v1";
 let pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
 function savePronFlag(){ saveMasteredSet(lsKey(PRON_FLAG_LS), pronFlagIds); }
@@ -2024,14 +2023,19 @@ let sortCefr = false;
 let sortCefrDesc = false;
 let sortNewest = true; // 預設新單字在前面比較合理——剛加的字最需要馬上看到、補資料
 const CEFR_SORT_RANK = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
-// 比對清單跟「已選取（練習用）」故意分開——這個只是暫時釘選幾個字方便你跨搜尋
-// 收集起來比對發音，不會動到你原本為了練習勾選的那份清單。原本設計成只存在
-// 當次瀏覽階段，但使用者實際用起來會希望重新整理、關掉再打開都還在，所以
-// 改成跟已學會/⚠️標記一樣存進 localStorage。
+// 以前另外有一份「📌 比對清單」，跟 ⚠️ 用途重疊，合併成只有 ⚠️。舊的比對清單
+// 併進每個語言的 ⚠️ 之後刪掉（還原舊備份時也會再跑一次）。
 const COMPARE_SET_LS = "flashcard_compare_set_v1";
-let compareSet = loadMasteredSet(lsKey(COMPARE_SET_LS));
-function saveCompareSet(){ saveMasteredSet(lsKey(COMPARE_SET_LS), compareSet); }
-let showCompareOnly = false;
+LANG_ORDER.forEach(lang => {
+  const compareKey = lsKeyForLang(COMPARE_SET_LS, lang);
+  if(kvStore.getItem(compareKey) === null) return;
+  const flagKey = lsKeyForLang(PRON_FLAG_LS, lang);
+  const merged = loadMasteredSet(flagKey);
+  loadMasteredSet(compareKey).forEach(id => merged.add(id));
+  saveMasteredSet(flagKey, merged);
+  kvStore.removeItem(compareKey);
+});
+pronFlagIds = loadMasteredSet(lsKey(PRON_FLAG_LS));
 let showPronFlagOnly = false;
 let showNumbersOnly = false;
 let showGreetingsOnly = false;
@@ -5108,7 +5112,7 @@ ${cleanRomanized} 這種拿掉聲調的拼法在${L().label}裡常常同時對�
   return parsed;
 }
 // 點已經在單字表裡的字：跳到那個字在清單裡的位置並閃一下提示，而不是靜靜沒反應。
-// 如果目前的搜尋/篩選/只顯示已選取/只顯示比對清單會讓那個字不在畫面上，
+// 如果目前的搜尋/篩選/只顯示已選取/只顯示 ⚠️ 會讓那個字不在畫面上，
 // 就先清掉篩選讓它顯示出來，再捲過去。
 let jumpBackY = null;
 let jumpBackFilters = null;
@@ -5144,7 +5148,7 @@ function jumpToWordObj(target){
       search: document.getElementById("wordSearch").value,
       search2: document.getElementById("wordSearch2").value,
       difficulty: document.getElementById("difficultyFilter").value,
-      showSelectedOnly, showCompareOnly, showPronFlagOnly, showNewlyImportedOnly
+      showSelectedOnly, showPronFlagOnly, showNewlyImportedOnly
     };
     document.getElementById("wordSearch").value = "";
     document.getElementById("wordSearch2").value = "";
@@ -5154,10 +5158,6 @@ function jumpToWordObj(target){
       const btn = document.getElementById("btnToggleSelectedOnly");
       btn.textContent = "只顯示已選取";
       btn.classList.remove("primary");
-    }
-    if(showCompareOnly){
-      showCompareOnly = false;
-      updateCompareToggleLabel();
     }
     if(showPronFlagOnly){
       showPronFlagOnly = false;
@@ -5190,10 +5190,6 @@ document.getElementById("btnJumpBack").addEventListener("click", (e) => {
       const btn = document.getElementById("btnToggleSelectedOnly");
       btn.textContent = "顯示全部單字";
       btn.classList.add("primary");
-    }
-    if(jumpBackFilters.showCompareOnly){
-      showCompareOnly = true;
-      updateCompareToggleLabel();
     }
     if(jumpBackFilters.showPronFlagOnly){
       showPronFlagOnly = true;
@@ -6986,10 +6982,10 @@ function getVisibleWords(){
   if(showHiddenOnly){
     return allWords.filter(w => hiddenIds.has(w.id));
   }
-  // 比對清單模式優先權最高：只看你釘選過的那幾個字，忽略搜尋框跟難度篩選，
-  // 這樣不管搜尋框現在打什麼，畫面都只會顯示你真正想比對的那幾個。
-  if(showCompareOnly){
-    return allWords.filter(w => compareSet.has(w.id) && !hiddenIds.has(w.id));
+  // 只看 ⚠️ 的模式優先權最高：忽略搜尋框跟難度篩選，這樣可以一個個搜尋、標 ⚠️
+  // 收集起來，不管搜尋框現在打什麼，畫面都只會顯示標過的那幾個來比對。
+  if(showPronFlagOnly){
+    return allWords.filter(w => pronFlagIds.has(w.id) && !hiddenIds.has(w.id));
   }
   if(showNewlyImportedOnly){
     return allWords.filter(w => newlyImportedIds.has(w.id) && !hiddenIds.has(w.id));
@@ -7002,7 +6998,6 @@ function getVisibleWords(){
   const passes = (w, ignoreGroup) => {
     if(hiddenIds.has(w.id)) return false;
     if(showSelectedOnly && !selected.has(w.id)) return false;
-    if(showPronFlagOnly && !pronFlagIds.has(w.id)) return false;
     if(showNumbersOnly && !isNumberWord(w)) return false;
     if(showGreetingsOnly && !isGreetingWord(w)) return false;
     if(showSentencesOnly && !isSentenceWord(w)) return false;
@@ -8026,26 +8021,6 @@ function createWordItem(w){
   refreshDiffChip();
   row.appendChild(diffChip);
 
-  const compareBtn = document.createElement("button");
-  compareBtn.type = "button";
-  compareBtn.className = "diff-chip";
-  function refreshCompareBtn(){
-    const pinned = compareSet.has(w.id);
-    compareBtn.classList.toggle("diff-E", pinned);
-    compareBtn.textContent = "📌";
-    compareBtn.style.opacity = pinned ? "1" : "0.35";
-    compareBtn.setAttribute("aria-label", `${w.text}${pinned ? "（已加入比對清單，點一下移除）" : "（點一下加入比對清單）"}`);
-  }
-  compareBtn.addEventListener("click", (e) => {
-    e.preventDefault(); e.stopPropagation();
-    if(compareSet.has(w.id)) compareSet.delete(w.id); else compareSet.add(w.id);
-    saveCompareSet();
-    refreshCompareBtn();
-    updateCompareToggleLabel();
-    if(showCompareOnly) renderList();
-  });
-  refreshCompareBtn();
-  row.appendChild(compareBtn);
 
   const pronFlagBtn = document.createElement("button");
   pronFlagBtn.type = "button";
@@ -8160,7 +8135,7 @@ function createWordItem(w){
     w.id = newId;
     allWords.push(w);
     // 所有「用編號當 key」的資料，把這個字的舊編號換成新編號。
-    [selected, cardMasteredIds, quizMasteredIds, pronFlagIds, teacherFlagIds, hiddenIds, useRecordingIds, compareSet, newlyImportedIds].forEach(set => {
+    [selected, cardMasteredIds, quizMasteredIds, pronFlagIds, teacherFlagIds, hiddenIds, useRecordingIds, newlyImportedIds].forEach(set => {
       if(set && set.has(oldId)){ set.delete(oldId); set.add(newId); }
     });
     if(colorFlags[oldId] !== undefined){ colorFlags[newId] = colorFlags[oldId]; delete colorFlags[oldId]; }
@@ -8172,7 +8147,6 @@ function createWordItem(w){
     saveTeacherFlag();
     saveHidden();
     saveUseRecordingIds();
-    saveCompareSet();
     saveColorFlags();
     renderList();
     jumpToWordObj(w);
@@ -8372,11 +8346,11 @@ function renderCompactList(el, words){
   el.appendChild(grid);
 }
 // 搜尋不到任何字時：如果是因為搜尋框有打字才找不到（不是 showHiddenOnly／
-// showCompareOnly／showNewlyImportedOnly 這種本來就會忽略搜尋框的模式），
+// showPronFlagOnly／showNewlyImportedOnly 這種本來就會忽略搜尋框的模式），
 // 就順便給一個「➕ 新增這個字」按鈕，不用切去別的畫面手動加。
 function renderEmptyState(el){
   const q = (document.getElementById("wordSearch").value.trim() || document.getElementById("wordSearch2").value.trim());
-  const searchActive = q && !showHiddenOnly && !showCompareOnly && !showNewlyImportedOnly;
+  const searchActive = q && !showHiddenOnly && !showPronFlagOnly && !showNewlyImportedOnly;
   const box = document.createElement("div");
   box.className = "item empty-msg";
   const msg = document.createElement("div");
@@ -8705,7 +8679,6 @@ document.getElementById("btnRenumber").onclick = () => {
   teacherFlagIds = remapIdSet(teacherFlagIds);
   hiddenIds = remapIdSet(hiddenIds);
   useRecordingIds = remapIdSet(useRecordingIds);
-  compareSet = remapIdSet(compareSet);
   colorFlags = remapIdMap(colorFlags);
   saveColorFlags();
   wordGroups = remapIdMap(wordGroups);
@@ -8727,8 +8700,7 @@ document.getElementById("btnRenumber").onclick = () => {
   saveTeacherFlag();
   saveHidden();
   saveUseRecordingIds();
-  saveCompareSet();
-  updateCompareToggleLabel();
+  updatePronFlagToggleLabel();
   updateNewlyImportedToggleLabel();
   renderList();
   alert(`重新編號完成，現在是 1~${allWords.length} 連續編號。`);
@@ -8782,23 +8754,16 @@ document.getElementById("btnToggleSelectedOnly").addEventListener("click", (e) =
   e.currentTarget.classList.toggle("primary", showSelectedOnly);
   renderList();
 });
-function updateCompareToggleLabel(){
-  const btn = document.getElementById("btnToggleCompareOnly");
-  btn.textContent = showCompareOnly ? `顯示全部單字 (比對清單 ${compareSet.size} 個)` : `📌 只顯示比對清單 (${compareSet.size})`;
-  btn.classList.toggle("primary", showCompareOnly);
-}
-document.getElementById("btnToggleCompareOnly").addEventListener("click", () => {
-  showCompareOnly = !showCompareOnly;
-  updateCompareToggleLabel();
-  renderList();
-});
-updateCompareToggleLabel();
 function updatePronFlagToggleLabel(){
   const btn = document.getElementById("btnTogglePronFlagOnly");
-  if(!btn) return; // 「只顯示發音待複習」按鈕已拿掉，showPronFlagOnly 永遠是 false
-  btn.textContent = showPronFlagOnly ? `顯示全部單字 (發音待複習 ${pronFlagIds.size} 個)` : `⚠️ 只顯示發音待複習 (${pronFlagIds.size})`;
+  btn.textContent = showPronFlagOnly ? `顯示全部單字 (⚠️ ${pronFlagIds.size} 個)` : `⚠️ 只顯示 ⚠️ 標記 (${pronFlagIds.size})`;
   btn.classList.toggle("primary", showPronFlagOnly);
 }
+document.getElementById("btnTogglePronFlagOnly").addEventListener("click", () => {
+  showPronFlagOnly = !showPronFlagOnly;
+  updatePronFlagToggleLabel();
+  renderList();
+});
 updatePronFlagToggleLabel();
 function updateNumbersToggleLabel(){
   const btn = document.getElementById("btnToggleNumbersOnly");
@@ -9749,7 +9714,7 @@ const BACKUP_PER_LANG_BASES = [
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS,
   ANTONYMS_CACHE_LS, CHUNKS_CACHE_LS, GRAMMAR_BREAKDOWN_CACHE_LS, MINIMAL_PAIRS_CACHE_LS, WORD_IN_CONTEXT_CACHE_LS,
-  VI_TONE_MARKS_CACHE_LS, VI_NATIVE_TONE_MARKS_CACHE_LS, USE_RECORDING_LS, COMPARE_SET_LS
+  VI_TONE_MARKS_CACHE_LS, VI_NATIVE_TONE_MARKS_CACHE_LS, USE_RECORDING_LS
 ];
 // 寫成函式、匯出時才取值：ALPHA_MASTERED_LS 定義在後面（字母練習那段），在這裡直接
 // 放進陣列會在載入時就丟 ReferenceError，整個主程式停在這一行。
