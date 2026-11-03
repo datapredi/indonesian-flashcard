@@ -985,10 +985,29 @@ const kvStore = (() => {
   const wl = document.getElementById("wordList");
   if(wl && !wl.children.length) wl.innerHTML = '<div class="empty-msg" style="padding:20px; text-align:center; color:var(--muted);">讀取單字資料中…</div>';
 }
+// 主程式在這段「下面」，網路慢（手機）時資料庫已經開好、HTML 卻還沒讀完，
+// 這時抓 textContent 只會拿到前半段，跑到一半就出現「Can't find variable」。
+// 所以一定要等整份 HTML 解析完（DOMContentLoaded）再注入，並確認結尾標記在。
 kvStore.ready.then(() => {
-  const s = document.createElement("script");
-  s.textContent = document.getElementById("mainScript").textContent;
-  document.body.appendChild(s);
+  const start = () => {
+    const el = document.getElementById("mainScript");
+    const code = el ? el.textContent : "";
+    if(code.indexOf("window.__mainScriptDone = true") === -1){
+      // 檔案沒下載完整（例如剛好遇到 GitHub Pages 在發布）：重新整理一次拿完整版。
+      let last = 0;
+      try{ last = Number(sessionStorage.getItem("__partialReloadAt")) || 0; }catch(e){}
+      if(Date.now() - last > 30000){
+        try{ sessionStorage.setItem("__partialReloadAt", String(Date.now())); }catch(e){}
+        location.replace(location.pathname + "?r=" + Date.now() + location.hash);
+      }
+      return;
+    }
+    const s = document.createElement("script");
+    s.textContent = code;
+    document.body.appendChild(s);
+  };
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+  else start();
 }, () => {}); // 失敗時 showLoadError 已經顯示提示，不啟動主程式（避免存到錯的地方）
 </script>
 
