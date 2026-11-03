@@ -394,6 +394,7 @@
     <div class="toolbar">
       <button id="btnToggleSelectedOnly">只顯示已選取</button>
       <button id="btnTogglePronFlagOnly">⚠️ 只顯示 ⚠️ 標記</button>
+      <button id="btnClearPronFlags" class="hidden">🧹 清除全部 ⚠️ 標記</button>
       <button id="btnToggleNumbersOnly">🔢 只顯示數字</button>
       <button id="btnSortNumbersAsc" class="hidden">🔢 數字由小到大排</button>
       <button id="btnToggleGreetingsOnly" class="hidden">👋 只顯示問候／客套話</button>
@@ -8787,7 +8788,21 @@ function updatePronFlagToggleLabel(){
   const btn = document.getElementById("btnTogglePronFlagOnly");
   btn.textContent = showPronFlagOnly ? `顯示全部單字 (⚠️ ${pronFlagIds.size} 個)` : `⚠️ 只顯示 ⚠️ 標記 (${pronFlagIds.size})`;
   btn.classList.toggle("primary", showPronFlagOnly);
+  const clr = document.getElementById("btnClearPronFlags");
+  clr.textContent = `🧹 清除全部 ⚠️ 標記 (${pronFlagIds.size})`;
+  clr.classList.toggle("hidden", pronFlagIds.size === 0);
 }
+// 一次把目前語言所有 ⚠️ 標記清掉（不用一個字一個字點）。
+document.getElementById("btnClearPronFlags").addEventListener("click", () => {
+  const n = pronFlagIds.size;
+  if(!n) return;
+  if(!confirm(`確定要清除全部 ${n} 個 ⚠️ 標記嗎？（只清目前語言，單字本身不會被刪）`)) return;
+  pronFlagIds.clear();
+  savePronFlag();
+  showPronFlagOnly = false;
+  updatePronFlagToggleLabel();
+  renderList();
+});
 document.getElementById("btnTogglePronFlagOnly").addEventListener("click", () => {
   showPronFlagOnly = !showPronFlagOnly;
   updatePronFlagToggleLabel();
