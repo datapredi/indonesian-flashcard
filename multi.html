@@ -1835,14 +1835,38 @@ const COLOR_FLAG_META = {
   green:  { label: "綠", emoji: "🟩", hex: "#34c759" }
 };
 
-// 使用者自訂的「分組」（例如老師分的 common expression／conversation），一個字
-// 一個組，存成 { id: "組名" }，換語言各存一份。複習時可以只看某一組。
+// 使用者自訂的「分組」（例如上課日期、common expression），一個字最多兩個組，
+// 存成 { id: "組名" } 或 { id: ["組1","組2"] }，換語言各存一份。複習時可以只看某一組。
 const WORD_GROUP_LS = "flashcard_word_group_v1";
 let wordGroups = {};
 try{ wordGroups = JSON.parse(kvStore.getItem(lsKey(WORD_GROUP_LS))) || {}; }catch(e){ wordGroups = {}; }
 function saveWordGroups(){ kvStore.setItem(lsKey(WORD_GROUP_LS), JSON.stringify(wordGroups)); }
+// 一個字最多可以在兩個分組（例如「9/12」跟「common expression」）。只有一組時
+// 照舊存成字串（舊備份／舊版相容），兩組才存成陣列 ["組1","組2"]。
+const MAX_GROUPS_PER_WORD = 2;
+function getWordGroups(id){
+  const v = wordGroups[id];
+  const arr = Array.isArray(v) ? v : [v];
+  return [...new Set(arr.map(x => String(x || "").trim()).filter(Boolean))].slice(0, MAX_GROUPS_PER_WORD);
+}
+function setWordGroups(id, arr){
+  arr = [...new Set((arr || []).map(x => String(x || "").trim()).filter(Boolean))].slice(0, MAX_GROUPS_PER_WORD);
+  if(arr.length === 0) delete wordGroups[id];
+  else wordGroups[id] = arr.length === 1 ? arr[0] : arr;
+}
+// 加進一個組（保留原本的組）；已經兩組了就換掉第二組。回傳有沒有改到。
+function addWordGroup(id, g){
+  g = String(g || "").trim();
+  if(!g) return false;
+  const cur = getWordGroups(id);
+  if(cur.indexOf(g) !== -1) return false;
+  if(cur.length < MAX_GROUPS_PER_WORD) cur.push(g); else cur[MAX_GROUPS_PER_WORD - 1] = g;
+  setWordGroups(id, cur);
+  return true;
+}
+function wordGroupsLabel(id){ const g = getWordGroups(id); return g.length ? g.join("、") : ""; }
 function distinctGroups(){
-  return [...new Set(Object.values(wordGroups).map(s => String(s || "").trim()).filter(Boolean))]
+  return [...new Set(Object.keys(wordGroups).flatMap(id => getWordGroups(id)))]
     .sort((a, b) => a.localeCompare(b));
 }
 // 把一個「分組下拉」填成：無分組 / 每個現有的組 / ＋新群組…，並選回 currentVal。
@@ -1859,7 +1883,13 @@ function fillGroupSelect(sel, currentVal){
 // 帶回目前的值，不動到使用者正在展開的面板。
 function refreshAllGroupSelects(){
   document.querySelectorAll("#wordList .word-group-select").forEach(sel => {
-    fillGroupSelect(sel, wordGroups[sel.dataset.wid] || "");
+    const groups = getWordGroups(sel.dataset.wid);
+    const slot = Number(sel.dataset.slot || 0);
+    fillGroupSelect(sel, groups[slot] || "");
+    if(slot === 1){
+      sel.classList.toggle("hidden", groups.length === 0);
+      if(sel.options[0]) sel.options[0].textContent = "➕ 第二組";
+    }
   });
 }
 let groupFilter = ""; // getVisibleWords 用：空＝全部；否則只顯示這一組
@@ -3443,7 +3473,7 @@ function addChunkAsWord(chunk, baseWord){
   customDB[text] = Object.assign({}, customDB[text] || {}, { zh: chunk.zh || "", en: chunk.en || "" }, chunk.nativeScript ? { nativeScript: chunk.nativeScript } : {});
   saveCustomDB();
   setWordNote(text, `來自：${baseWord.text}`);
-  if(wordGroups[baseWord.id]){ wordGroups[word.id] = wordGroups[baseWord.id]; saveWordGroups(); }
+  if(getWordGroups(baseWord.id).length){ setWordGroups(word.id, getWordGroups(baseWord.id)); saveWordGroups(); }
   if(wordCategories[baseWord.id]){ wordCategories[word.id] = wordCategories[baseWord.id]; saveWordCategories(); }
   return { word, added: true };
 }
@@ -7030,8 +7060,8 @@ function getVisibleWords(){
     if(showVerbOnly && !isVerbWord(w)) return false;
     if(showReduplOnly && currentLang === "id" && !isReduplWord(w)) return false;
     if(groupFilter && !ignoreGroup){
-      const g = wordGroups[w.id] || "";
-      if(g !== groupFilter && !(groupFilter2 && g === groupFilter2)) return false;
+      const gs = getWordGroups(w.id);
+      if(gs.indexOf(groupFilter) === -1 && !(groupFilter2 && gs.indexOf(groupFilter2) !== -1)) return false;
     }
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(diffFilter){
@@ -7117,7 +7147,7 @@ function createWordItem(w){
   row.className = "item" + (needsCoreGeneration(w) ? " no-data" : "");
   row.dataset.wordId = w.id;
   const outsideGroupNote = outsideGroupSearchIds.has(w.id)
-    ? ` <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">（不在這個分組・📁 ${escapeHtmlText(wordGroups[w.id] || "未分組")}）</span>` : "";
+    ? ` <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">（不在這個分組・📁 ${escapeHtmlText(wordGroupsLabel(w.id) || "未分組")}）</span>` : "";
   // 越南文：主標題顯示英文拼音（拆掉聲調符號的版本），帶聲調的原文放在下面
   // 那一行。就算當初是直接用越南文原文輸入、沒有另外存英文拼音也沒關係——
   // stripVietToneMarks 是純規則轉換，即時算得出來。
@@ -8093,25 +8123,43 @@ function createWordItem(w){
   // 自訂分組下拉：無 / 現有的組 / ＋新群組…（選了會 prompt 輸入名字）。
   // 加了 class 跟 data-wid，新增一個組時 refreshAllGroupSelects() 會把畫面上
   // 每一個下拉都補上這個新選項，不用整頁重繪、也不用捲下去每個重填。
-  const groupSelect = document.createElement("select");
-  groupSelect.className = "color-flag-select word-group-select";
-  groupSelect.dataset.wid = w.id;
-  fillGroupSelect(groupSelect, wordGroups[w.id] || "");
-  groupSelect.addEventListener("click", (e) => e.stopPropagation());
-  groupSelect.addEventListener("change", (e) => {
-    e.stopPropagation();
-    let v = groupSelect.value;
-    if(v === "__new__"){
-      v = (prompt("新分組名稱（通常拿來標日期／課次，例如 9/12、Lesson 3）：", "") || "").trim();
-      if(!v){ groupSelect.value = wordGroups[w.id] || ""; return; }
+  // 一個字可以有兩個分組：第一個下拉＝第一組，有了第一組才出現「➕ 第二組」。
+  [0, 1].forEach(slot => {
+    const groupSelect = document.createElement("select");
+    groupSelect.className = "color-flag-select word-group-select";
+    groupSelect.dataset.wid = w.id;
+    groupSelect.dataset.slot = String(slot);
+    const cur = getWordGroups(w.id);
+    fillGroupSelect(groupSelect, cur[slot] || "");
+    if(slot === 1){
+      groupSelect.options[0].textContent = "➕ 第二組";
+      groupSelect.title = "同一個字也可以放進第二個分組（例如日期＋common expression）";
+      if(cur.length === 0) groupSelect.classList.add("hidden");
     }
-    if(v) wordGroups[w.id] = v; else delete wordGroups[w.id];
-    saveWordGroups();
-    refreshAllGroupSelects();
-    updateGroupFilterOptions();
-    if(groupFilter) renderList();
+    groupSelect.addEventListener("click", (e) => e.stopPropagation());
+    groupSelect.addEventListener("change", (e) => {
+      e.stopPropagation();
+      const groups = getWordGroups(w.id);
+      let v = groupSelect.value;
+      if(v === "__new__"){
+        v = (prompt("新分組名稱（例如 9/12、Lesson 3、common expression）：", "") || "").trim();
+        if(!v){ groupSelect.value = groups[slot] || ""; return; }
+      }
+      if(v){
+        const other = groups[1 - slot];
+        if(v === other){ alert("另一個欄位已經是這個分組了。"); groupSelect.value = groups[slot] || ""; return; }
+        if(slot === 1 && !groups[0]) groups[0] = v; else groups[slot] = v;
+      }else{
+        groups.splice(slot, 1); // 清掉第一組時，第二組自動遞補成第一組
+      }
+      setWordGroups(w.id, groups.filter(Boolean));
+      saveWordGroups();
+      refreshAllGroupSelects();
+      updateGroupFilterOptions();
+      if(groupFilter) renderList();
+    });
+    row.appendChild(groupSelect);
   });
-  row.appendChild(groupSelect);
 
   // 第二個獨立標籤：類別（例如老師分的 common expression／conversation）。
   // 跟上面的分組完全分開，一個字兩個都能各自設定，互不影響。
@@ -8449,7 +8497,7 @@ function renderEmptyState(el){
       // 當下如果剛好篩了分組/類別在看，新字也順便標上，符合正在瀏覽的情境。
       const newWord = allWords.find(w => w.text === q);
       if(newWord){
-        if(groupFilter){ wordGroups[newWord.id] = groupFilter; saveWordGroups(); }
+        if(groupFilter){ addWordGroup(newWord.id, groupFilter); saveWordGroups(); }
         if(categoryFilter){ wordCategories[newWord.id] = categoryFilter; saveWordCategories(); }
       }
       // 直接順便生成翻譯，不用加完字再自己去按「AI 自動生成」——這裡是空清單
@@ -9029,7 +9077,7 @@ function updateGroupFilterOptions(){
   if(!sel) return;
   const groups = distinctGroups();
   const counts = {};
-  Object.entries(wordGroups).forEach(([id, g]) => { g = String(g || "").trim(); if(g) counts[g] = (counts[g] || 0) + 1; });
+  Object.keys(wordGroups).forEach(id => { getWordGroups(id).forEach(g => { counts[g] = (counts[g] || 0) + 1; }); });
   sel.innerHTML = '<option value="">📁 全部分組</option>'
     + groups.map(g => `<option value="${g.replace(/"/g, "&quot;")}">📁 ${g}（${counts[g] || 0}）</option>`).join("");
   sel.value = groupFilter;
@@ -9059,8 +9107,16 @@ document.getElementById("btnAssignGroup").addEventListener("click", () => {
   if(ids.length === 0){ alert("先勾選要分組的字（可以先搜尋／篩選出來再按「全選」）。"); return; }
   const existing = distinctGroups();
   const hint = existing.length ? `\n\n目前已有的分組：${existing.join("、")}` : "";
-  const g = (prompt(`把勾選的 ${ids.length} 個字設為哪個分組？（輸入空白＝清掉分組）${hint}`, existing[0] || "") || "").trim();
-  ids.forEach(id => { if(g) wordGroups[id] = g; else delete wordGroups[id]; });
+  const g = (prompt(`把勾選的 ${ids.length} 個字加入哪個分組？（輸入空白＝清掉這些字的所有分組）${hint}`, existing[0] || "") || "").trim();
+  if(!g){
+    if(!confirm(`確定要清掉這 ${ids.length} 個字的所有分組？`)) return;
+    ids.forEach(id => setWordGroups(id, []));
+  }else{
+    // 已經在別的組的字：問要「同時加入」（變兩組）還是「搬過去」（只剩這組）。
+    const inOther = ids.filter(id => { const cur = getWordGroups(id); return cur.length && cur.indexOf(g) === -1; });
+    const keepBoth = inOther.length === 0 || confirm(`其中 ${inOther.length} 個字已經在別的分組了。\n\n按「確定」＝同時加入「${g}」，原本的分組保留（一個字最多兩組）\n按「取消」＝搬到「${g}」，只留這一組`);
+    ids.forEach(id => { if(keepBoth) addWordGroup(id, g); else setWordGroups(id, [g]); });
+  }
   saveWordGroups();
   updateGroupFilterOptions();
   renderList();
@@ -9966,7 +10022,7 @@ function applyGroupToNewlyImported(){
   const nameEl = document.getElementById("convertGroupName");
   const g = nameEl ? nameEl.value.trim() : "";
   if(!g || newlyImportedIds.size === 0) return "";
-  newlyImportedIds.forEach(id => { wordGroups[id] = g; });
+  newlyImportedIds.forEach(id => { addWordGroup(id, g); }); // 已經在別組的舊字：保留原組，多加這一組
   saveWordGroups();
   if(typeof updateGroupFilterOptions === "function") updateGroupFilterOptions();
   if(typeof refreshAllGroupSelects === "function") refreshAllGroupSelects();
@@ -10469,7 +10525,7 @@ async function importYtInboxBatch(batch){
   }
   let restored = false;
   Object.keys(groupsBefore).forEach(id => {
-    if(groupsBefore[id] && wordGroups[id] !== groupsBefore[id]){ wordGroups[id] = groupsBefore[id]; restored = true; }
+    if(groupsBefore[id] && JSON.stringify(wordGroups[id]) !== JSON.stringify(groupsBefore[id])){ wordGroups[id] = groupsBefore[id]; restored = true; }
   });
   if(restored){
     saveWordGroups();
