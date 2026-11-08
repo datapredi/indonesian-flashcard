@@ -10648,6 +10648,63 @@ function showYtInboxBanner(){
 window.addEventListener("storage", (e) => { if(e.key === YT_INBOX_LS) showYtInboxBanner(); });
 document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") showYtInboxBanner(); });
 
+// ================= 老師上課的錄音（class_audio/） =================
+// 從上課影片剪出老師唸每個字的聲音，放在網站的 class_audio/ 資料夾，
+// manifest.json 列出 { id, lang, text, file, from }。開頁時自動抓：單字表裡有
+// 這個字、而且這個字還沒有錄音，就存成它的「🎙️ 我的錄音」並設成「★ 用我的錄音」。
+// 已經有自己錄音的字不覆蓋。字還沒匯入的先跳過，之後匯入了，下次開頁會補上。
+const CLASS_AUDIO_DONE_LS = "flashcard_class_audio_done_v1";
+async function applyClassAudio(){
+  let list;
+  try{
+    const r = await fetch("class_audio/manifest.json?r=" + Date.now(), { cache: "no-store" });
+    if(!r.ok) return;
+    list = await r.json();
+  }catch(e){ return; }
+  if(!Array.isArray(list)) return;
+  let done;
+  try{ done = new Set(JSON.parse(kvStore.getItem(lsKey(CLASS_AUDIO_DONE_LS))) || []); }catch(e){ done = new Set(); }
+  // 比對時忽略大小寫、標點（句尾的 . ? ! 、逗號）和多的空白。
+  const keyOf = s => String(s || "").normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
+  const byText = new Map(allWords.map(w => [keyOf(w.text), w]));
+  const added = [], kept = [];
+  for(const it of list){
+    if(!it || it.lang !== currentLang || !it.id || done.has(it.id)) continue;
+    const w = byText.get(keyOf(it.text));
+    if(!w) continue;
+    try{
+      const key = recKeyFor(w.text);
+      if(await getUserRecording(key)){
+        kept.push(w.text);
+      }else{
+        const res = await fetch("class_audio/" + encodeURIComponent(it.file), { cache: "no-store" });
+        if(!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        await setUserRecording(key, new Blob([buf], { type: "audio/mp4" }));
+        useRecordingIds.add(w.id);
+        added.push(w.text);
+      }
+      done.add(it.id);
+    }catch(e){ /* 這次抓不到，下次開頁再試 */ }
+  }
+  kvStore.setItem(lsKey(CLASS_AUDIO_DONE_LS), JSON.stringify([...done]));
+  if(!added.length && !kept.length) return;
+  if(added.length){ saveUseRecordingIds(); renderList(); }
+  const bar = document.createElement("div");
+  bar.style.cssText = "background:var(--card); border:2px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px; display:flex; gap:8px; align-items:flex-start;";
+  const msg = document.createElement("div");
+  msg.style.cssText = "flex:1; white-space:pre-wrap;";
+  msg.textContent = (added.length ? `🎙️ 加了 ${added.length} 個老師上課的錄音（已設成 ★ 用我的錄音）：${added.join("、")}` : "")
+    + (kept.length ? `${added.length ? "\n" : ""}這 ${kept.length} 個字你已經有自己的錄音，沒有覆蓋：${kept.join("、")}` : "");
+  const ok = document.createElement("button");
+  ok.textContent = "知道了";
+  ok.addEventListener("click", () => bar.remove());
+  bar.append(msg, ok);
+  const anchor = document.getElementById("wordList");
+  anchor.parentNode.insertBefore(bar, anchor);
+}
+applyClassAudio();
+
 // ================= Flash Card =================
 let cardSession = [];
 let cardIndex = 0;
