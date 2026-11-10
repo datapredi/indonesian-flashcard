@@ -408,6 +408,7 @@
       <button id="btnToggleReduplOnly" class="hidden">🔁 只顯示疊字</button>
       <select id="groupFilter" title="只顯示某個自訂分組（通常是日期／課次）"><option value="">📁 全部分組</option></select>
       <select id="groupFilter2" class="hidden" title="同時再顯示另一個分組（兩組的字一起列出來）"><option value="">➕ 再加一組</option></select>
+      <button id="btnRenameGroup" class="hidden" title="把目前篩選的這個分組改名（每個字的其他分組不動）">✏️ 改分組名稱</button>
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
       <button id="btnAssignCategory">🏷️ 把勾選的字加入類別…</button>
@@ -9091,6 +9092,8 @@ function updateGroupFilterOptions(){
   sel2.value = groupFilter2;
   if(sel2.value !== groupFilter2){ groupFilter2 = ""; sel2.value = ""; }
   sel2.classList.toggle("hidden", !groupFilter);
+  const rn = document.getElementById("btnRenameGroup");
+  if(rn) rn.classList.toggle("hidden", !groupFilter);
 }
 document.getElementById("groupFilter").addEventListener("change", (e) => {
   groupFilter = e.target.value;
@@ -9120,6 +9123,30 @@ document.getElementById("btnAssignGroup").addEventListener("click", () => {
   saveWordGroups();
   updateGroupFilterOptions();
   renderList();
+});
+// 分組改名：只把舊名稱換成新名稱，每個字原本的其他分組保留（一個字最多兩組）。
+// 新名稱已經存在的話就是合併，同一個字不會出現兩次一樣的組。
+document.getElementById("btnRenameGroup").addEventListener("click", () => {
+  const from = groupFilter;
+  if(!from) return;
+  const to = (prompt(`把分組「${from}」改成什麼名稱？\n（已經有同名的分組的話，兩組會合併）`, from) || "").trim();
+  if(!to || to === from) return;
+  let n = 0;
+  Object.keys(wordGroups).forEach(id => {
+    const cur = getWordGroups(id);
+    const i = cur.indexOf(from);
+    if(i === -1) return;
+    cur[i] = to;
+    setWordGroups(id, cur);
+    n++;
+  });
+  saveWordGroups();
+  groupFilter = to;
+  if(groupFilter2 === to) groupFilter2 = "";
+  updateGroupFilterOptions();
+  if(typeof refreshAllGroupSelects === "function") refreshAllGroupSelects();
+  renderList();
+  alert(`已把 ${n} 個字的分組「${from}」改成「${to}」。`);
 });
 updateGroupFilterOptions();
 function updateCategoryFilterOptions(){
