@@ -10654,6 +10654,7 @@ document.addEventListener("visibilitychange", () => { if(document.visibilityStat
 // 這個字、而且這個字還沒有錄音，就存成它的「🎙️ 我的錄音」並設成「★ 用我的錄音」。
 // 已經有自己錄音的字不覆蓋。字還沒匯入的先跳過，之後匯入了，下次開頁會補上。
 const CLASS_AUDIO_DONE_LS = "flashcard_class_audio_done_v1";
+const CLASS_AUDIO_SKIP_LS = "flashcard_class_audio_skip_v1";
 async function applyClassAudio(){
   let list;
   try{
@@ -10695,18 +10696,58 @@ async function applyClassAudio(){
     }
   }
   kvStore.setItem(lsKey(CLASS_AUDIO_DONE_LS), JSON.stringify([...done]));
-  if(!added.length && !kept.length) return;
+  // 老師錄音裡有、但還沒有卡片的字（筆記裡拆得比卡片細的那些：nên、gió、Sài Gòn…）：
+  // 列出來讓使用者決定要不要加成卡片。加的話走跟「匯入講義收件匣」一樣的匯入流程，
+  // 放進那堂課的分組；加完再跑一次這個函式，錄音就會接上。按「不用了」的不再問。
+  let skip;
+  try{ skip = new Set(JSON.parse(kvStore.getItem(lsKey(CLASS_AUDIO_SKIP_LS))) || []); }catch(e){ skip = new Set(); }
+  // 同一個字在好幾堂課都有錄音的，只列一次，但「不用了」要把每一筆都記起來。
+  const missing = [], missingByKey = new Map();
+  for(const it of list){
+    if(!it || it.lang !== currentLang || !it.id || skip.has(it.id)) continue;
+    const k = keyOf(it.text);
+    if(!k || (byText.get(k) || []).length) continue;
+    if(missingByKey.has(k)){ missingByKey.get(k).ids.push(it.id); continue; }
+    const m = { text: it.text, group: it.group || "", ids: [it.id] };
+    missingByKey.set(k, m); missing.push(m);
+  }
+  if(!added.length && !kept.length && !missing.length) return;
   if(added.length){ saveUseRecordingIds(); renderList(); }
   const bar = document.createElement("div");
-  bar.style.cssText = "background:var(--card); border:2px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px; display:flex; gap:8px; align-items:flex-start;";
+  bar.style.cssText = "background:var(--card); border:2px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px; display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;";
   const msg = document.createElement("div");
-  msg.style.cssText = "flex:1; white-space:pre-wrap;";
-  msg.textContent = (added.length ? `🎙️ 加了 ${added.length} 個老師上課的錄音（已設成 ★ 用我的錄音）：${added.join("、")}` : "")
-    + (kept.length ? `${added.length ? "\n" : ""}這 ${kept.length} 個字你已經有自己的錄音，沒有覆蓋：${kept.join("、")}` : "");
-  const ok = document.createElement("button");
-  ok.textContent = "知道了";
-  ok.addEventListener("click", () => bar.remove());
-  bar.append(msg, ok);
+  msg.style.cssText = "flex:1 1 220px; white-space:pre-wrap;";
+  msg.textContent = [
+    added.length ? `🎙️ 加了 ${added.length} 個老師上課的錄音（已設成 ★ 用我的錄音）：${added.join("、")}` : "",
+    kept.length ? `這 ${kept.length} 個字你已經有自己的錄音，沒有覆蓋：${kept.join("、")}` : "",
+    missing.length ? `🆕 老師錄音裡還有 ${missing.length} 個字沒有卡片：${missing.map(it => it.text).join("、")}` : ""
+  ].filter(Boolean).join("\n");
+  const btns = document.createElement("div");
+  btns.style.cssText = "display:flex; gap:6px; flex-wrap:wrap;";
+  const mkBtn = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.addEventListener("click", fn); btns.appendChild(b); return b; };
+  if(missing.length){
+    const addBtn = mkBtn(`➕ 把這 ${missing.length} 個加成卡片`, async () => {
+      addBtn.disabled = true; addBtn.textContent = "加入中…";
+      const byGroup = new Map();
+      missing.forEach(it => { byGroup.set(it.group, [...(byGroup.get(it.group) || []), it.text]); });
+      let ok = true;
+      for(const [g, texts] of byGroup){
+        const r = await importYtInboxBatch({ id: `class-audio-${g || "nogroup"}-${Date.now()}`, group: g, title: "老師上課錄音", rawText: texts.join("\n") });
+        if(r === false){ ok = false; break; }
+      }
+      if(!ok){ addBtn.disabled = false; addBtn.textContent = `➕ 把這 ${missing.length} 個加成卡片`; return; }
+      bar.remove();
+      await applyClassAudio();
+    });
+    mkBtn("不用了", () => {
+      missing.forEach(it => it.ids.forEach(id => skip.add(id)));
+      kvStore.setItem(lsKey(CLASS_AUDIO_SKIP_LS), JSON.stringify([...skip]));
+      bar.remove();
+    });
+  }else{
+    mkBtn("知道了", () => bar.remove());
+  }
+  bar.append(msg, btns);
   const anchor = document.getElementById("wordList");
   anchor.parentNode.insertBefore(bar, anchor);
 }
