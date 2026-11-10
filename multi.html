@@ -10666,26 +10666,33 @@ async function applyClassAudio(){
   try{ done = new Set(JSON.parse(kvStore.getItem(lsKey(CLASS_AUDIO_DONE_LS))) || []); }catch(e){ done = new Set(); }
   // 比對時忽略大小寫、標點（句尾的 . ? ! 、逗號）和多的空白。
   const keyOf = s => String(s || "").normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
-  const byText = new Map(allWords.map(w => [keyOf(w.text), w]));
+  // 同一個字可能有好幾張卡（不同堂課各匯入一次、句尾多一個句點…），每張都接上。
+  // 有些越南文卡片的 text 是不帶聲調的拼法，帶聲調的寫法存在 nativeScript，也一起比對。
+  const byText = new Map();
+  const addKey = (k, w) => { if(!k) return; const a = byText.get(k) || []; if(!a.includes(w)) a.push(w); byText.set(k, a); };
+  allWords.forEach(w => { addKey(keyOf(w.text), w); addKey(keyOf((lookup(w.text) || {}).nativeScript), w); });
   const added = [], kept = [];
   for(const it of list){
-    if(!it || it.lang !== currentLang || !it.id || done.has(it.id)) continue;
-    const w = byText.get(keyOf(it.text));
-    if(!w) continue;
-    try{
-      const key = recKeyFor(w.text);
-      if(await getUserRecording(key)){
-        kept.push(w.text);
-      }else{
-        const res = await fetch("class_audio/" + encodeURIComponent(it.file), { cache: "no-store" });
-        if(!res.ok) continue;
-        const buf = await res.arrayBuffer();
-        await setUserRecording(key, new Blob([buf], { type: "audio/mp4" }));
-        useRecordingIds.add(w.id);
-        added.push(w.text);
-      }
-      done.add(it.id);
-    }catch(e){ /* 這次抓不到，下次開頁再試 */ }
+    if(!it || it.lang !== currentLang || !it.id) continue;
+    for(const w of byText.get(keyOf(it.text)) || []){
+      // 每張卡各記一筆「接過了」；舊版只記 it.id，那種的只在卡片還沒有錄音時補接，不再提示。
+      const dk = `${it.id}@${w.id}`;
+      if(done.has(dk)) continue;
+      try{
+        const key = recKeyFor(w.text);
+        if(await getUserRecording(key)){
+          if(!done.has(it.id)) kept.push(w.text);
+        }else{
+          const res = await fetch("class_audio/" + encodeURIComponent(it.file), { cache: "no-store" });
+          if(!res.ok) continue;
+          const buf = await res.arrayBuffer();
+          await setUserRecording(key, new Blob([buf], { type: "audio/mp4" }));
+          useRecordingIds.add(w.id);
+          added.push(w.text);
+        }
+        done.add(dk);
+      }catch(e){ /* 這次抓不到，下次開頁再試 */ }
+    }
   }
   kvStore.setItem(lsKey(CLASS_AUDIO_DONE_LS), JSON.stringify([...done]));
   if(!added.length && !kept.length) return;
