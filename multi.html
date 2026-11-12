@@ -412,7 +412,7 @@
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
       <button id="btnAssignCategory">🏷️ 把勾選的字加入類別…</button>
-      <select id="vowelFilter" class="hidden" title="只顯示含有某個複合母音的字（例如 ươ：thường、được、người）"><option value="">🔤 全部母音</option></select>
+      <select id="vowelFilter" class="hidden" title="只顯示含有某個複合母音的單字（例如 ươ：thường、được、người），片語和句子不列"><option value="">🔤 全部母音</option></select>
       <select id="grammarFilter" class="hidden" title="只顯示用到某個文法的句子（時態、問句、比較…）"><option value="">📐 全部文法</option></select>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
@@ -1917,6 +1917,11 @@ let grammarFilter = "";
 let vowelFilter = "";
 const VI_VOWEL_CORES = ["uyê", "ươ", "iê", "yê", "uô", "ưa", "ia", "ua", "oa", "oă", "oe", "uy", "uâ", "uê", "ưu", "iu", "ai", "ay", "ao", "au", "âu", "ây", "eo", "êu", "oi", "ôi", "ơi", "ui", "ưi"];
 const viVowelCache = new Map();
+// 母音篩選只看單一個字（一個音節），片語、句子不列。
+function viIsSingleSyllable(w){
+  const src = String(((typeof lookup === "function" && lookup(w.text)) || {}).nativeScript || w.text || "");
+  return src.split(/[^\p{L}]+/u).filter(Boolean).length === 1;
+}
 function viVowelCores(w){
   const src = String(((typeof lookup === "function" && lookup(w.text)) || {}).nativeScript || w.text || "");
   if(viVowelCache.has(src)) return viVowelCache.get(src);
@@ -7093,7 +7098,7 @@ function getVisibleWords(){
     }
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(grammarFilter && !(wordGrammar[w.id] || []).includes(grammarFilter)) return false;
-    if(vowelFilter && !viVowelCores(w).has(vowelFilter)) return false;
+    if(vowelFilter && !(viIsSingleSyllable(w) && viVowelCores(w).has(vowelFilter))) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -8548,6 +8553,7 @@ function renderEmptyState(el){
 }
 function renderList(){
   updateVowelFilterOptions(); // 加了新字後數字跟著更新（有快取，很快）
+  updateVowelPanel();
   const el = document.getElementById("wordList");
   el.innerHTML = "";
   const visibleWords = getVisibleWords();
@@ -9231,12 +9237,55 @@ function updateVowelFilterOptions(){
   if(!sel) return;
   if(currentLang !== "vi"){ sel.classList.add("hidden"); vowelFilter = ""; return; }
   const counts = {};
-  allWords.forEach(w => viVowelCores(w).forEach(c => { counts[c] = (counts[c] || 0) + 1; }));
+  // 數字＝含這個母音的不同單字有幾個（單獨的卡＋從片語、句子拆出來的，同一個字只算一次）
+  const seen = new Set();
+  allWords.forEach(w => String((lookup(w.text) || {}).nativeScript || w.text || "").normalize("NFC").toLowerCase().split(/[^\p{L}]+/u).filter(Boolean).forEach(sy => {
+    if(seen.has(sy)) return; seen.add(sy);
+    viVowelCores({ text: sy }).forEach(c => { counts[c] = (counts[c] || 0) + 1; });
+  }));
   const cs = VI_VOWEL_CORES.filter(c => counts[c]).sort((a, b) => counts[b] - counts[a]);
   sel.classList.toggle("hidden", cs.length === 0);
   sel.innerHTML = '<option value="">🔤 全部母音</option>' + cs.map(c => `<option value="${c}">🔤 ${c}（${counts[c]}）</option>`).join("");
   sel.value = vowelFilter;
   if(sel.value !== vowelFilter){ vowelFilter = ""; sel.value = ""; }
+}
+// 選了母音時，在清單上方另外列出「從片語、句子拆出來的字」。只是顯示，不會新增卡片、
+// 不會改到單字表；已經是單獨一張卡的字不重複列（它就在下面的清單裡）。
+function updateVowelPanel(){
+  let panel = document.getElementById("vowelPanel");
+  if(!vowelFilter || currentLang !== "vi"){ if(panel) panel.remove(); return; }
+  const strip = t => t.normalize("NFD").replace(/[\u0300\u0301\u0303\u0309\u0323]/g, "").normalize("NFC");
+  const own = new Set(), found = new Map();
+  allWords.forEach(w => {
+    const src = String((lookup(w.text) || {}).nativeScript || w.text || "").normalize("NFC");
+    const syls = src.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean);
+    if(syls.length === 1){ own.add(syls[0]); return; }
+    syls.forEach(sy => {
+      if(!viVowelCores({ text: sy }).has(vowelFilter)) return;
+      const f = found.get(sy) || { n: 0, from: [] };
+      f.n++; if(f.from.length < 6) f.from.push({ t: src, zh: (lookup(w.text) || {}).zh || "" });
+      found.set(sy, f);
+    });
+  });
+  own.forEach(sy => found.delete(sy));
+  const list = [...found.entries()].sort((a, b) => b[1].n - a[1].n);
+  if(!panel){
+    panel = document.createElement("div");
+    panel.id = "vowelPanel";
+    panel.style.cssText = "background:var(--card); border:1px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px;";
+    const anchor = document.getElementById("wordList");
+    anchor.parentNode.insertBefore(panel, anchor);
+  }
+  const esc = x => String(x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  panel.innerHTML = `<div style="font-weight:600; margin-bottom:6px;">🔤 從片語、句子拆出來的 ${esc(vowelFilter)} 字（${list.length}）<span style="font-weight:400; font-size:13px; opacity:.7;">・只是列出來看，不會新增卡片；點字會唸、會列出它出現在哪幾張卡</span></div>`
+    + (list.length ? `<div style="display:flex; flex-wrap:wrap; gap:6px;">${list.map(([sy, f]) => `<button type="button" data-vsy="${esc(sy)}" style="font-size:16px;">${esc(sy)} <span style="opacity:.6; font-size:12px;">${f.n}</span></button>`).join("")}</div>` : `<div style="opacity:.7;">沒有其他的了，全部都已經是單獨的卡片。</div>`)
+    + `<div id="vowelPanelFrom" style="margin-top:8px; font-size:14px;"></div>`;
+  panel.onclick = e => {
+    const b = e.target.closest("[data-vsy]"); if(!b) return;
+    const sy = b.dataset.vsy, f = found.get(sy);
+    speak(sy, b);
+    document.getElementById("vowelPanelFrom").innerHTML = `<b>${esc(sy)}</b> 出現在：` + f.from.map(x => `<div>・${esc(x.t)} <span style="opacity:.7;">${esc(x.zh)}</span></div>`).join("") + (f.n > f.from.length ? `<div style="opacity:.7;">…共 ${f.n} 次</div>` : "");
+  };
 }
 document.getElementById("vowelFilter").addEventListener("change", (e) => { vowelFilter = e.target.value; renderList(); });
 updateVowelFilterOptions();
