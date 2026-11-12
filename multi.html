@@ -7299,7 +7299,7 @@ function createWordItem(w){
   speakBtn.textContent = "🔊";
   speakBtn.setAttribute("aria-label", `連續播放 3 次 ${w.text} 發音`);
   speakBtn.title = "連續播放 3 次";
-  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speakRepeat(getSpeechText(w), speakBtn, 3, null, useRecordingIds.has(w.id) ? recKeyFor(w.text) : null); });
+  speakBtn.addEventListener("click", (e) => { e.stopPropagation(); speakRepeat(getSpeechText(w), speakBtn, 1, null, useRecordingIds.has(w.id) ? recKeyFor(w.text) : null); });
   row.appendChild(speakBtn);
 
   const playRecBtn = document.createElement("button");
