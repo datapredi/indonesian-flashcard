@@ -412,6 +412,7 @@
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
       <button id="btnAssignCategory">🏷️ 把勾選的字加入類別…</button>
+      <select id="vowelFilter" class="hidden" title="只顯示含有某個複合母音的字（例如 ươ：thường、được、người）"><option value="">🔤 全部母音</option></select>
       <select id="grammarFilter" class="hidden" title="只顯示用到某個文法的句子（時態、問句、比較…）"><option value="">📐 全部文法</option></select>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
@@ -1912,6 +1913,24 @@ let wordGrammar = {};
 try{ wordGrammar = JSON.parse(kvStore.getItem(lsKey(WORD_GRAMMAR_LS))) || {}; }catch(e){ wordGrammar = {}; }
 function saveWordGrammar(){ kvStore.setItem(lsKey(WORD_GRAMMAR_LS), JSON.stringify(wordGrammar)); }
 let grammarFilter = "";
+// 越南文複合母音篩選（ươ、iê、uô…）：從字的寫法即時算，不用存資料，新加的字也會自動算進去。
+let vowelFilter = "";
+const VI_VOWEL_CORES = ["uyê", "ươ", "iê", "yê", "uô", "ưa", "ia", "ua", "oa", "oă", "oe", "uy", "uâ", "uê", "ưu", "iu", "ai", "ay", "ao", "au", "âu", "ây", "eo", "êu", "oi", "ôi", "ơi", "ui", "ưi"];
+const viVowelCache = new Map();
+function viVowelCores(w){
+  const src = String(((typeof lookup === "function" && lookup(w.text)) || {}).nativeScript || w.text || "");
+  if(viVowelCache.has(src)) return viVowelCache.get(src);
+  // 拿掉聲調符號（保留 ă â ê ô ơ ư 本身的符號），再一個音節一個音節找母音組合。
+  const base = src.normalize("NFD").replace(/[\u0300\u0301\u0303\u0309\u0323]/g, "").normalize("NFC").toLowerCase();
+  const out = new Set();
+  for(const syl of base.split(/[^\p{L}]+/u)){
+    let v = (syl.replace(/^(qu|gi(?=[aăâeêoôơuưy]))/, "").match(/[aăâeêioôơuưy]+/) || [""])[0];
+    const core = VI_VOWEL_CORES.find(c => v.includes(c));
+    if(core) out.add(core);
+  }
+  viVowelCache.set(src, out);
+  return out;
+}
 function distinctCategories(){
   return [...new Set(Object.values(wordCategories).map(s => String(s || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
@@ -7074,6 +7093,7 @@ function getVisibleWords(){
     }
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
     if(grammarFilter && !(wordGrammar[w.id] || []).includes(grammarFilter)) return false;
+    if(vowelFilter && !viVowelCores(w).has(vowelFilter)) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -8527,6 +8547,7 @@ function renderEmptyState(el){
   el.appendChild(box);
 }
 function renderList(){
+  updateVowelFilterOptions(); // 加了新字後數字跟著更新（有快取，很快）
   const el = document.getElementById("wordList");
   el.innerHTML = "";
   const visibleWords = getVisibleWords();
@@ -9205,6 +9226,20 @@ document.getElementById("grammarFilter").addEventListener("change", (e) => {
   renderList();
 });
 updateGrammarFilterOptions();
+function updateVowelFilterOptions(){
+  const sel = document.getElementById("vowelFilter");
+  if(!sel) return;
+  if(currentLang !== "vi"){ sel.classList.add("hidden"); vowelFilter = ""; return; }
+  const counts = {};
+  allWords.forEach(w => viVowelCores(w).forEach(c => { counts[c] = (counts[c] || 0) + 1; }));
+  const cs = VI_VOWEL_CORES.filter(c => counts[c]).sort((a, b) => counts[b] - counts[a]);
+  sel.classList.toggle("hidden", cs.length === 0);
+  sel.innerHTML = '<option value="">🔤 全部母音</option>' + cs.map(c => `<option value="${c}">🔤 ${c}（${counts[c]}）</option>`).join("");
+  sel.value = vowelFilter;
+  if(sel.value !== vowelFilter){ vowelFilter = ""; sel.value = ""; }
+}
+document.getElementById("vowelFilter").addEventListener("change", (e) => { vowelFilter = e.target.value; renderList(); });
+updateVowelFilterOptions();
 function updateHiddenToggleLabel(){
   const btn = document.getElementById("btnToggleHiddenOnly");
   btn.textContent = showHiddenOnly ? `回到正常清單 (隱藏 ${hiddenIds.size} 個)` : `🙈 顯示隱藏的 (${hiddenIds.size})`;
