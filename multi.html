@@ -412,6 +412,7 @@
       <button id="btnAssignGroup">📁 把勾選的字加入分組…</button>
       <select id="categoryFilter" title="只顯示某個自訂類別（例如 common expression／conversation）"><option value="">🏷️ 全部類別</option></select>
       <button id="btnAssignCategory">🏷️ 把勾選的字加入類別…</button>
+      <select id="grammarFilter" class="hidden" title="只顯示用到某個文法的句子（時態、問句、比較…）"><option value="">📐 全部文法</option></select>
       <button id="btnToggleHiddenOnly">🙈 顯示隱藏的</button>
       <button id="btnToggleNewlyImportedOnly">🆕 只顯示剛匯入的單字</button>
       <button id="btnSortAZ">🔤 A→Z 排序</button>
@@ -1904,6 +1905,13 @@ const WORD_CATEGORY_LS = "flashcard_word_category_v1";
 let wordCategories = {};
 try{ wordCategories = JSON.parse(kvStore.getItem(lsKey(WORD_CATEGORY_LS))) || {}; }catch(e){ wordCategories = {}; }
 function saveWordCategories(){ kvStore.setItem(lsKey(WORD_CATEGORY_LS), JSON.stringify(wordCategories)); }
+// 文法標籤（時態、問句、比較…）：一張卡可以有好幾個，跟分組、類別分開存，
+// 不佔「最多兩個分組」的名額。存成 { id: ["文法・問句", ...] }，換語言各存一份。
+const WORD_GRAMMAR_LS = "flashcard_word_grammar_v1";
+let wordGrammar = {};
+try{ wordGrammar = JSON.parse(kvStore.getItem(lsKey(WORD_GRAMMAR_LS))) || {}; }catch(e){ wordGrammar = {}; }
+function saveWordGrammar(){ kvStore.setItem(lsKey(WORD_GRAMMAR_LS), JSON.stringify(wordGrammar)); }
+let grammarFilter = "";
 function distinctCategories(){
   return [...new Set(Object.values(wordCategories).map(s => String(s || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
@@ -7065,6 +7073,7 @@ function getVisibleWords(){
       if(gs.indexOf(groupFilter) === -1 && !(groupFilter2 && gs.indexOf(groupFilter2) !== -1)) return false;
     }
     if(categoryFilter && (wordCategories[w.id] || "") !== categoryFilter) return false;
+    if(grammarFilter && !(wordGrammar[w.id] || []).includes(grammarFilter)) return false;
     if(diffFilter){
       const d = getDifficulty(w.text);
       if(diffFilter === "none" ? d !== null : d !== diffFilter) return false;
@@ -8592,6 +8601,7 @@ function deleteWord(id){
   if(colorFlags[id]){ delete colorFlags[id]; saveColorFlags(); }
   if(wordGroups[id]){ delete wordGroups[id]; saveWordGroups(); updateGroupFilterOptions(); }
   if(wordCategories[id]){ delete wordCategories[id]; saveWordCategories(); updateCategoryFilterOptions(); }
+  if(wordGrammar[id]){ delete wordGrammar[id]; saveWordGrammar(); updateGrammarFilterOptions(); }
   // 把這個字的 AI 生成資料也一起清掉（你自己打的 📝 筆記保留），這樣之後重新
   // 輸入同一個字會重新生成，不會撈到刪掉前的舊翻譯／舊變化形。
   if(target){
@@ -8783,6 +8793,8 @@ document.getElementById("btnRenumber").onclick = () => {
   saveWordGroups();
   wordCategories = remapIdMap(wordCategories);
   saveWordCategories();
+  wordGrammar = remapIdMap(wordGrammar);
+  saveWordGrammar();
   wordLinks = remapIdMap(wordLinks);
   Object.keys(wordLinks).forEach(id => { wordLinks[id] = wordLinks[id].map(x => idMap.get(x)).filter(x => x !== undefined); });
   saveWordLinks();
@@ -9176,6 +9188,23 @@ document.getElementById("btnAssignCategory").addEventListener("click", () => {
   renderList();
 });
 updateCategoryFilterOptions();
+function updateGrammarFilterOptions(){
+  const sel = document.getElementById("grammarFilter");
+  if(!sel) return;
+  const counts = {};
+  Object.values(wordGrammar).forEach(arr => (arr || []).forEach(g => { counts[g] = (counts[g] || 0) + 1; }));
+  const gs = Object.keys(counts).sort((a, b) => a.localeCompare(b));
+  sel.classList.toggle("hidden", gs.length === 0);
+  sel.innerHTML = '<option value="">📐 全部文法</option>'
+    + gs.map(g => `<option value="${g.replace(/"/g, "&quot;")}">📐 ${g.replace(/^文法・/, "")}（${counts[g]}）</option>`).join("");
+  sel.value = grammarFilter;
+  if(sel.value !== grammarFilter){ grammarFilter = ""; sel.value = ""; }
+}
+document.getElementById("grammarFilter").addEventListener("change", (e) => {
+  grammarFilter = e.target.value;
+  renderList();
+});
+updateGrammarFilterOptions();
 function updateHiddenToggleLabel(){
   const btn = document.getElementById("btnToggleHiddenOnly");
   btn.textContent = showHiddenOnly ? `回到正常清單 (隱藏 ${hiddenIds.size} 個)` : `🙈 顯示隱藏的 (${hiddenIds.size})`;
@@ -9858,7 +9887,7 @@ const BACKUP_PER_LANG_BASES = [
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
   TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, MNEMONIC_CACHE_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
-  THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS,
+  THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS, WORD_GRAMMAR_LS,
   ANTONYMS_CACHE_LS, CHUNKS_CACHE_LS, GRAMMAR_BREAKDOWN_CACHE_LS, MINIMAL_PAIRS_CACHE_LS, WORD_IN_CONTEXT_CACHE_LS,
   VI_TONE_MARKS_CACHE_LS, VI_NATIVE_TONE_MARKS_CACHE_LS, USE_RECORDING_LS
 ];
@@ -10779,6 +10808,53 @@ async function applyClassAudio(){
   anchor.parentNode.insertBefore(bar, anchor);
 }
 applyClassAudio();
+
+// ================= 自動分類（word_tags/） =================
+// word_tags/<語言>.json 列出 { text, cat, gr:[文法…] }，開頁時自動套用：
+// 用字比對（跟老師錄音一樣忽略大小寫、標點、聲調寫法），每個版本只套一次。
+// 已經有自己設的類別不覆蓋（舊的「time」除外，會換成新的時間類）；文法標籤只補上沒有的。
+const WORD_TAGS_DONE_LS = "flashcard_word_tags_done_v1";
+async function applyWordTags(){
+  let data;
+  try{
+    const r = await fetch(`word_tags/${currentLang}.json?r=` + Date.now(), { cache: "no-store" });
+    if(!r.ok) return;
+    data = await r.json();
+  }catch(e){ return; }
+  if(!data || !Array.isArray(data.items)) return;
+  const ver = Number(data.version) || 1;
+  if(Number(kvStore.getItem(lsKey(WORD_TAGS_DONE_LS)) || 0) >= ver) return;
+  const keyOf = s => String(s || "").normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
+  const byText = new Map();
+  const addKey = (k, w) => { if(!k) return; const a = byText.get(k) || []; if(!a.includes(w)) a.push(w); byText.set(k, a); };
+  allWords.forEach(w => { addKey(keyOf(w.text), w); addKey(keyOf((lookup(w.text) || {}).nativeScript), w); });
+  let nCat = 0, nGr = 0;
+  for(const it of data.items){
+    for(const w of byText.get(keyOf(it.text)) || []){
+      const cur = String(wordCategories[w.id] || "").trim();
+      if(it.cat && (!cur || cur === "time") && cur !== it.cat){ wordCategories[w.id] = it.cat; nCat++; }
+      const g = wordGrammar[w.id] || [];
+      const add = (it.gr || []).filter(x => !g.includes(x));
+      if(add.length){ wordGrammar[w.id] = [...g, ...add]; nGr++; }
+    }
+  }
+  saveWordCategories(); saveWordGrammar();
+  kvStore.setItem(lsKey(WORD_TAGS_DONE_LS), String(ver));
+  updateCategoryFilterOptions(); updateGrammarFilterOptions();
+  if(nCat || nGr){
+    renderList();
+    const bar = document.createElement("div");
+    bar.style.cssText = "background:var(--card); border:2px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;";
+    const msg = document.createElement("div");
+    msg.style.cssText = "flex:1 1 220px;";
+    msg.textContent = `🏷️ 已自動分類：${nCat} 張設了主題類別、${nGr} 張加了文法標籤。用「🏷️ 全部類別」和「📐 全部文法」選單篩選；分錯的可以用「🏷️ 把勾選的字加入類別…」改。`;
+    const b = document.createElement("button"); b.textContent = "知道了"; b.addEventListener("click", () => bar.remove());
+    bar.append(msg, b);
+    const anchor = document.getElementById("wordList");
+    anchor.parentNode.insertBefore(bar, anchor);
+  }
+}
+applyWordTags();
 
 // ================= Flash Card =================
 let cardSession = [];

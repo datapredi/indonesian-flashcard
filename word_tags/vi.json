@@ -1,0 +1,6171 @@
+{
+"version": 1,
+"note": "越南文主題分類＋文法群組（2026-11-12）",
+"items": [
+{
+"text": "khong biet",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "hat ca phe",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "thong minh",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "tre hon",
+"cat": "🕐 時間",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Ban bao nhieu tuoi?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "ga",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "o",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "neu",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "nha",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "chi",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "khong",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "ngan hang",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "dep",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "cua hang",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "cai do",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "con cho",
+"cat": "🐾 動物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "con meo",
+"cat": "🐾 動物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "hoc",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "tac xi",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "con",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "binh thuong",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "dang",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "khong co",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "gia",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "nghe",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "ban co thich khong?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "thit heo",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "dai",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "quan an",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "tin",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "rat",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "nguoi yeu",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "binh minh",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "ngay lam viec",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "dep trai",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "de thuong",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "do an Trung Quoc",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "thich nhat",
+"cat": "😊 形容詞",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "tre",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Ban biet di xe may khong?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Ban biet lai o to khong?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "ten cua em",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "em khoe khong",
+"cat": "🏥 健康",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "khong phai anh",
+"cat": "🔤 其他",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Em bao nhieu tuoi?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "ban",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "em co thich khong?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "xin loi",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "em biet di xe may khong?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "em biet lai o to khong?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "gap",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "cai quan",
+"cat": "🏠 生活",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "em dang lam gi day?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "gan khach san",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "tam",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "hoi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "dang lam viec",
+"cat": "💼 工作",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "hoi doi",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "o gan day",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "ngu",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "cay",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "thang nay",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "phut",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "ve nha",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "dung (2)",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "the nao",
+"cat": "🔤 其他",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "met",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "mot minh",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "muon an gi?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "nha ve sinh o dau?",
+"cat": "🏠 生活",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "ngot",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "em ten gi?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "em co nguoi yeu chua?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "em la giao vien tieng viet cua anh.",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "co ngon khong",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "khong muon",
+"cat": "🔤 其他",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "di dau",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "mot trieu",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "lam viec bao lau roi",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "mot nam",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "anh lam viec online.",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "com trang",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "ao",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "cai nay bao nhieu tien?",
+"cat": "🔢 數字",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "phu nu",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "voi anh",
+"cat": "🔤 其他",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "chua",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "mau",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "di cung",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "khi",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "cong viec",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "hay",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "mua to",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "em the nao",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "de (2)",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "rat nhieu",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "mon an trung quoc",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "em biet lai xe khong",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "dang lam gi",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "khong sao",
+"cat": "🔤 其他",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "la",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "kho lam",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "doi mot chut",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "em lam viec bao lau roi",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "com",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "day la cai gi",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "da",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "ket xe",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "dien thoai",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "nha ve sinh",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "va",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "mit",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "nay",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "mot",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "thich",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "em",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "cua",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "tram",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "tra",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "thit bo",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "giao vien",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "se",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "cung",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "tra da",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "da binh thuong",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "cho anh xem menu duoc khong",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "cho hai chai bia",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "voi ai",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "hai gio chieu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "may gio roi",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "tam gio toi",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "nam gio chieu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "ba gio chieu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "bon gio chieu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "sau gio sang",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "mot gio sang",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "chin gio sang",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "mot tieng",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "it nguoi",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "dong nguoi",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "doi (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "sau gio chieu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "em an com chua",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "chua an",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "anh khong khoe",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "luoi",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "anh",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "roi",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "voi",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "man",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "dang (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "cong an",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "cung roi",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "em co hieu tieng anh khong?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "hieu",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "em co hieu tieng trung khong?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "anh la nguoi dai loan",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "sao",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Viet",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "nguoi",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "chao chi",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "chao anh",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "chao em",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "biet",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "cam",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "ban cua em",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "Cai",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "hai muoi tuoi",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi chin tuoi",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "hai muoi mot tuoi",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi tam tuoi",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "hai",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "ba",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "bon",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "sau",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "bay",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "tam (2)",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi mot",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi hai",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi ba",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi bon",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi lam",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi sau",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi bay",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi tam",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muoi chin",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "trieu",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "cam on",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "chut",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "duong pho",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "lau (5)",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "bao (3)",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "viec",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "em la nguoi viet nam phai khong?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "mon",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Em muon an gi?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "o kia",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "day (7)",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Thang (2)",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Anh rat thich em.",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "yeu",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "ban (3)",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "tot",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Anh yeu em.",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "anh o day ba ngay roi",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "ba ngay",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Em o dau?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "do an viet nam",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh thich do an Viet Nam lam.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "do an",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Em dep lam.",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "khi nao",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "hai trieu",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "nha anh",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "hai coc bia",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "hai ly bia",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "may gio",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "toi mai",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "an toi",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "an trua",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "thi sao",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "muoi",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "dong (2)",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "do an thai",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "tieng thai",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "em da di thai lan chua",
+"cat": "🛵 交通",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "da (4)",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "duoc",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "nha hang",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "anh muon cai nay",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・助動詞",
+"文法・量詞"
+]
+},
+{
+"text": "lam (4)",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "ca phe da",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "ca phe sua da",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "sua",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "ca phe nong",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "ca phe trung",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Anh mua ca phe va banh mi.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Co banh mi khong?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "co com tam khong?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Co sinh to xoai khong?",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "khong duong da binh thuong",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "bao nhieu",
+"cat": "😊 形容詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "em noi duoc tieng viet khong?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "anh hoc tieng viet o dai loan",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "tai sao",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Ban noi duoc tieng Viet khong?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "ao dai",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "toi (3)",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "dung roi",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "no roi",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "doi roi",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "nam oi",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "con bo",
+"cat": "🐾 動物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "pho ga",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "lẹ lẹ",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "mẹ",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "tệ",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "bap",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "to qua",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Không có gì anh",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "mam me",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "tre (2)",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "thit kho",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "ca kho",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "com tam",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "pho bo",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "bac",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "phap",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "an",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "khoe (2)",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "no",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "em oi",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "thu (2)",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "từ từ",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Lau (2)",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "o dau",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "dau (2)",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "gia (2)",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "gi",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "da (2)",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "co (2)",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "dì",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "di",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "lại nha (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "tien",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "to",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "chuc (2)",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "chin",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "rat tot",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "bao nhieu tien?",
+"cat": "🔢 數字",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "cai nay",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "cai kia",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "cai nay o dau",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "ba muoi nghin",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "ba mươi ka",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "hai chuc",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "ba chuc",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "còn em",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "Xong rồi!",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh đang ăn.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh thích bánh mì này.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh không thích bánh mì kia.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Mũi Né",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Phú Quốc",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh muốn",
+"cat": "🔤 其他",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Em đi Mũi Né chưa?",
+"cat": "🛵 交通",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Anh đi Phú Quốc chưa?",
+"cat": "🛵 交通",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Chưa.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "đó",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Lấy cái này",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "năm chục ngàn",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "bốn mươi ba ngàn",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "ngàn",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "muon (2)",
+"cat": "🔤 其他",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Anh muon di Mui Ne va Phu Quoc",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Anh chua di Phu Quoc.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh muon di dau o Viet Nam?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "banh mi",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "gia dinh",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Em biet italy khong?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh hieu roi.",
+"cat": "",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Thu vi!",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Bây giờ",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Anh đang ăn bún bò huế.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh thích bún bò huế.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Bún bò huế ngon lắm.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Bánh mì này ngon lắm.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Bánh mì kia",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Ngon (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Dở",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Đây là Dahab",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Ở đây đẹp lắm",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Đây là gì?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Cái này là gì?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "Cái đó là gì?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "Đây là",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Ở đây",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Ở đó",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Đây là Dahab, ở đây đẹp lắm.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bây giờ, anh đang ở đâu?",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Bay gio, anh dang o Chau Au, o Ai Cap.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Bay gio, em dang o Chau A, o Viet Nam, o Phan Thiet.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh o dau?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh o Ai Cap",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh muon di dau?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "Anh muon di Chau Au",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Chau My",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Chau A",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Chau Phi",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Y",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "chau au",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "anh hieu",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh biet tieng Duc",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "anh biết Đức",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "co",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "dung khong? (2)",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "nong",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "bun bo hue",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh ăn gì ở Ai Cập?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh nấu bò và gà.",
+"cat": "🍜 食物",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "nau",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "rau cu",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "cu ca rot",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "sua chua",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "pho mai",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "trứng",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "cá",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "mắc",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "rẻ",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "cũng được",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Cà rốt cũng được.",
+"cat": "🍜 食物",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "ý kiến",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "lý do",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh là người ở đâu?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "tiếng",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "tiếng Anh",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "tiếng Việt",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "tiếng Quan Thoại",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "nói",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh nói tiếng Anh và tiếng Quan Thoại.",
+"cat": "📚 上課",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Anh có nói tiếng Việt không?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "mot chut (2)",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "nhieu",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "con tieng Duc?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Biển",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh thích Dahab lắm.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh thích biển ở Dahab.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh ăn gì ở Dahab?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Uống",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh có uống sữa không? - Có.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Bữa nay anh ăn cơm gà.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Hôm nay anh ăn cơm gà.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "truyen thong",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "noi tieng",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "dac san",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "dac san Tan Bac la gi?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "hai san",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "nuoc mam",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh biet an nuoc mam khong?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh thich nuoc mam khong?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Cai nay la banh mi pita dung khong?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "Tan Bac",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Que anh o dau?",
+"cat": "🏠 生活",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Que anh o Tan Bac, Dai Loan.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bac (2)",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Nam (2)",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Noi ve",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Em noi ve Phan Thiet roi.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "phai khong",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句",
+"文法・助動詞"
+]
+},
+{
+"text": "hả",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "bua nay",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "hom nay",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "tiep theo",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Hơi",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Chút xíu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Xíu xiu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Nhưng mà",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Làm",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh làm gì?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Kỹ sư",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "Thiết kế",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "vi mach",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "an sang (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "yen mach",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Anh noi tieng Quan Thoai, tieng Dai Loan, tieng Anh, mot chut tieng Thai, tieng Indonesia, tieng Viet, va xiu xiu tieng Ai Cap.",
+"cat": "📚 上課",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Mat (2)",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Lanh (2)",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Da (3)",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Ca phe da nay lanh.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "yen mach voi sua",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "mi",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "mi y",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Vậy hả?",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh đang ở thành phố Cairo.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "thanh pho",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "thanh pho tiep theo",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "nuoc tiep theo",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "nguoi tiep theo",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "Tiếp theo anh sẽ đi thành phố Frankfurt.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Nước tiếp theo anh sẽ đi là Đức.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Thành phố tiếp theo anh sẽ đi là gì?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "tới",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Anh tới Cairo hôm qua đúng không? - Đúng rồi.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Đường ở Cairo dơ lắm.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "dơ",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "sạch",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "canh",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "canh dep",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "duong",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "nuoc",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Duong o Tan Bac khong dep nhung ma sach hon duong o Ai Cap.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句",
+"文法・比較",
+"文法・連接詞"
+]
+},
+{
+"text": "hon",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "nhieu duong hon",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Anh khong an nhieu duong.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Anh khong uong nhieu duong.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "hôm qua",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "năm",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Mới",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Không đường",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Sữa đặc",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Thanh pho nao?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Pyramids dep lam nhung ma duong do lam.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Trung Quoc",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "anh làm online",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "anh làm cho công ty nào 2 năm rồi",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "anh mới ăn một xíu",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "mua",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "ban (2)",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Anh dang hoc tieng Viet.",
+"cat": "📚 上課",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Lam sao noi \"Check, please\" tieng Viet?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Lam sao noi cai nay?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句",
+"文法・量詞"
+]
+},
+{
+"text": "Cho mot latte va mot matcha latte.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Cho một sinh tố bơ sầu riêng đem đi.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "thêm",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Cho thêm một ly bia thủ công.",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "Cho anh cái menu đi!",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "Đem đi",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Cho một cà phê không đường đem đi.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "khách sạn",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Đây là một khách sạn Nhật.",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "xoài",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Cho thêm một sinh tố xoài.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "bơ",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Sầu riêng mắc hơn bơ.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "sầu riêng",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "bơ sầu riêng",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "sinh tố",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Cho một sinh tố bơ sầu riêng.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "bia thủ công",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "công viên",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "công ty",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "quán",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "quán cà phê",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "tối",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Bay từ Đài Loan tới Việt Nam bốn tiếng.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "nhật bản",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "tính tiền",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "tối nay",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "sinh tố xoài",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Trời ơi!",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Ngày mai",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Ngày",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Trước",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Chờ chút!",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Thái Lan",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh tới Pattaya hôm qua đúng không? - Không. Anh tới Pattaya 2 ngày trước.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh sẽ ở Pattaya bao nhiêu ngày? - 4 ngày.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Cũng đẹp",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Pattaya bây giờ mắc không? - Không mắc hơn Đức. Rẻ hơn Đức.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・比較"
+]
+},
+{
+"text": "trung tâm thành phố",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Trung tâm",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Trung tâm mua sắm",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Central Pattaya là một trung tâm mua sắm có cảnh biển đẹp.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Hôm nay anh đi Central Pattaya.",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Mưa - Trời mưa",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "ô tô",
+"cat": "🛵 交通",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "đi ô tô 1 tiếng",
+"cat": "🛵 交通",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "đi ô tô từ Tân Bắc tới Tân Trúc 1 tiếng.",
+"cat": "🛵 交通",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "xe máy",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "ở VN có nhiều xe máy lắm.",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Tân Trúc",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Pattaya sạch hơn Ai Cập.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・比較"
+]
+},
+{
+"text": "Starbucks ở Pattaya mắc hơn ở Ai Cập nhiều.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句",
+"文法・比較"
+]
+},
+{
+"text": "đông",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Trời mưa",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "quá",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "chuan bi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "chu y",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "dac biet",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Thanh pho nay dac biet lam.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bien nay dac biet.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "muc dich",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "quan ly",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh chuan bi di dau? - Anh chuan bi di Dai Bac va Ho Vi",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Anh chuan bi di an pho.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Cai nay dac biet.",
+"cat": "😊 形容詞",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "Day la pho dac biet.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Chia (2)",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh chuan bi di dau? - Anh chuan bi di Dai Bac va Ho Vi (2)",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Muc dich di Tan Bac va Ho Vi la gi? - Muc dich di Tan Bac la de gap ba me cua anh va di Ho Vi la de gap anh cua anh. (2)",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Anh của anh ở Hổ Vĩ.",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "Mục đích học tiếng Việt là để đi Việt Nam và nói chuyện với người Việt.",
+"cat": "📚 上課",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Quản lý của quán này",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Quản lý của quán này ở đâu?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh muốn gặp quản lý của quán này.",
+"cat": "🍜 食物",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Anh làm quản lý. Còn anh?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh làm kỹ sư thiết kế vi mạch.",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "ba mẹ",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "nói chuyện",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "la de",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Ngày mai anh chuẩn bị đi Hổ Vĩ để gặp anh của anh.",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Chú ý xe máy và ô tô ở đường ở Việt Nam.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞",
+"文法・量詞"
+]
+},
+{
+"text": "Thành phố này đặc biệt lắm.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Đồ ăn Việt Nam ngon, đặc biệt là phở bò.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Thỉnh thoảng, học một tiếng không cần lý do đặc biệt.",
+"cat": "📚 上課",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "cần",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh làm kỹ sư, không cần quản lý công ty.",
+"cat": "💼 工作",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Ngày mai anh sẽ đi ô tô tới Hổ Vĩ để gặp anh của anh.",
+"cat": "🛵 交通",
+"gr": [
+"文法・時態",
+"文法・量詞"
+]
+},
+{
+"text": "Lý do anh học tiếng Việt là để nói chuyện với người Việt.",
+"cat": "📚 上課",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Tiếng Đài Loan nghe dễ thương.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bay (2)",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Ngày mai anh sẽ không bay tới Hổ Vĩ.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Thỉnh thoảng",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Thỉnh thoảng, anh uống đồ ngọt, ví dụ là trà sữa.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Thỉnh thoảng anh uống đồ ngọt.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Giống",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Ví dụ",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Dễ thương",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "De",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Tran chau",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Thuong (2)",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Nha anh o Tan Truc. Que anh o Tan Bac.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Do an (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Do uong",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "trắng",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "đen",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "May gio?",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Bay gio may gio roi?",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "9 gio 7 phut sang",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Nhanh",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Cham",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Gio o Dai Loan nhanh hon VN 1 tieng.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Gio o VN cham hon Dai Loan 1 tieng.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Anh (2)",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "Bánh",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Bánh ngọt",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Bánh mì",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Nhà",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Nhà anh ở đâu?",
+"cat": "🏠 生活",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Chung cư",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Anh ở chung cư.",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Chung cư của anh ở đâu?",
+"cat": "🏠 生活",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Căn hộ",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Chung cư này có 20 căn hộ.",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Anh anh",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "Anh đang ở nhà của anh anh.",
+"cat": "🏠 生活",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Thường",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Anh không thường uống trà sữa nhưng mà khi anh đang ở Đài Loan anh sẽ thường mua trà sữa trân châu hay trà trân châu.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "vài",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "chè",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "chè Thái",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "size",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "nhỏ",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "vừa",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Lớn",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Trân châu nổ",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "giờ",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "phút",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "sáng",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "trưa",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "chiều",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "gap lai sau",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "旅遊",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "một mình",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Tự do",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Em làm tự do đúng không?",
+"cat": "💼 工作",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Làm tự do",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "Hổ",
+"cat": "🐾 動物",
+"gr": []
+},
+{
+"text": "Con hổ",
+"cat": "🐾 動物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "Dữ",
+"cat": "🐾 動物",
+"gr": []
+},
+{
+"text": "Hổ dữ không ăn thịt con.",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "Con (2)",
+"cat": "🔤 其他",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "con nguoi",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "noi cham lai",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "noi tu tu",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "di nhanh len",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "di cham lai",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "di tu tu",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Anh an toi chua?",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "kho (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "dau hu kho trung vit",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "thit ho",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "vi",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "2 ngay nua",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "noi soi",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "kiem tra suc khoe",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "quan com",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "vit",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "chậm lại",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "nhanh lên",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "đậu hũ",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "trứng vịt",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "gà",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "L Y G K",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "thit ga",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "quán cơm phần",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "dau (3)",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "rất tự do",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Hồi nào?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "cắt",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "cắt điện",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "cúp điện",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "điện",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "điện thoại",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "máy tính",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "não",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "về",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh về Tân Bắc hồi nào?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh mới về Tân Bắc 2 tiếng trước.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh ăn gì chưa?",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Anh đi ăn mì",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "xa",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "gần",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "gần nhà",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Quán mì này gần nhà anh không? - Gần lắm. Lái xe 30 phút. Rồi đi bộ 10 phút.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Lái xe",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Đi bộ",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Phổ biến",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Mì",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Địa phương",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Quán địa phương",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Món địa phương",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Người địa phương",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "truyền",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "thống",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Bình thường",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Anh khoẻ không? - Bình thường.",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Món này ngon không? - Bình thường.",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Quán mì này có mì đặc biệt.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Muối",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Dầu hào",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Xì dầu",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Hải sản",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Hải sản ở Đài Loan giá cũng được, không mắc.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Giá",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "Giá cả",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "Giá cũng được",
+"cat": "🔢 數字",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Hải sản ở Đài Loan giá cũng được.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Cái này giá cũng được.",
+"cat": "🔢 數字",
+"gr": [
+"文法・助動詞",
+"文法・量詞"
+]
+},
+{
+"text": "Giá cả cũng được",
+"cat": "🔢 數字",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Ở Đài Loan, giá cả cũng được.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "Ở Singapore, giá cả rất mắc.",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "Đài Loan không làm nước mắm.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Thái cũng làm nước mắm.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Món này gọi là",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Đường này gọi là",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "chung",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "nhà vệ sinh",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "nhà vệ sinh chung",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "bếp chung",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Tuy nhiên, nước mắm truyền thống của Nhật Bản ít phổ biến hơn nước tương và miso, và thường chỉ được sản xuất tại một số vùng biển địa phương.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較",
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Nhật Bản có làm nước mắm, gọi chung là Gyosho.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "món này gọi là phở",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Đường này gọi là Trần Hưng Đạo",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "tên là",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "tuy nhiên",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "nước tương",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "tương",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh đang ở nhà anh.",
+"cat": "🏠 生活",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "phòng, ở trong phòng",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "văn",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "văn phòng",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "trên máy tính, trên YouTube, trên Italki",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "máy",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "tính",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Tính tiền!",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh thích tự do, anh không thích làm ở văn phòng. Anh làm trên máy tính ở nhà.",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Anh rất tự do, anh làm việc và đi du lịch. Anh đi du lịch ở Nhật Bản rồi.",
+"cat": "🛵 交通",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "Anh đi Tân Bắc để kiểm tra sức khoẻ.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Bệnh viện, thuốc",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "viên",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Em bị đau chân tám tháng rồi, nhưng mà em không đi bệnh viện.",
+"cat": "🏥 健康",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "Hôm qua anh cũng đi bệnh viện.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Anh uống thuốc sau khi ăn đúng không?",
+"cat": "🏥 健康",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Anh chưa ăn sáng. Anh chỉ uống cà phê có đường thôi. Sau khi uống một chút cà phê, anh uống thuốc rồi. Anh chưa uống cà phê xong.",
+"cat": "🏥 健康",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "Em uống thuốc chưa?",
+"cat": "🏥 健康",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "sau (2)",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Sau khi ăn, anh uống thuốc.",
+"cat": "🏥 健康",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Sau khi Ai Cập, anh sẽ về Tân Trúc.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態",
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "ăn cay",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh không biết, em nói lại nha và nói chậm lại.",
+"cat": "📚 上課",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Em đi nhanh lên, anh đói rồi.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh thích ăn ở quán cơm phần vì anh ăn được nhiều thịt và rau củ.",
+"cat": "🍜 食物",
+"gr": [
+"文法・連接詞",
+"文法・助動詞",
+"文法・量詞"
+]
+},
+{
+"text": "nhất",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Anh thích gì nhất ở Nhật Bản?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句",
+"文法・比較"
+]
+},
+{
+"text": "Anh thích trượt tuyết ở Nhật Bản nhất.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "trượt tuyết",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "tuyết",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "truot",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "thuoc",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "bị đau chân",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "uống thuốc",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "nha thuoc",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "nghĩ",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh viết sao?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Nhìn ngon!",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Không sao.",
+"cat": "",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Thú vị là có nhiều nhà thuốc ở Sài Gòn. Đài Loan và Đức không có nhiều nhà thuốc như vậy.",
+"cat": "🏥 健康",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Ở Việt Nam, anh thích ăn nhất là phở bò.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Ở Việt Nam, anh thích ăn phở bò nhất.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Ở Bali, anh thường ăn phở bò, có hai quán Việt gần khách sạn anh.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh thường đi Bali nhưng mà gần đây anh không đi tới đó vì khói nhiều.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Anh ăn được cay, khi anh ở Việt Nam, thỉnh thoảng anh đi ăn Haidilao.",
+"cat": "🍜 食物",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Không cay, không ngon.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Mỗi ngày",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Anh có đi biển mỗi ngày không?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Bao lâu?",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Đi xe máy 5 phút.",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Đối diện",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Anh thường đi mall đối diện biển để ăn cơm gà.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Em (2)",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Xe của anh là xe điện đúng không?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Đúng rồi.",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh mua xe này hồi nào?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh mua xe này 2 năm trước.",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Ở Đài Loan, không thường cúp điện.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Khi anh ở Pattaya, không có cúp điện.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Anh nghĩ là vậy.",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Anh không đi bộ vì nóng quá. Anh đi Grab hay Bolt.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Anh không đi bộ vì nóng quá.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "xe điện",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "như vậy",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "gần đây",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "đi tới đó",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "khói nhiều",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "không sao",
+"cat": "🔤 其他",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "có sao",
+"cat": "🙋 聊天",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Khi nào",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Anh sẽ ở Pattaya tới khi nào?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態",
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Thêm (2)",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Nữa",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "1 tuần nữa",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Gì nữa?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Nhà anh ở Tân Trúc đối diện 7",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Khách sạn ở Bali có đối diện biển không?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Có. Nhưng mà mắc. Khách sạn cách biển 5 phút đi bộ rẻ hơn.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較",
+"文法・連接詞"
+]
+},
+{
+"text": "cách",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Khách sạn cách biển 5 phút đi bộ.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Khách sạn cách quán cơm 1 km",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Sau khi về Đài Loan, anh ăn nhiều đồ ngon. Ví dụ là trà sữa trân châu, gà viên chiên và một chút đồ ăn đường phố.",
+"cat": "🏥 健康",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Anh thích trà sữa vị gì?",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "trà sữa ô long",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Tra sua matcha khong duong ngon hon.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "chon",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "phan tram",
+"cat": "🔢 數字",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "O Dai Loan, minh chon phan tram da va phan tram duong duoc khong?",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句",
+"文法・連接詞",
+"文法・助動詞",
+"文法・量詞"
+]
+},
+{
+"text": "Duoc. Anh thuong noi da binh thuong va khong duong.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "thuong noi",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Quan ca phe la van phong anh, vi du Starbucks. Khi o Thai Lan hay Indonesia, anh thich lam viec o do lam.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Quán cà phê rất phổ biến ở Việt Nam. Có nhiều quán cà phê rất rộng và đẹp.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Nếu",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "nên là",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Nếu không nhiều đá thì trà sữa rất là ngọt, nên là em phải nói 50",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Nếu khói nhiều thì anh không đi Bali.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Nếu không nóng thì anh đi bộ.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "bao lau roi",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "tuần",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "cho thêm thịt bò",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "cho 1 tô phở nữa",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "tuần sau",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "gà viên chiên",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "vị",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "mình",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "anh thường nói đá bình thường và không đường",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "rộng",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "đi mát-xa",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Sao vậy?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Chắc là vậy.",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Anh quên rồi!",
+"cat": "",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Coi phim",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Tập thể dục",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Anh thỉnh thoảng tập thể dục.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "phòng",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Khách sạn này có một phòng gym.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Bình thường anh làm cà phê ở phòng khách sạn, khi anh không đi quán cà phê.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "tối qua",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Tuần trước",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Chủ Nhật",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Quên",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Thấy",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh thấy Malaysia mắc không?",
+"cat": "🔢 數字",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Giá cả ở Việt Nam, Thái Lan và Indonesia không mắc.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "anh ở lâu được.",
+"cat": "🕐 時間",
+"gr": [
+"文法・助動詞"
+]
+},
+{
+"text": "bão",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "siêu bão",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "mạnh",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Bão Champi đang đi tới Đài Loan rất là mạnh.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Thuốc này mạnh lắm!",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Anh đó mạnh lắm.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Cà phê nào mạnh nhất?",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句",
+"文法・比較"
+]
+},
+{
+"text": "Cà phê mạnh nhất là Robusta.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Ở VN, cà phê Robusta phổ biến nên là cà phê VN mạnh lắm.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Ở Thái, cà phê Arabica phổ biến hơn. Ở Đài Loan cũng là Arabica.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Cà phê Arabica ngon hơn Robusta nhưng mà Robusta rẻ và mạnh hơn.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・比較",
+"文法・連接詞"
+]
+},
+{
+"text": "Em không biết nhiều về cà phê. Em uống cà phê thỉnh thoảng thôi.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "thôi.",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Quán cà phê cóc",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "cóc",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh thường uống cà phê ở quán cóc không?",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Thỉnh thoảng thôi.",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "bụi",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Em thích cà phê cóc nhưng mà em không thích ngồi gần đường vì rất là bụi.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "khác",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "\"Siêu\" tiếng Trung khác tiếng Việt.",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "bị sốt",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "bị cảm",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Bị đau đầu",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Bị bệnh",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "ngủ",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "ngoi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Không biết hỏi gì luôn.",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Anh vẫn còn ở Thái Lan.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "vẫn còn",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh vẫn còn ở Pattaya. Nhưng mà khách sạn mới",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "đổi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Vì sao anh đổi khách sạn?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Khách sạn này yên tĩnh hơn.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "yên tĩnh",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Từ khách sạn này đi bộ tới biển là 5 phút.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh hay đi tới trung tâm thương mại đối diện biển để ăn cơm gà.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Để",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "cà phê hạt",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Máy pha cà phê",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Máy xay cà phê mini",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Máy lạnh",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Anh thích trượt tuyết ở Nhật Bản, và cảnh khi trượt tuyết cũng đẹp lắm.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Năm nay anh đi Nhật Bản chưa?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Rồi. Anh đi Nhật tháng tư năm nay.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Tháng tư",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Phòng khách sạn không có máy pha cà phê.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Anh đi Starbucks 2 lần một tuần.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Trên máy tính",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Anh làm việc trên máy tính ở Starbucks.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Gọi",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "gọi điện thoại",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Gia đình",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Anh có thường gọi điện thoại cho gia đình không?",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Không. Anh không quen gọi điện thoại cho mẹ.",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "Quen",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Gojek nghe rất là quen.",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Khi em ở xa gia đình, em thường gọi điện thoại cho mẹ một lần một tuần.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "hỏi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Em đi bộ bao lâu ở công viên?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "con chó",
+"cat": "🐾 動物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "Em phải đi bộ nhiều hơn.",
+"cat": "🛵 交通",
+"gr": [
+"文法・比較",
+"文法・助動詞"
+]
+},
+{
+"text": "Em phải đi bộ ít hơn.",
+"cat": "🛵 交通",
+"gr": [
+"文法・比較",
+"文法・助動詞"
+]
+},
+{
+"text": "Anh đi bộ nhiều hơn ở Bali.",
+"cat": "🛵 交通",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Khi em ở Úc, em đi bộ nhiều lắm!",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Thỉnh thoảng em đi bộ 3km để mua đồ ăn.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Úc",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "mấy ngày?",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "xay",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "lần",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "thời gian",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Mệt",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Anh mệt không?",
+"cat": "🏥 健康",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Bị chảy mũi",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Từ Bangkok bay tới Jakarta 3 tiếng 30 phút.",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "Anh đi Indonesia nhiều lần rồi.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Bali mắc hơn VN và Jakarta rẻ hơn VN.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・比較",
+"文法・連接詞"
+]
+},
+{
+"text": "Bali mắc hơn VN, còn Jakarta rẻ hơn VN.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Anh thích uống trà sữa trân châu, còn mẹ anh thích uống trà.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Anh đang ở Starbucks.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh ở Starbucks từ sáng tới chiều đúng không?",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Sáng nay, anh đi Starbucks khác gần khách sạn anh, còn chiều nay anh đi Starbucks này xa khách sạn.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Starbucks này cách khách sạn 8 km thôi, nhưng mà đi 40 phút vì kẹt xe.",
+"cat": "☕ 咖啡",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "kẹt",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "kẹt xe",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "kẹt giờ",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "giờ cao điểm",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Gio cao diem buoi sang la 7 gio toi 9 gio, con buoi chieu la 4 gio toi 7 gio.",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Vay la chieu nay anh di 4 gio ha?",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Khong. Anh di 1 gio 40 nhung ma cung ket xe.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Anh moi di mat-xa xong",
+"cat": "🏥 健康",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Anh thich mat-xa Thai vi no manh.",
+"cat": "🏥 健康",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Anh mat-xa 90 phut. Kha lau",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Lan dau tien",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Lần cuối cùng",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "đầu",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "tiên",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "cuối",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "cùng",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "Lần đầu tiên em đi mát-xa Thái, em đau quá",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Lần đầu tiên cũng là lần cuối cùng.",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "nhột",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Sợ nhột",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Sợ",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "làm mặt",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Bước",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Làm mặt có 13 bước.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Anh có làm mặt nhưng mà ít lắm.",
+"cat": "🏥 健康",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Ít lắm",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Chắc là 5 đô Mỹ.",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Mỹ",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Mì Ý",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "còn",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "buổi",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "vậy là",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "khá lâu",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "3 ngày 1 lần",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "chắc là",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "vì sao",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Anh ở Jakarta ba ngày rồi, nhưng mà anh chỉ đi Trung tâm mua sắm thôi.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "Bay từ Jakarta tới Bali một tiếng năm mươi phút.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Jakarta và Bali kẹt xe lắm.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Lần này anh đổi khách sạn vì khách sạn lần trước không yên tĩnh.",
+"cat": "🍜 食物",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Khách sạn này yên tĩnh hơn nhưng mà cách xa biển hơn.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較",
+"文法・連接詞"
+]
+},
+{
+"text": "Khách sạn này mắc hơn một chút nhưng mà rộng hơn.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較",
+"文法・連接詞"
+]
+},
+{
+"text": "Khách sạn cách biển mười phút đi xe máy.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Ngày hôm sau khi anh tới Bali, anh tập thể dục ở phòng gym.",
+"cat": "🏥 健康",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Phòng gym này mắc lắm nhưng mà làm việc và ăn được ở đây. Nên là anh tới đây mỗi ngày.",
+"cat": "🏥 健康",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Vì không tập thể dục nhiều, tuần này anh tập thể dục ở phòng gym trước, còn tuần sau anh sẽ đi lướt sóng",
+"cat": "🏥 健康",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "Chắc là anh sẽ lướt sóng vào cuối tuần này.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "chanh",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh lái xe máy.",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Ngủ ngon!",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Ngủ đi!",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Anh ăn hồi 5 giờ chiều rồi.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Mọi người ăn nhiều xong rồi tập gym.",
+"cat": "🏥 健康",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Phòng gym",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Anh tập gym trước, xong rồi ăn sáng nhiều.",
+"cat": "🏥 健康",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "Thứ 7 tuần trước",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Thứ 2",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Thứ 3",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Thứ 5",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Thứ 7",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Thứ tư",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Thứ 6",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Anh bay tới Bali thứ 7 tuần trước.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "tới đây",
+"cat": "🧩 功能詞",
+"gr": []
+},
+{
+"text": "cuối tuần này",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "hồi",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "mọi người",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "xong rồi",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "tập gym",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "anh đọc đi",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "tên",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "lướt sóng",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Đảo",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bali là một hòn đảo.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bán đảo",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bali là một đảo du lịch.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "du lịch",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "bán thời gian",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "làm bán thời gian",
+"cat": "🏠 生活",
+"gr": []
+},
+{
+"text": "toàn thời gian",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "làm toàn thời gian",
+"cat": "💼 工作",
+"gr": []
+},
+{
+"text": "Tươi",
+"cat": "😊 形容詞",
+"gr": []
+},
+{
+"text": "Hải sản ở SG không tươi.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bắp",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Nấm",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Tối nay anh ăn đồ nướng.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh ăn nhiều hải sản nướng, nấm nướng và bắp nướng.",
+"cat": "🍜 食物",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Chai",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh cũng uống một chai bia.",
+"cat": "🍜 食物",
+"gr": [
+"文法・量詞"
+]
+},
+{
+"text": "nướng",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "đi chơi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Cuối tháng này, em sẽ đi chơi.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "đi du lịch",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "mất",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "khoảng",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "định",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Em sẽ đi đâu?",
+"cat": "🧩 功能詞",
+"gr": [
+"文法・時態",
+"文法・問句"
+]
+},
+{
+"text": "Em định đi Bảo Lộc.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Bảo Lộc ở trên núi.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh thấy Bảo Lộc gần Phan Thiết.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Bảo Lộc cách Phan Thiết bao xa?",
+"cat": "🍜 食物",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "trăm",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "núi",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh thích đi núi hơn hay biển hơn?",
+"cat": "🛵 交通",
+"gr": [
+"文法・問句",
+"文法・比較"
+]
+},
+{
+"text": "Phan Thiết có 1 núi cao nhưng mà nóng.",
+"cat": "🍜 食物",
+"gr": [
+"文法・連接詞"
+]
+},
+{
+"text": "Bảo Lộc mát hơn Phan thiết nên là đi hiking rất tốt.",
+"cat": "🍜 食物",
+"gr": [
+"文法・比較",
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "sớm",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "phải",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh phải đi sớm nếu anh muốn đi hiking ở Bali.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "mặt trời",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "mặt trời mọc",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Đi sớm là mấy giờ?",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Đi sớm là 4 giờ sáng nếu muốn coi mặt trời mọc.",
+"cat": "🕐 時間",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "coi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "đi qua",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Nếu muốn đi tới Đà Lạt thì phải đi qua Bảo Lộc.",
+"cat": "🛵 交通",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "chỗ",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Cuối tháng này em sẽ đi nhiều chỗ.",
+"cat": "🕐 時間",
+"gr": [
+"文法・時態"
+]
+},
+{
+"text": "đồ nướng",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Làm sao nói \"...\" ?",
+"cat": "📚 上課",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Sửa",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "câu",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "Câu trước, câu này, câu đó",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "câu tiếp theo",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "Nếu trời không mưa ở VN thì anh sẽ đi du lịch VN. Dự báo thời tiết nói là VN sẽ có mưa lớn từ 11 tới 13 tháng 11.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・時態",
+"文法・連接詞"
+]
+},
+{
+"text": "Sau Bali, anh định đi VN. Chắc là sẽ đi Mũi Né học lướt sóng dù. Nếu anh muốn học lướt sóng dù, anh nên đi trước Tết vì trước Tết trời rất gió.",
+"cat": "📚 上課",
+"gr": [
+"文法・時態",
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Tết",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "vai ngay",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "hom nay anh lam gi?",
+"cat": "🕐 時間",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "tuong",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "thit",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "banh mi nuong",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh mới ăn 2 miếng bánh mì.",
+"cat": "🍜 食物",
+"gr": [
+"文法・時態",
+"文法・量詞"
+]
+},
+{
+"text": "miếng",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Lúc 6 giờ",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Hồ bơi",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Nhiều người",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": []
+},
+{
+"text": "Nhà hàng cũng có bán cà phê.",
+"cat": "☕ 咖啡",
+"gr": []
+},
+{
+"text": "Thẻ",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Anh mua thẻ 1 tháng ở đây.",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "khach du lich",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "nguoi nuoc ngoai",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Nguoi tap o day la nguoi nuoc ngoai.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "thap hon Viet Nam",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "thap",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "cao",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Do an o Da Lat rat mac.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Nhieu nguoi o Sai Gon lam 20 trieu mot thang.",
+"cat": "🔢 數字",
+"gr": []
+},
+{
+"text": "Bạn",
+"cat": "🙋 聊天",
+"gr": []
+},
+{
+"text": "Anh có bạn ở Bali không?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Bạn anh ở khách sạn.",
+"cat": "🍜 食物",
+"gr": []
+},
+{
+"text": "Anh không nói chuyện với ai.",
+"cat": "👨‍👩‍👧 稱呼",
+"gr": [
+"文法・問句",
+"文法・連接詞"
+]
+},
+{
+"text": "Gym này hơi xa homestay của anh.",
+"cat": "🏥 健康",
+"gr": []
+},
+{
+"text": "Bali lớn hơn em nghĩ.",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・比較"
+]
+},
+{
+"text": "Ở đây không có trung tâm mua sắm, chỉ có siêu thị thôi.",
+"cat": "✈️ 旅行",
+"gr": []
+},
+{
+"text": "Anh thường mua đồ ở siêu thị không?",
+"cat": "✈️ 旅行",
+"gr": [
+"文法・問句"
+]
+},
+{
+"text": "Câu trước",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "Câu này",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "Câu đó",
+"cat": "📚 上課",
+"gr": []
+},
+{
+"text": "Dự báo thời tiết",
+"cat": "🕐 時間",
+"gr": []
+},
+{
+"text": "Lướt sóng dù",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Nên",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Trước Tết",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Gió",
+"cat": "🌤 天氣",
+"gr": []
+},
+{
+"text": "Nếu anh muốn học lướt sóng dù, anh nên đi trước Tết vì trước Tết trời rất gió.",
+"cat": "📚 上課",
+"gr": [
+"文法・連接詞",
+"文法・助動詞"
+]
+},
+{
+"text": "Sài Gòn",
+"cat": "🔤 其他",
+"gr": []
+},
+{
+"text": "Hơi xa",
+"cat": "🛵 交通",
+"gr": []
+},
+{
+"text": "Siêu thị",
+"cat": "✈️ 旅行",
+"gr": []
+}
+]
+}
