@@ -9249,26 +9249,26 @@ function updateVowelFilterOptions(){
   sel.value = vowelFilter;
   if(sel.value !== vowelFilter){ vowelFilter = ""; sel.value = ""; }
 }
-// 選了母音時，在清單上方另外列出「從片語、句子拆出來的字」。只是顯示，不會新增卡片、
-// 不會改到單字表；已經是單獨一張卡的字不重複列（它就在下面的清單裡）。
+// 選了母音時，在清單上方列出含這個母音的每個字：上面一排字可以點來跳過去，
+// 下面每個字一段，列出它出現在哪些卡（全部列出，往下捲就能看）。只是顯示，
+// 不會新增卡片、不會改到單字表。
 function updateVowelPanel(){
   let panel = document.getElementById("vowelPanel");
   if(!vowelFilter || currentLang !== "vi"){ if(panel) panel.remove(); return; }
-  const strip = t => t.normalize("NFD").replace(/[\u0300\u0301\u0303\u0309\u0323]/g, "").normalize("NFC");
-  const own = new Set(), found = new Map();
+  const found = new Map();
   allWords.forEach(w => {
     const src = String((lookup(w.text) || {}).nativeScript || w.text || "").normalize("NFC");
-    const syls = src.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean);
-    if(syls.length === 1){ own.add(syls[0]); return; }
+    const syls = [...new Set(src.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean))];
     syls.forEach(sy => {
       if(!viVowelCores({ text: sy }).has(vowelFilter)) return;
-      const f = found.get(sy) || { n: 0, from: [] };
-      f.n++; if(f.from.length < 6) f.from.push({ t: src, zh: (lookup(w.text) || {}).zh || "" });
+      const f = found.get(sy) || { own: false, from: [] };
+      if(syls.length === 1) f.own = true;
+      f.from.push({ t: src, zh: (lookup(w.text) || {}).zh || "", one: syls.length === 1 });
       found.set(sy, f);
     });
   });
-  own.forEach(sy => found.delete(sy));
-  const list = [...found.entries()].sort((a, b) => b[1].n - a[1].n);
+  const list = [...found.entries()].sort((a, b) => b[1].from.length - a[1].from.length || a[0].localeCompare(b[0]));
+  list.forEach(([, f]) => f.from.sort((a, b) => (b.one - a.one) || a.t.length - b.t.length));
   if(!panel){
     panel = document.createElement("div");
     panel.id = "vowelPanel";
@@ -9277,14 +9277,18 @@ function updateVowelPanel(){
     anchor.parentNode.insertBefore(panel, anchor);
   }
   const esc = x => String(x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  panel.innerHTML = `<div style="font-weight:600; margin-bottom:6px;">🔤 從片語、句子拆出來的 ${esc(vowelFilter)} 字（${list.length}）<span style="font-weight:400; font-size:13px; opacity:.7;">・只是列出來看，不會新增卡片；點字會唸、會列出它出現在哪幾張卡</span></div>`
-    + (list.length ? `<div style="display:flex; flex-wrap:wrap; gap:6px;">${list.map(([sy, f]) => `<button type="button" data-vsy="${esc(sy)}" style="font-size:16px;">${esc(sy)} <span style="opacity:.6; font-size:12px;">${f.n}</span></button>`).join("")}</div>` : `<div style="opacity:.7;">沒有其他的了，全部都已經是單獨的卡片。</div>`)
-    + `<div id="vowelPanelFrom" style="margin-top:8px; font-size:14px;"></div>`;
+  const mark = (t, sy) => esc(t).replace(/[\p{L}]+/gu, w => w.toLowerCase() === sy ? `<b style="color:var(--accent2);">${w}</b>` : w);
+  panel.innerHTML = `<div style="font-weight:600; margin-bottom:6px;">🔤 含 ${esc(vowelFilter)} 的字（${list.length} 個）<span style="font-weight:400; font-size:13px; opacity:.7;">・點字跳到它那一段；每一行點一下會唸。只是列出來看，不會新增卡片</span></div>`
+    + `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${list.map(([sy, f], k) => `<button type="button" data-vjump="${k}" style="font-size:16px;">${esc(sy)} <span style="opacity:.6; font-size:12px;">${f.from.length}</span></button>`).join("")}</div>`
+    + list.map(([sy, f], k) => `<div id="vsec${k}" style="border-top:1px solid var(--border, #ddd); padding:8px 0 4px; scroll-margin-top:60px;">`
+      + `<div style="font-size:18px; font-weight:700; cursor:pointer;" data-vsay="${esc(sy)}">🔊 ${esc(sy)} <span style="font-size:13px; font-weight:400; opacity:.7;">出現在 ${f.from.length} 張卡</span></div>`
+      + f.from.map(x => `<div data-vsay="${esc(x.t)}" style="padding:3px 0 3px 12px; cursor:pointer;">${mark(x.t, sy)} <span style="opacity:.65; font-size:14px;">${esc(x.zh)}</span></div>`).join("")
+      + `</div>`).join("");
   panel.onclick = e => {
-    const b = e.target.closest("[data-vsy]"); if(!b) return;
-    const sy = b.dataset.vsy, f = found.get(sy);
-    speak(sy, b);
-    document.getElementById("vowelPanelFrom").innerHTML = `<b>${esc(sy)}</b> 出現在：` + f.from.map(x => `<div>・${esc(x.t)} <span style="opacity:.7;">${esc(x.zh)}</span></div>`).join("") + (f.n > f.from.length ? `<div style="opacity:.7;">…共 ${f.n} 次</div>` : "");
+    const j = e.target.closest("[data-vjump]");
+    if(j){ const sec = document.getElementById("vsec" + j.dataset.vjump); if(sec) sec.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    const sp = e.target.closest("[data-vsay]");
+    if(sp) speak(sp.dataset.vsay, null);
   };
 }
 document.getElementById("vowelFilter").addEventListener("change", (e) => { vowelFilter = e.target.value; renderList(); });
