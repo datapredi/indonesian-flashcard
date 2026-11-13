@@ -10663,7 +10663,9 @@ async function importYtInboxBatch(batch){
     if(!it.example) return;
     const mapped = convertedMap[String(it.term).toLowerCase()];
     if(!mapped) return;
-    const line = `🎬 ${batch.title ? batch.title + "：" : ""}${it.example}`;
+    // 播放器 AI 挑字的類別（生字／熟字新義／口語說法）標在原句前面
+    const kind = { new: "🆕 生字", meaning: "🔄 熟字新義", spoken: "💬 口語說法" }[it.kind];
+    const line = `${kind ? kind + "｜" : ""}🎬 ${batch.title ? batch.title + "：" : ""}${it.example}`;
     const cur = getWordNote(mapped);
     if(cur.includes(it.example)) return;
     setWordNote(mapped, cur ? `${cur}\n${line}` : line);
