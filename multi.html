@@ -102,6 +102,8 @@
   .autoplay-panel{border:2px solid var(--accent); border-radius:14px; padding:12px; margin:10px 0; background:color-mix(in srgb, var(--accent) 8%, var(--bg));}
   .autoplay-panel #btnListAutoplay{flex:1 1 100%; font-size:1.15rem; font-weight:700; padding:14px 16px; border-radius:12px; background:var(--accent); color:#fff; border-color:var(--accent);}
   .autoplay-panel #btnListAutoplay.primary{background:var(--accent2); border-color:var(--accent2);}
+  button.quiz-copy{flex:1 1 100%; font-size:1.15rem; padding:14px 18px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+  button.quiz-copy small{font-weight:400; opacity:0.9; font-size:0.85rem;}
   button.secondary{background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600;}
   button:disabled{opacity:0.5; cursor:default;}
   /* iPad/iPhone Safari 用程式呼叫 file input 的 .click() 常常什麼都不會跳出來，
@@ -301,6 +303,9 @@
       <input type="text" id="wordSearch" placeholder="搜尋目前語言、中文或英文..." style="flex:1 1 140px;">
       <input type="text" id="wordSearch2" placeholder="＋第二個搜尋（兩批一起顯示）" style="flex:1 1 140px;">
     </div>
+    <div class="toolbar quiz-copy-bar">
+      <button class="primary quiz-copy" id="btnCopyZhForQuiz">📝 複製中文意思來測驗</button>
+    </div>
     <div class="toolbar hidden" id="compactReadBar">
       <button id="btnCompactRead">📃 精簡閱讀模式</button>
     </div>
@@ -363,7 +368,6 @@
     <div class="note">備份涵蓋所有語言的單字表、翻譯、例句、聲調標記、⚠️ 待複習標記、已學會進度等，存成一個 JSON 檔下載。也包含你自己的錄音。不含 API Key（安全考量，換裝置要自己重新輸入）。還原會直接覆蓋目前資料（錄音是同一個字的才會被蓋掉，其他錄音保留），請小心操作。手機換到 Mac：手機按「📤 分享備份」選 AirDrop 傳到 Mac（檔案會在「下載項目」），再到 Mac Safari 按「📥 選擇備份檔還原」選那個檔。</div>
     <div class="toolbar" id="pendingSyncBar">
       <button id="btnCopyPending">📋 複製目前顯示的單字</button>
-      <button id="btnCopyZhForQuiz">📋 複製中文意思（測驗用，照目前篩選）</button>
       <button id="btnCopyVisibleForAIReview">📖 複製目前顯示的單字（給 AI 帶我複習）</button>
       <button id="btnCopyVisibleForAI">🤖 複製目前顯示的單字（給 AI 出題）</button>
     </div>
@@ -8346,6 +8350,8 @@ function updatePendingSyncBar(){
   let n = "";
   try{ n = ` (${getVisibleWords().length})`; }catch(e){ /* 頁面剛載入、篩選狀態還沒準備好 */ }
   btn.textContent = `📋 複製目前顯示的單字${n}`;
+  const qb = document.getElementById("btnCopyZhForQuiz");
+  if(qb) qb.innerHTML = `📝 複製中文意思來測驗${n} <small>照目前篩選</small>`;
 }
 
 document.getElementById("btnCopyPending").addEventListener("click", async () => {
