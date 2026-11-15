@@ -10732,7 +10732,9 @@ function showYtInboxBanner(){
   msg.style.cssText = "flex:1 1 220px;";
   const what = batch.rawText
     ? `📥 ${batch.title || "講義"}：${batch.count || batch.rawText.split("\n").length} 行${langLabel}新內容`
-    : `📥 從逐字稿送來 ${batch.items.length} 個${langLabel}單字／片語（${batch.title || "影片"}）`;
+    : String(batch.id).startsWith("mnemonic-")
+      ? `💡 有 ${batch.items.length} 個已經想好諧音、但還不在單字表裡的${langLabel}單字，按「匯入」加進來`
+      : `📥 從逐字稿送來 ${batch.items.length} 個${langLabel}單字／片語（${batch.title || "影片"}）`;
   msg.textContent = what + (batch.group ? `，會加入分組「${batch.group}」` : "") + (inbox.length > 1 ? `　（另外還有 ${inbox.length - 1} 批）` : "");
   const go = document.createElement("button");
   go.className = "primary";
@@ -10965,6 +10967,18 @@ async function applyMnemonicImport(){
   }
   saveMnemonicCache();
   kvStore.setItem(lsKey(MNEMONIC_IMPORT_DONE_LS), String(ver));
+  // 單字表裡還沒有的字：放進匯入收件匣（跟講義一樣），上方會出現「匯入」通知，
+  // 按下去就用檔案裡給的中文加進單字表，其他資料（例句等）由 AI 生成。
+  let queued = 0;
+  if(notInList.length){
+    const missing = data.items.filter(it => it && it.zh && notInList.includes(it.text));
+    const batchId = `mnemonic-${currentLang}-v${ver}`;
+    if(missing.length && !inboxDoneIds().has(batchId) && !readYtInbox().some(b => b.id === batchId)){
+      writeYtInbox(readYtInbox().concat([{ id: batchId, lang: currentLang, title: "諧音單字", group: data.group || "", items: missing.map(it => ({ term: it.text, zh: it.zh })) }]));
+      showYtInboxBanner();
+      queued = missing.length;
+    }
+  }
   if(!added.length && !kept.length && !notInList.length) return;
   renderList();
   const bar = document.createElement("div");
@@ -10972,7 +10986,9 @@ async function applyMnemonicImport(){
   const msg = document.createElement("div");
   msg.style.cssText = "flex:1 1 220px; white-space:pre-wrap;";
   const lines = [`💡 已匯入 ${added.length} 個諧音（在每個字的 💡 諧音裡的「✏️ 我的版本」，Flash Card 背面也會看到）`];
-  if(notInList.length) lines.push(`還不在單字表裡、先存起來（加了這些字就會出現）：${notInList.join("、")}`);
+  if(notInList.length) lines.push(queued
+    ? `還不在單字表裡的 ${queued} 個字（${notInList.join("、")}）：按上面通知的「匯入」就會加進單字表，諧音已經先存好了`
+    : `還不在單字表裡、先存起來（加了這些字就會出現）：${notInList.join("、")}`);
   if(kept.length) lines.push(`已經有自己寫的版本、沒有覆蓋：${kept.join("、")}`);
   msg.textContent = lines.join("\n");
   const b = document.createElement("button"); b.textContent = "知道了"; b.addEventListener("click", () => bar.remove());
