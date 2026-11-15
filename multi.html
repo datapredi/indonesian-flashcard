@@ -10935,6 +10935,53 @@ async function applyWordTags(){
 }
 applyWordTags();
 
+// ================= 諧音匯入（mnemonics/） =================
+// mnemonics/<語言>.json 列出 { text, custom }，開頁時自動存成那個字的「✏️ 我的版本」諧音。
+// 每個版本只套一次；已經有自己寫的版本不覆蓋。單字表裡還沒有的字也先存起來
+// （諧音快取用單字文字當 key），之後加了這個字就會直接看到。
+const MNEMONIC_IMPORT_DONE_LS = "flashcard_mnemonic_import_done_v1";
+async function applyMnemonicImport(){
+  let data;
+  try{
+    const r = await fetch(`mnemonics/${currentLang}.json?r=` + Date.now(), { cache: "no-store" });
+    if(!r.ok) return;
+    data = await r.json();
+  }catch(e){ return; }
+  if(!data || !Array.isArray(data.items)) return;
+  const ver = Number(data.version) || 1;
+  if(Number(kvStore.getItem(lsKey(MNEMONIC_IMPORT_DONE_LS)) || 0) >= ver) return;
+  const keyOf = s => String(s || "").normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
+  const byKey = new Map();
+  allWords.forEach(w => { const k = keyOf(String(w.text).replace(/\s*\(\d+\)$/, "")); if(k && !byKey.has(k)) byKey.set(k, w.text); });
+  const added = [], kept = [], notInList = [];
+  for(const it of data.items){
+    if(!it || !it.text || !it.custom) continue;
+    const text = byKey.get(keyOf(it.text));
+    const key = text || it.text;
+    const cur = mnemonicCache[key] || {};
+    if(cur.custom && cur.custom !== it.custom){ kept.push(key); continue; }
+    mnemonicCache[key] = Object.assign({}, cur, { custom: it.custom });
+    if(text) added.push(key); else notInList.push(it.text);
+  }
+  saveMnemonicCache();
+  kvStore.setItem(lsKey(MNEMONIC_IMPORT_DONE_LS), String(ver));
+  if(!added.length && !kept.length && !notInList.length) return;
+  renderList();
+  const bar = document.createElement("div");
+  bar.style.cssText = "background:var(--card); border:2px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;";
+  const msg = document.createElement("div");
+  msg.style.cssText = "flex:1 1 220px; white-space:pre-wrap;";
+  const lines = [`💡 已匯入 ${added.length} 個諧音（在每個字的 💡 諧音裡的「✏️ 我的版本」，Flash Card 背面也會看到）`];
+  if(notInList.length) lines.push(`還不在單字表裡、先存起來（加了這些字就會出現）：${notInList.join("、")}`);
+  if(kept.length) lines.push(`已經有自己寫的版本、沒有覆蓋：${kept.join("、")}`);
+  msg.textContent = lines.join("\n");
+  const b = document.createElement("button"); b.textContent = "知道了"; b.addEventListener("click", () => bar.remove());
+  bar.append(msg, b);
+  const anchorEl = document.getElementById("wordList");
+  anchorEl.parentNode.insertBefore(bar, anchorEl);
+}
+applyMnemonicImport();
+
 // ================= Flash Card =================
 let cardSession = [];
 let cardIndex = 0;

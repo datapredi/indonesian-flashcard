@@ -1,0 +1,16 @@
+{
+"version": 1,
+"note": "印尼文諧音（2026-11-15 自己挑的）",
+"items": [
+{"text": "semuanya", "custom": "師母啊娘：師母跟阿娘全部到齊（開頭 se 唸很輕）"},
+{"text": "kembalian", "custom": "跟爸里安：零錢跟爸爸拿回來才安心（開頭 kem 唸很輕）"},
+{"text": "totalnya", "custom": "偷他娘：偷他娘的錢，總共多少？"},
+{"text": "boleh", "custom": "玻璃：玻璃可以看穿"},
+{"text": "silakan", "custom": "吸辣乾：請你吸一口辣椒乾"},
+{"text": "pake", "custom": "爸給：爸爸給我用"},
+{"text": "warna", "custom": "哇～那！：哇～那顏色好美！"},
+{"text": "lutut", "custom": "露凸凸：膝蓋露出來凸凸的"},
+{"text": "merek", "custom": "麥瑞克：麥瑞克只穿名牌"},
+{"text": "ketinggalan", "custom": "可聽嘎爛：可以聽，但東西忘了帶，嘎爛了（開頭 ke 唸很輕）"}
+]
+}
