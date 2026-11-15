@@ -7454,7 +7454,9 @@ function createWordItem(w){
     saveHidden();
     renderList();
   });
-  row.appendChild(hideBtn);
+  // 不再提供「🙈 隱藏」：每個字旁邊的猴子拿掉了。以前藏起來的字還找得回來——
+  // 上方「🙈 顯示隱藏的」只在還有隱藏的字時出現，那裡每個字有「👁 取消隱藏」。
+  if(isHidden) row.appendChild(hideBtn);
 
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
