@@ -1039,6 +1039,8 @@ const LANG_LS = "flashcard_lang_v1";
 // "wordFirst" = 外語x3 → 停頓 → 中文x1（預設）；"zhFirst" = 中文x1 → 停頓 → 外語x3。
 const LISTEN_ORDER_LS = "flashcard_listen_order_v1";
 const LANG_ORDER = ["id", "vi", "th", "ja", "ko", "yue", "arz", "en"];
+// 🌐 其他語言只在泰／印／越之間互查、互相生成（日文、韓文、英文等不參與）。
+const CROSS_LANGS = ["th", "id", "vi"];
 let currentLang = LANG_ORDER.includes(kvStore.getItem(LANG_LS)) ? kvStore.getItem(LANG_LS) : "id";
 function lsKey(base){ return lsKeyForLang(base, currentLang); }
 function lsKeyForLang(base, lang){ return lang === "id" ? base : `${base}_${lang}`; }
@@ -2501,7 +2503,7 @@ function getCrossLangStatus(zhMeaning, enMeaning){
   if(!zhMeaning && !enMeaning) return [];
   const results = [];
   LANG_ORDER.forEach((lang) => {
-    if(lang === currentLang) return;
+    if(lang === currentLang || !CROSS_LANGS.includes(lang)) return;
     try{
       const wordsRaw = kvStore.getItem(lsKeyForLang(LS_KEY, lang));
       const words = wordsRaw ? JSON.parse(wordsRaw) : [];
@@ -8316,7 +8318,7 @@ function createWordItem(w){
     crossLangPanel.classList.remove("hidden");
     renderCrossLangPanel();
   });
-  row.appendChild(crossLangBtn);
+  if(CROSS_LANGS.includes(currentLang)) row.appendChild(crossLangBtn);
 
   return { row, usagePanel, antonymsPanel, inflectionsPanel, notesPanel, tonePanel, nativeTonePanel, minimalPairsPanel, crossLangPanel, linksPanel, mnemonicPanel };
 }
