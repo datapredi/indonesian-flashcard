@@ -7072,8 +7072,14 @@ function getVisibleWords(){
   }
   // 只看 ⚠️ 的模式優先權最高：忽略搜尋框跟難度篩選，這樣可以一個個搜尋、標 ⚠️
   // 收集起來，不管搜尋框現在打什麼，畫面都只會顯示標過的那幾個來比對。
+  // 但 📁 分組照樣套用：選了分組就只看那一組裡標 ⚠️ 的字（例如只複習某天上課的）。
   if(showPronFlagOnly){
-    return allWords.filter(w => pronFlagIds.has(w.id) && !hiddenIds.has(w.id));
+    return allWords.filter(w => {
+      if(!pronFlagIds.has(w.id) || hiddenIds.has(w.id)) return false;
+      if(!groupFilter) return true;
+      const gs = getWordGroups(w.id);
+      return gs.indexOf(groupFilter) !== -1 || !!(groupFilter2 && gs.indexOf(groupFilter2) !== -1);
+    });
   }
   if(showNewlyImportedOnly){
     return allWords.filter(w => newlyImportedIds.has(w.id) && !hiddenIds.has(w.id));
