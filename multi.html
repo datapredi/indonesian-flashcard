@@ -423,7 +423,7 @@
       <button id="btnSortAZ">🔤 A→Z 排序</button>
       <button id="btnSortCefr">📊 難易度排序</button>
       <button id="btnSortNewest">🆕 新單字在後</button>
-      <select id="difficultyFilter">
+      <select id="difficultyFilter" class="hidden">
         <option value="">全部難度</option>
         <option value="S">S 超簡單</option>
         <option value="E">E 簡單</option>
@@ -446,11 +446,11 @@
       </select>
     </div>
     <div class="toolbar">
-      <label for="listenRangeFrom" style="align-self:center;">跑步模式複習範圍（照編號，兩個都填才生效；也可以加選難度；都留空就用已勾選的字）：</label>
+      <label for="listenRangeFrom" style="align-self:center;">跑步模式複習範圍（照編號，兩個都填才生效；都留空就用已勾選的字）：</label>
       <input type="number" id="listenRangeFrom" placeholder="從" min="1" step="1" style="max-width:90px; flex:0 0 auto;">
       <span style="align-self:center;">～</span>
       <input type="number" id="listenRangeTo" placeholder="到" min="1" step="1" style="max-width:90px; flex:0 0 auto;">
-      <select id="listenDifficultyFilter">
+      <select id="listenDifficultyFilter" class="hidden">
         <option value="">全部難度</option>
         <option value="S">S 超簡單</option>
         <option value="E">E 簡單</option>
@@ -3206,18 +3206,13 @@ function mnemonicEligible(w){
 }
 function hasMnemonic(text){
   const m = mnemonicCache[text];
-  return !!(m && (m.custom || (m.zh && m.zh.sound) || (m.tw && m.tw.sound) || (m.en && m.en.sound)));
+  return !!(m && m.custom);   // 只算自己寫的（AI 生成的諧音不再使用）
 }
 // Flash Card 背面用的一行摘要（自己寫的版本優先）。
 function mnemonicSummary(text){
   const m = mnemonicCache[text];
   if(!m) return "";
-  if(m.custom) return "💡 " + m.custom.replace(/\s*\n\s*/g, "；");
-  const parts = [];
-  if(m.zh && m.zh.sound) parts.push(`國：${m.zh.sound}`);
-  if(m.tw && m.tw.sound) parts.push(`台：${m.tw.sound}`);
-  if(m.en && m.en.sound) parts.push(`英：${m.en.sound}`);
-  return parts.length ? "💡 " + parts.join("　") : "";
+  return m.custom ? "💡 " + m.custom.replace(/\s*\n\s*/g, "；") : "";
 }
 async function generateMnemonic(w){
   const data = lookup(w.text) || {};
@@ -7729,7 +7724,7 @@ function createWordItem(w){
     const refreshMnBtn = () => {
       const has = hasMnemonic(w.text);
       mnBtn.classList.toggle("primary", has);
-      mnBtn.title = has ? "諧音記憶（已有）" : "AI 找諧音（國語／台語" + (currentLang !== "en" ? "／英文" : "") + "）幫助記憶";
+      mnBtn.title = has ? "諧音記憶（已有）" : "自己寫諧音幫助記憶";
     };
     refreshMnBtn();
     const renderMnemonic = () => {
@@ -7740,29 +7735,11 @@ function createWordItem(w){
       if(m.custom){
         lines.push(`<div style="margin-bottom:8px;"><b>✏️ 我的版本</b><div style="white-space:pre-wrap;">${escapeHtmlText(m.custom)}</div></div>`);
       }
-      [["zh", "國語諧音"], ["tw", "台語諧音"], ["en", "英文諧音"]].forEach(([k, label]) => {
-        const it = m[k];
-        if(!it) return;
-        if(!it.sound){ lines.push(`<div style="margin-bottom:6px; color:var(--muted);">${label}：找不到夠像的</div>`); return; }
-        lines.push(`<div style="margin-bottom:6px;"><b>${label}：</b>${escapeHtmlText(it.sound)}<div class="meaning">${escapeHtmlText(it.story || "")}</div></div>`);
-      });
-      box.innerHTML = lines.join("") || '<div class="note-saved">還沒有諧音。按「✨ 生成」讓 AI 幫你找，或按「✏️ 自己寫」。</div>';
+      // AI 生成的國語／台語／英文諧音不再顯示（品質不好），只留自己寫的。
+      box.innerHTML = lines.join("") || '<div class="note-saved">還沒有諧音。按「✏️ 自己寫」，或請 Claude 想幾個讓你挑。</div>';
       mnemonicPanel.appendChild(box);
       const bar = document.createElement("div");
       bar.style.cssText = "display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;";
-      const genBtn = document.createElement("button");
-      genBtn.type = "button";
-      genBtn.textContent = (m.zh || m.tw || m.en) ? "🔄 重新生成" : "✨ 生成";
-      genBtn.addEventListener("click", async (e) => {
-        e.preventDefault(); e.stopPropagation();
-        if(!getApiKey()){ alert("請先輸入並儲存 API Key。"); return; }
-        genBtn.disabled = true;
-        genBtn.textContent = "生成中…";
-        try{ await generateMnemonic(w); }
-        catch(err){ alert("生成失敗：" + err.message); }
-        refreshMnBtn();
-        renderMnemonic();
-      });
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.textContent = "✏️ 自己寫";
@@ -7788,7 +7765,6 @@ function createWordItem(w){
         bar.replaceWith(ta, save);
         ta.focus();
       });
-      bar.appendChild(genBtn);
       bar.appendChild(editBtn);
       mnemonicPanel.appendChild(bar);
     };
@@ -7797,11 +7773,6 @@ function createWordItem(w){
       if(!mnemonicPanel.classList.contains("hidden")){ mnemonicPanel.classList.add("hidden"); return; }
       renderMnemonic();
       mnemonicPanel.classList.remove("hidden");
-      // 第一次打開、還沒有任何資料：直接幫忙生成，不用再多按一次。
-      if(!mnemonicCache[w.text] && getApiKey()){
-        const g = mnemonicPanel.querySelector("button");
-        if(g) g.click();
-      }
     });
     row.appendChild(mnBtn);
   }
@@ -8118,7 +8089,7 @@ function createWordItem(w){
     refreshDiffChip();
   });
   refreshDiffChip();
-  row.appendChild(diffChip);
+  // S／E／M／H 難易度標籤不再使用：不放進列表（舊資料保留，不刪）。
 
 
   const pronFlagBtn = document.createElement("button");
@@ -8157,7 +8128,6 @@ function createWordItem(w){
     if(c) row.classList.add("color-" + c);
   }
   colorSelect.value = colorFlags[w.id] || "";
-  applyColorFlagClass();
   colorSelect.addEventListener("click", (e) => e.stopPropagation());
   colorSelect.addEventListener("change", (e) => {
     e.stopPropagation();
@@ -8166,7 +8136,7 @@ function createWordItem(w){
     saveColorFlags();
     applyColorFlagClass();
   });
-  row.appendChild(colorSelect);
+  // 黃／紅／綠 顏色標記不再使用：選單不放進列表、整列也不再上色（舊資料保留，不刪）。
 
   // 自訂分組下拉：無 / 現有的組 / ＋新群組…（選了會 prompt 輸入名字）。
   // 加了 class 跟 data-wid，新增一個組時 refreshAllGroupSelects() 會把畫面上
