@@ -5385,10 +5385,12 @@ function renderTappableSentence(sentence, sentenceNativeScript, onWordAdded){
   // （常見於泰文——泰文原生文字本來就沒有空白，跟羅馬拼音字數不會一樣）
   // 才在點擊當下退回去問 AI。
   let nativeWords = null;
+  const showNativeSentence = currentLang === "vi" && !!sentenceNativeScript;
   if(sentenceNativeScript){
     const tappableCount = tokens.filter(t => t && !/^\s+$/.test(t) && t.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "")).length;
     const candidate = sentenceNativeScript.trim().split(/\s+/).filter(Boolean);
     if(candidate.length === tappableCount) nativeWords = candidate;
+    if(showNativeSentence && nativeWords) container.dataset.native = "1";
   }
   // 片語模式：有些字要好幾個連在一起才是完整的意思（例如越南文「thế nào」
   // 才是完整的「怎麼樣」，單獨點 the 或 nào 都不對）。開啟這個模式後，點字
@@ -5413,7 +5415,8 @@ function renderTappableSentence(sentence, sentenceNativeScript, onWordAdded){
     wordIndex++;
     const wSpan = document.createElement("span");
     wSpan.className = "usage-word" + (isWordInList(clean) ? " in-list" : "");
-    wSpan.textContent = tok;
+    // 越南文：畫面上顯示有聲調的原文（點字、加入單字表照舊用羅馬拼音）。
+    wSpan.textContent = (showNativeSentence && nativeWords) ? nativeWords[myIndex] : tok;
     wSpan.title = isWordInList(clean) ? "已在單字表裡，點一下跳過去看" : "點一下加入單字表";
     wordMeta.push({ clean, wSpan });
     wSpan.addEventListener("click", async (e) => {
@@ -5584,6 +5587,14 @@ function renderUsagePanel(panel, examples, onRegenerate){
     // 按鈕知道要補哪幾個字的資料，不用捲到上面按「AI 自動生成」。
     const newlyAddedIds = [];
     const sentEl = renderTappableSentence(ex.id, ex.nativeScript, id => newlyAddedIds.push(id));
+    // 越南文原文跟羅馬拼音字數對不上、沒辦法逐字換成原文時，另外整句顯示原文。
+    if(currentLang === "vi" && ex.nativeScript && !sentEl.dataset.native){
+      const nl = document.createElement("div");
+      nl.className = "usage-id";
+      nl.style.fontWeight = "600";
+      nl.textContent = ex.nativeScript;
+      item.appendChild(nl);
+    }
     idLine.appendChild(sentEl);
     const speakBtn = document.createElement("button");
     speakBtn.type = "button";
