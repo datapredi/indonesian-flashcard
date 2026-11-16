@@ -10978,6 +10978,21 @@ async function applyMnemonicImport(){
 }
 applyMnemonicImport();
 
+// ================= 清掉不再學的語言（一次性） =================
+// 🌐 以前幫日文、韓文、粵語、英文產生了很多字，那些語言現在不學了：每台裝置第一次
+// 打開新版時，把這四個語言的單字表跟翻譯資料整個清掉（只做一次）。
+(function clearUnusedLangs(){
+  const DONE = "flashcard_clear_unused_langs_v1";
+  if(kvStore.getItem(DONE)) return;
+  const langs = ["ja", "ko", "yue", "en"];
+  langs.forEach(l => {
+    kvStore.removeItem(lsKeyForLang(LS_KEY, l));
+    kvStore.removeItem(lsKeyForLang(CUSTOM_DB_LS, l));
+  });
+  kvStore.setItem(DONE, "1");
+  if(langs.includes(currentLang)) kvStore.flush().then(() => location.reload());
+})();
+
 // ================= Flash Card =================
 let cardSession = [];
 let cardIndex = 0;
