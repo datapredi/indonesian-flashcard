@@ -1,5 +1,5 @@
 {
-"version": 3,
+"version": 4,
 "note": "印尼文諧音（自己挑的：2026-11-15、2026-11-18）",
 "group": "💡 諧音",
 "items": [
@@ -32,6 +32,18 @@
 {"text": "habis", "custom": "哈比斯：哈比人把東西全吃完了", "zh": "用完"},
 {"text": "kartu", "custom": "卡兔：卡片上畫一隻兔子", "zh": "卡片"},
 {"text": "nanas", "custom": "娜娜絲：娜娜絲愛吃鳳梨", "zh": "鳳梨"},
-{"text": "banyak", "custom": "辦呀：事情很多，要辦呀", "zh": "很多"}
+{"text": "banyak", "custom": "辦呀：事情很多，要辦呀", "zh": "很多"},
+{"text": "Gimana", "custom": "雞罵那：雞在罵那個人，你覺得怎麼樣？", "zh": "怎麼樣、如何（口語）"},
+{"text": "jendela", "custom": "正的拉：窗戶要正的拉才關得上", "zh": "窗戶"},
+{"text": "bumbu", "custom": "蹦補：蹦一下，再補點調味料", "zh": "調味料"},
+{"text": "lembut", "custom": "冷不？：冷不？蓋這條柔軟的被子", "zh": "柔軟的"},
+{"text": "rame", "custom": "拉妹：拉妹妹去熱鬧的夜市", "zh": "熱鬧"},
+{"text": "gurih", "custom": "咕哩：咕哩咕哩吃，鹹香好吃", "zh": "鹹香的；美味的"},
+{"text": "harum", "custom": "哈潤：哈一口氣，又香又潤", "zh": "芳香的"},
+{"text": "sirup", "custom": "跟英文 syrup 一樣", "zh": "糖漿"},
+{"text": "kasir", "custom": "卡夕兒：收銀員叫卡夕兒", "zh": "收銀員；收銀台"},
+{"text": "sesekali", "custom": "捨捨卡哩：偶爾捨得刷一下卡哩", "zh": "偶爾"},
+{"text": "pilihan", "custom": "批哩漢：批哩啪啦選漢堡", "zh": "選擇"},
+{"text": "alpukat", "custom": "阿婆咖：阿婆咖啡加酪梨", "zh": "酪梨"}
 ]
 }
