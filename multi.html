@@ -10780,7 +10780,8 @@ document.addEventListener("visibilitychange", () => { if(document.visibilityStat
 // 從上課影片剪出老師唸每個字的聲音，放在網站的 class_audio/ 資料夾，
 // manifest.json 列出 { id, lang, text, file, from }。開頁時自動抓：單字表裡有
 // 這個字、而且這個字還沒有錄音，就存成它的「🎙️ 我的錄音」並設成「★ 用我的錄音」。
-// 已經有自己錄音的字不覆蓋。字還沒匯入的先跳過，之後匯入了，下次開頁會補上。
+// 已經有自己錄音（手機對著影片錄的）的字，換成老師的，舊的另存 "<key>#手機錄音"。
+// 字還沒匯入的先跳過，之後匯入了，下次開頁會補上。
 const CLASS_AUDIO_DONE_LS = "flashcard_class_audio_done_v1";
 const CLASS_AUDIO_SKIP_LS = "flashcard_class_audio_skip_v1";
 async function applyClassAudio(){
@@ -10801,22 +10802,51 @@ async function applyClassAudio(){
   const addKey = (k, w) => { if(!k) return; const a = byText.get(k) || []; if(!a.includes(w)) a.push(w); byText.set(k, a); };
   allWords.forEach(w => { addKey(keyOf(w.text), w); addKey(keyOf((lookup(w.text) || {}).nativeScript), w); });
   const added = [], kept = [];
+  // 舊版遇到手機錄音是「保留並記成接過了」，所以全部重新檢查一次，把那些換掉。
+  const RECHECK_LS = "flashcard_class_audio_recheck_v2";
+  const recheck = !kvStore.getItem(lsKey(RECHECK_LS));
+  const handled = new Set();
+  let fetchFailed = false;
+  const bufCache = new Map();
+  const clipBuf = async (file) => {
+    if(!bufCache.has(file)){
+      bufCache.set(file, fetch("class_audio/" + encodeURIComponent(file), { cache: "no-store" })
+        .then(r => r.ok ? r.arrayBuffer() : null).catch(() => null));
+    }
+    return bufCache.get(file);
+  };
   for(const it of list){
     if(!it || it.lang !== currentLang || !it.id) continue;
     for(const w of byText.get(keyOf(it.text)) || []){
       // 每張卡各記一筆「接過了」；舊版只記 it.id，那種的只在卡片還沒有錄音時補接，不再提示。
       const dk = `${it.id}@${w.id}`;
-      if(done.has(dk)) continue;
+      if(done.has(dk) && !recheck) continue;
+      if(handled.has(w.id)){ done.add(dk); continue; }
       try{
         const key = recKeyFor(w.text);
-        if(await getUserRecording(key)){
-          if(!done.has(it.id)) kept.push(w.text);
+        const old = await getUserRecording(key);
+        // 卡片上的錄音跟任何一個同字的老師錄音一模一樣（大小相同）→ 已經是老師的，不動。
+        // 其他的是自己用手機對著影片錄的，音質比直接從影片剪的差，換成老師的；舊的另存一份 "#手機錄音" 備份。
+        let fromClass = false;
+        if(old){
+          for(const c of list){
+            if(!c || c.lang !== currentLang || keyOf(c.text) !== keyOf(it.text)) continue;
+            const b = await clipBuf(c.file);
+            if(b && b.byteLength === old.size){ fromClass = true; break; }
+          }
+        }
+        if(fromClass){
+          handled.add(w.id);
         }else{
-          const res = await fetch("class_audio/" + encodeURIComponent(it.file), { cache: "no-store" });
-          if(!res.ok) continue;
-          const buf = await res.arrayBuffer();
+          if(old){
+            await setUserRecording(key + "#手機錄音", old);
+            kept.push(w.text);
+          }
+          const buf = await clipBuf(it.file);
+          if(!buf){ fetchFailed = true; continue; }
           await setUserRecording(key, new Blob([buf], { type: "audio/mp4" }));
           useRecordingIds.add(w.id);
+          handled.add(w.id);
           added.push(w.text);
         }
         done.add(dk);
@@ -10824,6 +10854,7 @@ async function applyClassAudio(){
     }
   }
   kvStore.setItem(lsKey(CLASS_AUDIO_DONE_LS), JSON.stringify([...done]));
+  if(recheck && !fetchFailed) kvStore.setItem(lsKey(RECHECK_LS), "1");
   // 老師錄音裡有、但還沒有卡片的字（筆記裡拆得比卡片細的那些：nên、gió、Sài Gòn…）：
   // 列出來讓使用者決定要不要加成卡片。加的話走跟「匯入講義收件匣」一樣的匯入流程，
   // 放進那堂課的分組；加完再跑一次這個函式，錄音就會接上。按「不用了」的不再問。
@@ -10847,7 +10878,7 @@ async function applyClassAudio(){
   msg.style.cssText = "flex:1 1 220px; white-space:pre-wrap;";
   msg.textContent = [
     added.length ? `🎙️ 加了 ${added.length} 個老師上課的錄音（已設成 ★ 用我的錄音）：${added.join("、")}` : "",
-    kept.length ? `這 ${kept.length} 個字你已經有自己的錄音，沒有覆蓋：${kept.join("、")}` : "",
+    kept.length ? `其中 ${kept.length} 個原本是手機錄的，換成老師的乾淨音檔了（舊的有留備份）：${kept.join("、")}` : "",
     missing.length ? `🆕 老師錄音裡還有 ${missing.length} 個字沒有卡片：${missing.map(it => it.text).join("、")}` : ""
   ].filter(Boolean).join("\n");
   const btns = document.createElement("div");
