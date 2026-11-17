@@ -1,6 +1,6 @@
 {
-"version": 2,
-"note": "印尼文諧音（2026-11-15 自己挑的）",
+"version": 3,
+"note": "印尼文諧音（自己挑的：2026-11-15、2026-11-18）",
 "group": "💡 諧音",
 "items": [
 {"text": "semuanya", "custom": "師母啊娘：師母跟阿娘全部到齊（開頭 se 唸很輕）", "zh": "全部、大家"},
@@ -12,6 +12,26 @@
 {"text": "warna", "custom": "哇～那！：哇～那顏色好美！", "zh": "顏色"},
 {"text": "lutut", "custom": "露凸凸：膝蓋露出來凸凸的", "zh": "膝蓋"},
 {"text": "merek", "custom": "麥瑞克：麥瑞克只穿名牌", "zh": "品牌"},
-{"text": "ketinggalan", "custom": "可聽嘎爛：可以聽，但東西忘了帶，嘎爛了（開頭 ke 唸很輕）", "zh": "忘了帶、被落下、錯過"}
+{"text": "ketinggalan", "custom": "可聽嘎爛：可以聽，但東西忘了帶，嘎爛了（開頭 ke 唸很輕）", "zh": "忘了帶、被落下、錯過"},
+{"text": "jangan", "custom": "江安：江邊不安全，別去！", "zh": "不要；別"},
+{"text": "tempat tidur", "custom": "攤趴・提肚：攤開趴在床上，挺著肚子睡", "zh": "床"},
+{"text": "bulan ini", "custom": "不爛・一你：這個月不爛，一切靠你", "zh": "這個月"},
+{"text": "jarang", "custom": "加浪：今天海邊很少浪", "zh": "很少；罕見"},
+{"text": "mendung", "custom": "悶動：陰天悶得不想動", "zh": "陰天"},
+{"text": "gratis", "custom": "葛拉提斯：葛拉提斯大方請客，免費！", "zh": "免費"},
+{"text": "hidupin", "custom": "吸毒品：一打開箱子，發現吸毒品！", "zh": "打開；啟動"},
+{"text": "tumis kangkung", "custom": "吐米絲・扛公：扛公公去吃炒空心菜，吐出米絲", "zh": "炒空心菜"},
+{"text": "sop iga", "custom": "依嘎：依嘎啃排骨湯", "zh": "排骨湯"},
+{"text": "bungkus", "custom": "繃哭斯：打包繃太緊，哭斯了", "zh": "打包；外帶"},
+{"text": "pesanan", "custom": "被傻男：點的餐被傻男拿走了（pesan 點＋an）", "zh": "訂單；所點的餐"},
+{"text": "atas nama", "custom": "啊他是哪嗎？：用誰的名字？他是哪位？", "zh": "以…的名義（點餐／訂位用誰的名字）"},
+{"text": "cek", "custom": "跟英文 check 一樣", "zh": "檢查"},
+{"text": "betul", "custom": "不禿：對！他真的不禿", "zh": "對"},
+{"text": "rekomendasi", "custom": "熱可們・達西：熱可的們推薦達西", "zh": "推薦"},
+{"text": "kosong", "custom": "哥送：哥送來的盒子是空的", "zh": "空的"},
+{"text": "habis", "custom": "哈比斯：哈比人把東西全吃完了", "zh": "用完"},
+{"text": "kartu", "custom": "卡兔：卡片上畫一隻兔子", "zh": "卡片"},
+{"text": "nanas", "custom": "娜娜絲：娜娜絲愛吃鳳梨", "zh": "鳳梨"},
+{"text": "banyak", "custom": "辦呀：事情很多，要辦呀", "zh": "很多"}
 ]
 }
