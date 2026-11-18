@@ -1,5 +1,5 @@
 {
-"version": 1,
+"version": 2,
 "note": "越南文諧音（自己挑的 2026-11-18）",
 "group": "💡 諧音",
 "items": [
@@ -20,6 +20,9 @@
 {"text": "Sốt", "custom": "英文 sauce：醬料", "zh": "醬料"},
 {"text": "lành mạnh", "custom": "年滿：健康的人年年滿滿", "zh": "健康的"},
 {"text": "Boi", "custom": "杯：游泳池就像一大杯水", "zh": "游泳"},
-{"text": "chung (2)", "custom": "蒸（漢越詞，就是「蒸」）", "zh": "蒸/燉"}
+{"text": "chung (2)", "custom": "蒸（漢越詞，就是「蒸」）", "zh": "蒸/燉"},
+{"text": "ngoài trời", "custom": "外天（trời＝天）：外面的天空下＝戶外", "zh": "戶外"},
+{"text": "Ăn chùa", "custom": "台語「按怎」（án-tsuánn）：白吃白喝還問「按怎？」", "zh": "白吃白喝；吃免費的"},
+{"text": "Chưa bao giờ", "custom": "差寶藥：從來沒有差過寶貴的藥", "zh": "從來沒有"}
 ]
 }
