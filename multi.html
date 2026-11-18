@@ -370,6 +370,7 @@
       <button id="btnCopyPending">📋 複製目前顯示的單字</button>
       <button id="btnCopyVisibleForAIReview">📖 複製目前顯示的單字（給 AI 帶我複習）</button>
       <button id="btnCopyVisibleForAI">🤖 複製目前顯示的單字（給 AI 出題）</button>
+      <button id="btnCopyMnemonicWant">🙋 複製想要諧音的字</button>
     </div>
     <div class="toolbar">
       <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
@@ -3218,6 +3219,17 @@ const MNEMONIC_CACHE_LS = "flashcard_mnemonic_v1";
 let mnemonicCache = {};
 try{ mnemonicCache = JSON.parse(kvStore.getItem(lsKey(MNEMONIC_CACHE_LS))) || {}; }catch(e){ mnemonicCache = {}; }
 function saveMnemonicCache(){ kvStore.setItem(lsKey(MNEMONIC_CACHE_LS), JSON.stringify(mnemonicCache)); }
+// 🙋「想要諧音」標記：在 💡 面板裡勾起來，之後按「🙋 複製想要諧音的字」一次複製
+// 貼給 Claude 想選項。已經有自己的諧音的字不會列進去（匯入後自動消失）。
+const MNEMONIC_WANT_LS = "flashcard_mnemonic_want_v1";
+let mnemonicWant = {};
+try{ mnemonicWant = JSON.parse(kvStore.getItem(lsKey(MNEMONIC_WANT_LS))) || {}; }catch(e){ mnemonicWant = {}; }
+function saveMnemonicWant(){ kvStore.setItem(lsKey(MNEMONIC_WANT_LS), JSON.stringify(mnemonicWant)); updateCopyMnemonicWantBtn(); }
+function wantedMnemonicTexts(){ return Object.keys(mnemonicWant).filter(t => mnemonicWant[t] && !hasMnemonic(t)); }
+function updateCopyMnemonicWantBtn(){
+  const b = document.getElementById("btnCopyMnemonicWant");
+  if(b) b.textContent = `🙋 複製想要諧音的字（${wantedMnemonicTexts().length}）`;
+}
 function mnemonicEligible(w){
   if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
   const t = String(w.text).replace(/\s*\(\d+\)$/, "").trim();
@@ -7753,8 +7765,10 @@ function createWordItem(w){
     mnBtn.textContent = "💡";
     const refreshMnBtn = () => {
       const has = hasMnemonic(w.text);
+      const want = !has && !!mnemonicWant[w.text];
       mnBtn.classList.toggle("primary", has);
-      mnBtn.title = has ? "諧音記憶（已有）" : "自己寫諧音幫助記憶";
+      mnBtn.textContent = want ? "💡🙋" : "💡";
+      mnBtn.title = has ? "諧音記憶（已有）" : want ? "已標記想要諧音" : "自己寫諧音幫助記憶";
     };
     refreshMnBtn();
     const renderMnemonic = () => {
@@ -7796,6 +7810,24 @@ function createWordItem(w){
         ta.focus();
       });
       bar.appendChild(editBtn);
+      if(!m.custom){
+        const wantBtn = document.createElement("button");
+        wantBtn.type = "button";
+        const paintWant = () => {
+          const on = !!mnemonicWant[w.text];
+          wantBtn.textContent = on ? "🙋 已標記想要諧音（點一下取消）" : "🙋 想要諧音";
+          wantBtn.classList.toggle("primary", on);
+        };
+        paintWant();
+        wantBtn.addEventListener("click", (ev) => {
+          ev.preventDefault(); ev.stopPropagation();
+          if(mnemonicWant[w.text]) delete mnemonicWant[w.text]; else mnemonicWant[w.text] = 1;
+          saveMnemonicWant();
+          paintWant();
+          refreshMnBtn();
+        });
+        bar.appendChild(wantBtn);
+      }
       mnemonicPanel.appendChild(bar);
     };
     mnBtn.addEventListener("click", async (e) => {
@@ -8426,6 +8458,27 @@ ${lines.join("\n")}`;
     prompt("自動複製失敗，請手動全選複製以下內容：", text);
   }
 });
+
+// 🙋 複製所有標記「想要諧音」、還沒有諧音的字（不管目前篩選），貼給 Claude 想選項。
+document.getElementById("btnCopyMnemonicWant").addEventListener("click", async () => {
+  const texts = wantedMnemonicTexts();
+  if(texts.length === 0){ alert("還沒有標記任何字。在單字的 💡 裡按「🙋 想要諧音」來標記。"); return; }
+  const hasScript = L().hasScript;
+  const lines = texts.map(t => {
+    const d = lookup(t) || {};
+    const native = hasScript && d.nativeScript && d.nativeScript !== t ? d.nativeScript : "";
+    const head = native ? (currentLang === "vi" ? native : `${native}（${t}）`) : t;
+    return d.zh ? `${head} = ${d.zh}` : head;
+  });
+  const text = `${L().label}想要諧音（${texts.length} 個）：\n${lines.join("\n")}`;
+  try{
+    await navigator.clipboard.writeText(text);
+    alert(`已複製 ${texts.length} 個想要諧音的字，貼給 Claude 就可以了。`);
+  }catch(e){
+    prompt("自動複製失敗，請手動全選複製以下內容：", text);
+  }
+});
+updateCopyMnemonicWantBtn();
 
 // 跟上面出題版一樣照目前畫面上的字，但這是考之前先複習用的：每行附上中文意思
 // （複習本來就要看得到意思），請 AI 一次帶幾個字講解、讓我練習，最後才考。
@@ -9987,7 +10040,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
-  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, MNEMONIC_CACHE_LS, HIDDEN_LS,
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, MNEMONIC_CACHE_LS, MNEMONIC_WANT_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS, WORD_GRAMMAR_LS,
   ANTONYMS_CACHE_LS, CHUNKS_CACHE_LS, GRAMMAR_BREAKDOWN_CACHE_LS, MINIMAL_PAIRS_CACHE_LS, WORD_IN_CONTEXT_CACHE_LS,
