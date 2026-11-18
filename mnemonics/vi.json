@@ -1,0 +1,25 @@
+{
+"version": 1,
+"note": "越南文諧音（自己挑的 2026-11-18）",
+"group": "💡 諧音",
+"items": [
+{"text": "sấm to", "custom": "閃多：閃電一多，雷聲就很大", "zh": "打雷聲很大"},
+{"text": "giật mình", "custom": "要命（南部 gi 唸 y：yựt mìn）：嚇一跳，嚇得要命", "zh": "嚇一跳"},
+{"text": "đau bụng", "custom": "倒蹦：肚子痛到倒在地上亂蹦", "zh": "肚子痛"},
+{"text": "hiếm", "custom": "希罕：東西稀少，所以很希罕", "zh": "稀少"},
+{"text": "dừa", "custom": "要啊（南部 d 唸 y）：椰子水？要啊！", "zh": "椰子"},
+{"text": "nhìn", "custom": "凝：凝視＝一直看", "zh": "看"},
+{"text": "chắc chắn", "custom": "查查真：查了又查，確定是真的", "zh": "確定"},
+{"text": "mây", "custom": "美：天上的雲好美", "zh": "雲"},
+{"text": "Vỏ bánh", "custom": "有綁（南部 v 唸 y）：餅皮有綁住餡", "zh": "餅皮；外皮"},
+{"text": "Pháo hoa", "custom": "炮花（漢越詞，就是「炮花」）：煙火是炮炸出來的花", "zh": "煙火"},
+{"text": "Giật", "custom": "噎（南部唸 yựt）：嚇到噎住", "zh": "嚇一跳；驚嚇"},
+{"text": "Nguyên trái", "custom": "原摘：原顆摘下來＝整顆水果（nguyên＝原）", "zh": "整顆水果"},
+{"text": "Miền Tây", "custom": "眠台：在西部睡（眠）台上", "zh": "西部地區"},
+{"text": "Tiêu", "custom": "丟：胡椒丟一點就好", "zh": "胡椒"},
+{"text": "Sốt", "custom": "英文 sauce：醬料", "zh": "醬料"},
+{"text": "lành mạnh", "custom": "年滿：健康的人年年滿滿", "zh": "健康的"},
+{"text": "Boi", "custom": "杯：游泳池就像一大杯水", "zh": "游泳"},
+{"text": "chung (2)", "custom": "蒸（漢越詞，就是「蒸」）", "zh": "蒸/燉"}
+]
+}

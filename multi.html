@@ -11068,7 +11068,9 @@ async function applyMnemonicImport(){
   const added = [], kept = [], notInList = [];
   for(const it of data.items){
     if(!it || !it.text || !it.custom) continue;
-    const text = byKey.get(keyOf(it.text));
+    // 先找完全一樣的單字文字（例如「chung (2)」），找不到再用寬鬆比對。
+    const exact = allWords.find(w => String(w.text).normalize("NFC") === String(it.text).normalize("NFC"));
+    const text = exact ? exact.text : byKey.get(keyOf(it.text));
     const key = text || it.text;
     const cur = mnemonicCache[key] || {};
     if(cur.custom && cur.custom !== it.custom){ kept.push(key); continue; }
