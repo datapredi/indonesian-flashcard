@@ -611,6 +611,7 @@
   <button type="button" id="autoplayFloatToggle" title="暫停／繼續">⏸️</button>
   <button type="button" id="autoplayFloatMark" title="把這個字標成待複習（停在原地繼續播）">⚠️</button>
   <button type="button" id="autoplayFloatNext" title="這個字已經會了，跳過去聽下一個（不會標待複習）">⏭️</button>
+  <button type="button" id="autoplayFloatExclude" title="這個字不用再循環（只到重新整理網頁為止）">🚫</button>
   <button type="button" id="autoplayFloatClose" title="結束依序播放">✕</button>
 </div>
 
@@ -1981,6 +1982,22 @@ let autoplayRunStartMs = 0;       // 這一輪（或這次繼續）開始的時�
 let autoplayRunStartIndex = 0;    // 開始時的 index，配合上面算實際每字花多久
 let autoplaySpeed = 1;            // 依序播放的語速倍率（1 / 1.2 / 1.5）
 let autoplayNewPhase = null;      // 「先播新字」階段：{ boundary, returnId }，見 planAutoplayNewPhase
+// 🚫「這個字不用再循環」：只在這次打開網頁期間有效（不存檔），重新整理就全部恢復。
+// 依目前的 📁 分組分開記，所以只影響這一組的循環，單字表、Flash Card 都不受影響。
+// 用 var：renderAutoplayControls 可能在這行之前就被呼叫，let 會撞 TDZ。
+var loopSkipByGroup = new Map();
+function loopSkipKey(){ return `${currentLang}|${groupFilter || ""}|${groupFilter2 || ""}`; }
+function loopSkipSet(){
+  const k = loopSkipKey();
+  if(!loopSkipByGroup.has(k)) loopSkipByGroup.set(k, new Set());
+  return loopSkipByGroup.get(k);
+}
+// 依序播放用的字：畫面上看得到的字，扣掉這次按過 🚫 的。
+function getAutoplayWords(){
+  const skip = loopSkipByGroup.get(loopSkipKey());
+  const v = getVisibleWords();
+  return skip && skip.size ? v.filter(w => !skip.has(w.id)) : v;
+}
 // 每字唸幾次（中文前面）／中文之後再唸幾次，都是數字框，1～10、0～10。
 function clampReps(v, min, fallback){
   const n = parseInt(v, 10);
@@ -9295,7 +9312,7 @@ function clearAutoplayHighlight(){
 function renderAutoplayControls(){
   const active = listAutoplayRunning || listAutoplayPaused;
   const toolBtn = document.getElementById("btnListAutoplay");
-  const visible = getVisibleWords();
+  const visible = getAutoplayWords();
   const total = visible.length;
   if(toolBtn){
     let idleTxt = `▶️ 依序播放發音（${total} 個字，${fmtDuration(estimateAutoplaySeconds(total))}）`;
@@ -9416,7 +9433,7 @@ function autoplaySkipNext(){
   if(!listAutoplayRunning && !listAutoplayPaused) return;
   if(listAutoplayPaused){
     // 暫停中：把進度往前推一個，再從那裡接回播放。
-    const total = getVisibleWords().length;
+    const total = getAutoplayWords().length;
     if(listAutoplayIndex < total - 1) listAutoplayIndex++;
     runListAutoplay();
     return;
@@ -9424,6 +9441,22 @@ function autoplaySkipNext(){
   autoplayJump = 1;   // 播放迴圈看到就會中斷這個字的三遍＋中文，index++ 換下一個
   abortCurrentPlayback();
   if('speechSynthesis' in window) speechSynthesis.cancel();
+}
+// 🚫：這個字這次不再循環。播放中：記下來再跳下一個（這輪剩下的照原清單播，
+// 下一輪重抓清單時就不會有它）。暫停中：清單少了這個字，index 不動就已經指著下一個。
+function autoplayExcludeCurrent(){
+  if(!listAutoplayRunning && !listAutoplayPaused) return;
+  const w = autoplayCurrentWord || getAutoplayWords()[listAutoplayIndex];
+  if(!w) return;
+  loopSkipSet().add(w.id);
+  const rowEl = document.querySelector(`#wordList .item[data-word-id="${w.id}"]`);
+  if(rowEl) rowEl.style.opacity = "0.45";
+  if(listAutoplayPaused){
+    if(listAutoplayIndex >= getAutoplayWords().length) listAutoplayIndex = 0;
+    renderAutoplayControls();
+    return;
+  }
+  autoplaySkipNext();
 }
 // 暫停：停在目前這個字，浮動控制器跟 highlight 都留著，之後從同一個字繼續。
 function pauseListAutoplay(){
@@ -9452,7 +9485,7 @@ async function speakZhForAutoplay(zh){
   }catch(e){ /* 中文唸不出來就跳過，不要卡住整個播放 */ }
 }
 async function runListAutoplay(){
-  let words = getVisibleWords();
+  let words = getAutoplayWords();
   if(words.length === 0){ stopListAutoplay(); return; }
   if(listAutoplayIndex >= words.length) listAutoplayIndex = 0;
   listAutoplayRunning = true;
@@ -9555,7 +9588,7 @@ async function runListAutoplay(){
     // 可能有改篩選、標 ⚠️），順便刷新列表把這輪標的 ⚠️ 顯示出來。
     if(listAutoplayRunning && listAutoplayIndex >= words.length && autoplayLoopOn()){
       renderList();
-      words = getVisibleWords();
+      words = getAutoplayWords();
       if(words.length === 0) break;
       listAutoplayIndex = 0;
     }
@@ -9681,7 +9714,7 @@ function toggleListAutoplay(){
   // 重新開始（不是從暫停處繼續）：從「從第幾個開始」那格指定的位置播。
   if(!listAutoplayPaused){
     const n = parseInt(document.getElementById("autoplayStartAt").value, 10);
-    const plan = planAutoplayNewPhase(getVisibleWords(), n > 0 ? n : null, true);
+    const plan = planAutoplayNewPhase(getAutoplayWords(), n > 0 ? n : null, true);
     listAutoplayIndex = plan.startIndex;
     autoplayNewPhase = plan.phase;
   }
@@ -9691,6 +9724,7 @@ document.getElementById("btnListAutoplay").addEventListener("click", toggleListA
 document.getElementById("autoplayFloatToggle").addEventListener("click", toggleListAutoplay);
 document.getElementById("autoplayFloatMark").addEventListener("click", autoplayMarkCurrent);
 document.getElementById("autoplayFloatNext").addEventListener("click", autoplaySkipNext);
+document.getElementById("autoplayFloatExclude").addEventListener("click", autoplayExcludeCurrent);
 document.getElementById("autoplayFloatClose").addEventListener("click", stopListAutoplay);
 // 「加唸中文」勾選狀態記起來（全語言通用）
 const AUTOPLAY_ZH_LS = "flashcard_autoplay_include_zh_v1";
