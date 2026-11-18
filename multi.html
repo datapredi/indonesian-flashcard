@@ -285,7 +285,7 @@
         <input type="checkbox" id="numberToWords">
         數字轉成該語言的說法（例：100 → 該語言「一百」的唸法）
       </label>
-      <input type="text" id="convertGroupName" placeholder="📁 分組名稱（可留空，例：9/12）" style="flex:0 0 200px;">
+      <input type="text" id="convertGroupName" placeholder="📁 分組名稱（預設今天日期，可改可清空）" title="預設自動填今天日期，例如 20261118" style="flex:0 0 200px;">
       <input type="text" id="convertCategoryName" placeholder="🏷️ 類別名稱（可留空，例：common expression）" style="flex:0 0 220px;">
     </div>
     <div class="toolbar hidden" id="convertPasteBar" style="align-items:flex-start;">
@@ -12039,6 +12039,20 @@ function showScreen(name){
 
 renderList();
 updateResumeListenBtn();
+// 匯入的「📁 分組名稱」預設自動填今天日期（例：20261118），不用每次自己打。
+// 自己改過（或清空）就不再動；頁面開著過了午夜，回到頁面時換成新的日期。
+(function(){
+  const el = document.getElementById("convertGroupName");
+  if(!el) return;
+  const today = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`; };
+  let auto = "", userEdited = false;
+  // 只在欄位還是上次自動填的值時才換（匯入中程式暫時改掉欄位時不會被蓋掉）。
+  const fill = () => { if(userEdited || el.value !== auto) return; auto = today(); el.value = auto; };
+  el.addEventListener("input", () => { userEdited = el.value !== auto; });
+  fill();
+  document.addEventListener("visibilitychange", () => { if(!document.hidden) fill(); });
+  window.addEventListener("focus", fill);
+})();
 window.__mainScriptDone = true;
 </script>
 </body>
