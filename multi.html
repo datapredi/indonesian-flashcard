@@ -3233,7 +3233,8 @@ function updateCopyMnemonicWantBtn(){
 function mnemonicEligible(w){
   if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
   const t = String(w.text).replace(/\s*\(\d+\)$/, "").trim();
-  return t.split(/\s+/).filter(Boolean).length <= 2;
+  // 越南文一個音節就是一個「字」，三個音節的片語也很短，所以放寬到三個。
+  return t.split(/\s+/).filter(Boolean).length <= (currentLang === "vi" ? 3 : 2);
 }
 function hasMnemonic(text){
   const m = mnemonicCache[text];
@@ -7755,7 +7756,7 @@ function createWordItem(w){
   });
   row.appendChild(linksBtn);
 
-  // 💡 諧音記憶：只給單字／兩個字以內的片語。
+  // 💡 諧音記憶：只給單字／兩個字以內的片語（越南文三個字以內）。
   const mnemonicPanel = document.createElement("div");
   mnemonicPanel.className = "usage-panel hidden";
   if(mnemonicEligible(w)){
