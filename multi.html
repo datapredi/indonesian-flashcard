@@ -1499,7 +1499,10 @@ function ttsCacheKey(text, instructions){ return `${TTS_MODEL}::${instructions |
 const FPT_PROXY_URL_LS = "flashcard_vitts_proxy_url_v1";
 const FPT_VOICE_LS = "flashcard_vitts_voice_v1";
 const FPT_VI_ENABLED_LS = "flashcard_vitts_enabled_v1";
-function fptProxyUrl(){ try{ return (kvStore.getItem(FPT_PROXY_URL_LS) || "").trim(); }catch(e){ return ""; } }
+// 網址前面不小心多打了字（例如「二https://...」）會被當成相對路徑、打到 github.io 變 404：
+// 從第一個 http(s):// 開始取，前面多的字都丟掉。
+function cleanProxyUrl(v){ v = String(v || "").trim(); const i = v.search(/https?:\/\//i); return i > 0 ? v.slice(i) : v; }
+function fptProxyUrl(){ try{ return cleanProxyUrl(kvStore.getItem(FPT_PROXY_URL_LS)); }catch(e){ return ""; } }
 function fptVoice(){ try{ return (kvStore.getItem(FPT_VOICE_LS) || "").trim(); }catch(e){ return ""; } }
 function fptViActive(lang){
   if((lang || currentLang) !== "vi") return false;
@@ -8953,12 +8956,12 @@ document.getElementById("btnCompactRead").addEventListener("click", () => {
 updateCompactReadLabel();
 // 南部腔 TTS（ElevenLabs）設定：載入已存的值 + 綁定變更
 try{
-  document.getElementById("fptProxyUrl").value = kvStore.getItem(FPT_PROXY_URL_LS) || "";
+  document.getElementById("fptProxyUrl").value = cleanProxyUrl(kvStore.getItem(FPT_PROXY_URL_LS));
   document.getElementById("fptVoice").value = kvStore.getItem(FPT_VOICE_LS) || "";
   document.getElementById("fptViEnabled").checked = kvStore.getItem(FPT_VI_ENABLED_LS) === "1";
 }catch(e){}
 document.getElementById("fptProxyUrl").addEventListener("change", (e) => {
-  try{ kvStore.setItem(FPT_PROXY_URL_LS, e.target.value.trim()); }catch(err){}
+  try{ kvStore.setItem(FPT_PROXY_URL_LS, cleanProxyUrl(e.target.value)); }catch(err){}
 });
 document.getElementById("fptVoice").addEventListener("change", (e) => {
   try{ kvStore.setItem(FPT_VOICE_LS, e.target.value.trim()); }catch(err){}
