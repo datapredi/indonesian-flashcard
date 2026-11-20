@@ -11116,13 +11116,49 @@ applyMnemonicImport();
 (function clearUnusedLangs(){
   const DONE = "flashcard_clear_unused_langs_v1";
   if(kvStore.getItem(DONE)) return;
-  const langs = ["ja", "ko", "yue", "en"];
+  const langs = ["ja", "ko", "yue"]; // 英文不清（使用者還要用）
   langs.forEach(l => {
     kvStore.removeItem(lsKeyForLang(LS_KEY, l));
     kvStore.removeItem(lsKeyForLang(CUSTOM_DB_LS, l));
   });
   kvStore.setItem(DONE, "1");
   if(langs.includes(currentLang)) kvStore.flush().then(() => location.reload());
+})();
+
+// ================= 還原被誤清的英文單字表（一次性） =================
+// 上面那段以前也把英文清掉了。從 2026-11-15 的備份（restore/en_20261115.json）把
+// 英文單字表跟翻譯資料補回來：目前沒有的字才加，已經有的字不動。
+(async function restoreEnglishOnce(){
+  const DONE = "flashcard_restore_en_v1";
+  if(kvStore.getItem(DONE)) return;
+  let data;
+  try{
+    const r = await fetch("restore/en_20261115.json?r=" + Date.now(), { cache: "no-store" });
+    if(!r.ok) return;
+    data = await r.json();
+  }catch(e){ return; }
+  const listKey = lsKeyForLang(LS_KEY, "en"), dbKey = lsKeyForLang(CUSTOM_DB_LS, "en");
+  const parse = (v, def) => { try{ const x = typeof v === "string" ? JSON.parse(v) : v; return x || def; }catch(e){ return def; } };
+  const oldList = parse(data.keys[listKey], []), oldDb = parse(data.keys[dbKey], {});
+  const curList = parse(kvStore.getItem(listKey), []), curDb = parse(kvStore.getItem(dbKey), {});
+  if(!Array.isArray(curList) || !Array.isArray(oldList)) return;
+  const have = new Set(curList.map(w => String(w && w.text)));
+  let nextId = Math.max(0, ...curList.concat(oldList).map(w => Number(w && w.id) || 0)) + 1;
+  const usedIds = new Set(curList.map(w => w && w.id));
+  let added = 0;
+  oldList.forEach(w => {
+    if(!w || have.has(String(w.text))) return;
+    const item = Object.assign({}, w);
+    if(usedIds.has(item.id)) item.id = nextId++;
+    usedIds.add(item.id);
+    curList.push(item); have.add(String(w.text)); added++;
+  });
+  Object.keys(oldDb).forEach(t => { if(!(t in curDb)) curDb[t] = oldDb[t]; });
+  kvStore.setItem(listKey, JSON.stringify(curList));
+  kvStore.setItem(dbKey, JSON.stringify(curDb));
+  kvStore.setItem(DONE, "1");
+  await kvStore.flush();
+  if(added && currentLang === "en") location.reload();
 })();
 
 // ================= Flash Card =================
