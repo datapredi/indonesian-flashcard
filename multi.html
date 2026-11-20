@@ -371,6 +371,7 @@
       <button id="btnCopyVisibleForAIReview">📖 複製目前顯示的單字（給 AI 帶我複習）</button>
       <button id="btnCopyVisibleForAI">🤖 複製目前顯示的單字（給 AI 出題）</button>
       <button id="btnCopyMnemonicWant">🙋 複製想要諧音的字</button>
+      <button id="btnCopyTeacherAudioWant">🧑‍🏫 複製想要老師音檔的字</button>
     </div>
     <div class="toolbar">
       <input type="number" id="randomCount" min="1" step="1" value="30" style="max-width:90px; flex:0 0 auto;">
@@ -3248,6 +3249,19 @@ function wantedMnemonicTexts(){ return Object.keys(mnemonicWant).filter(t => mne
 function updateCopyMnemonicWantBtn(){
   const b = document.getElementById("btnCopyMnemonicWant");
   if(b) b.textContent = `🙋 複製想要諧音的字（${wantedMnemonicTexts().length}）`;
+}
+// 🧑‍🏫「想要老師音檔」標記：每個字列上一顆按鈕，按了就記起來（不管目前有沒有錄音、
+// 是不是老師的——自己錄的、或之前剪的老師音檔不滿意也可以標）。之後按
+// 「🧑‍🏫 複製想要老師音檔的字」把清單（含分組，分組名稱通常是上課日期）貼給 Claude
+// 去上課影片裡找。新的老師音檔接上之後，標記自動消失。
+const TEACHER_AUDIO_WANT_LS = "flashcard_teacher_audio_want_v1";
+let teacherAudioWant = {};
+try{ teacherAudioWant = JSON.parse(kvStore.getItem(lsKey(TEACHER_AUDIO_WANT_LS))) || {}; }catch(e){ teacherAudioWant = {}; }
+function saveTeacherAudioWant(){ kvStore.setItem(lsKey(TEACHER_AUDIO_WANT_LS), JSON.stringify(teacherAudioWant)); updateCopyTeacherAudioWantBtn(); }
+function wantedTeacherAudioTexts(){ return Object.keys(teacherAudioWant).filter(t => teacherAudioWant[t]); }
+function updateCopyTeacherAudioWantBtn(){
+  const b = document.getElementById("btnCopyTeacherAudioWant");
+  if(b) b.textContent = `🧑‍🏫 複製想要老師音檔的字（${wantedTeacherAudioTexts().length}）`;
 }
 function mnemonicEligible(w){
   if(typeof isSentenceWord === "function" && isSentenceWord(w)) return false;
@@ -7775,6 +7789,26 @@ function createWordItem(w){
   });
   row.appendChild(linksBtn);
 
+  // 🧑‍🏫 想要老師音檔：點一下標記／取消。
+  const taBtn = document.createElement("button");
+  taBtn.type = "button";
+  taBtn.className = "usage-btn";
+  const refreshTaBtn = () => {
+    const on = !!teacherAudioWant[w.text];
+    taBtn.textContent = on ? "🧑‍🏫✓" : "🧑‍🏫";
+    taBtn.classList.toggle("primary", on);
+    taBtn.title = on ? "已標記想要老師上課音檔（點一下取消）" : "標記：想要老師上課的音檔";
+  };
+  refreshTaBtn();
+  taBtn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(teacherAudioWant[w.text]) delete teacherAudioWant[w.text];
+    else teacherAudioWant[w.text] = { at: new Date().toISOString().slice(0, 10) };
+    saveTeacherAudioWant();
+    refreshTaBtn();
+  });
+  row.appendChild(taBtn);
+
   // 💡 諧音記憶：只給單字／兩個字以內的片語（越南文三個字以內）。
   const mnemonicPanel = document.createElement("div");
   mnemonicPanel.className = "usage-panel hidden";
@@ -8499,6 +8533,39 @@ document.getElementById("btnCopyMnemonicWant").addEventListener("click", async (
   }
 });
 updateCopyMnemonicWantBtn();
+
+// 🧑‍🏫 複製所有標記「想要老師音檔」的字（不管目前篩選），附上分組（通常是上課日期）
+// 跟目前有沒有錄音，貼給 Claude 去上課影片裡找。
+document.getElementById("btnCopyTeacherAudioWant").addEventListener("click", async () => {
+  const texts = wantedTeacherAudioTexts();
+  if(texts.length === 0){ alert("還沒有標記任何字。在單字列上按 🧑‍🏫 來標記。"); return; }
+  const hasScript = L().hasScript;
+  const lines = [];
+  for(const t of texts){
+    const d = lookup(t) || {};
+    const native = hasScript && d.nativeScript && d.nativeScript !== t ? d.nativeScript : "";
+    const head = native ? (currentLang === "vi" ? `${native}（${t}）` : `${native}（${t}）`) : t;
+    const ws = allWords.filter(w => w.text === t);
+    const groups = [...new Set(ws.flatMap(w => getWordGroups(w.id)))];
+    let rec = "";
+    try{ rec = (await getUserRecording(recKeyFor(t))) ? "目前有錄音" : "目前沒錄音"; }catch(e){}
+    const parts = [d.zh ? `${head} = ${d.zh}` : head];
+    if(ws.length) parts.push("#" + ws.map(w => w.id).join("/#"));
+    parts.push("分組：" + (groups.length ? groups.join("、") : "無"));
+    if(teacherAudioWant[t] && teacherAudioWant[t].at) parts.push("標記 " + teacherAudioWant[t].at);
+    if(rec) parts.push(rec);
+    if(!ws.length) parts.push("（單字表裡已經沒有這個字）");
+    lines.push(parts.join("｜"));
+  }
+  const text = `${L().label}想要老師音檔（${texts.length} 個）：\n${lines.join("\n")}`;
+  try{
+    await navigator.clipboard.writeText(text);
+    alert(`已複製 ${texts.length} 個想要老師音檔的字，貼給 Claude 就可以了。`);
+  }catch(e){
+    prompt("自動複製失敗，請手動全選複製以下內容：", text);
+  }
+});
+updateCopyTeacherAudioWantBtn();
 
 // 跟上面出題版一樣照目前畫面上的字，但這是考之前先複習用的：每行附上中文意思
 // （複習本來就要看得到意思），請 AI 一次帶幾個字講解、讓我練習，最後才考。
@@ -10060,7 +10127,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 const BACKUP_PER_LANG_BASES = [
   LS_KEY, CUSTOM_DB_LS, MASTERED_CARDS_LS, MASTERED_QUIZ_LS, PRON_FLAG_LS, TEACHER_FLAG_LS,
   CONVERTED_MAP_LS, DIFFICULTY_LS, SELECTED_LS, USAGE_CACHE_LS,
-  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, MNEMONIC_CACHE_LS, MNEMONIC_WANT_LS, HIDDEN_LS,
+  TONE_MARKS_CACHE_LS, NATIVE_TONE_MARKS_CACHE_LS, CARD_DIRECTION_LS, WORD_NOTES_LS, WORD_LINKS_LS, MNEMONIC_CACHE_LS, MNEMONIC_WANT_LS, TEACHER_AUDIO_WANT_LS, HIDDEN_LS,
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS, WORD_GRAMMAR_LS,
   ANTONYMS_CACHE_LS, CHUNKS_CACHE_LS, GRAMMAR_BREAKDOWN_CACHE_LS, MINIMAL_PAIRS_CACHE_LS, WORD_IN_CONTEXT_CACHE_LS,
@@ -10935,7 +11002,13 @@ async function applyClassAudio(){
         // 卡片上的錄音跟任何一個同字的老師錄音一模一樣（大小相同）→ 已經是老師的，不動。
         // 其他的是自己用手機對著影片錄的，音質比直接從影片剪的差，換成老師的；舊的另存一份 "#手機錄音" 備份。
         let fromClass = false;
-        if(old){
+        // 標了 🧑‍🏫 的字：代表現在的錄音（就算是之前的老師音檔）不滿意，這筆新的老師音檔
+        // 只要跟現在的不一樣就換上去；不跟其他同字的舊老師音檔比。
+        const wantNew = !!teacherAudioWant[w.text] && !done.has(dk);
+        if(old && wantNew){
+          const b = await clipBuf(it.file);
+          if(b && b.byteLength === old.size) fromClass = true;
+        }else if(old){
           for(const c of list){
             if(!c || c.lang !== currentLang || keyOf(c.text) !== keyOf(it.text)) continue;
             const b = await clipBuf(c.file);
@@ -10955,6 +11028,7 @@ async function applyClassAudio(){
           useRecordingIds.add(w.id);
           handled.add(w.id);
           added.push(w.text);
+          if(teacherAudioWant[w.text]){ delete teacherAudioWant[w.text]; saveTeacherAudioWant(); }
         }
         done.add(dk);
       }catch(e){ /* 這次抓不到，下次開頁再試 */ }
