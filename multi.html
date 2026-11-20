@@ -1310,10 +1310,10 @@ async function speak(text, btn, langOverride, recordingOverrideKey, instructions
     audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
     if(btn){ btn.disabled = true; btn.classList.add('speaking'); }
     try{
-      const blob = await withTimeout(getFptViAudioBlob(text), 30000, "南部腔語音逾時（30 秒）");
+      const blob = await withTimeout(getWordAudioBlobFor(langOverride || currentLang, text), 30000, "語音逾時（30 秒）");
       if(myGeneration === speakGeneration) await playAudioBlob(blob);
     }catch(e){
-      if(myGeneration === speakGeneration) alert("南部腔語音失敗：" + e.message + "\n（可以先在設定裡取消勾選，改回原本語音）");
+      if(myGeneration === speakGeneration) alert("越南文語音失敗：" + e.message);
     }finally{
       if(btn){ btn.disabled = false; btn.classList.remove('speaking'); }
     }
@@ -1538,7 +1538,7 @@ async function getFptViAudioBlob(text){
     const res = await fetch(url);
     const ct = (res.headers.get("content-type") || "").toLowerCase();
     if(!res.ok || ct.includes("application/json")){
-      let msg = `HTTP ${res.status}`;
+      let msg = `HTTP ${res.status}` + (res.status === 404 ? `：Worker 網址找不到（${base}）` : "");
       try{ const j = await res.json(); if(j && j.error) msg = j.error; }catch(e){}
       throw new Error(msg);
     }
@@ -1591,8 +1591,24 @@ function respellForTTS(lang, text){
   return text;
 }
 // 給越南文的字/句子取「該用哪個引擎產出的音檔」——南部腔開著就走 proxy，否則走 OpenAI。
+// 南部腔 proxy 失敗（例如 Worker 網址 404、額度用完）時，不要跳 alert 卡住依序播放：
+// 改用原本的 GPT 語音唸，畫面下方跳一次小提示（每次打開頁面只提示一次）。
+let _fptFailNoticeShown = false;
+function showFptFallbackNotice(err){
+  console.warn("南部腔語音失敗，改用原本語音", err);
+  if(_fptFailNoticeShown) return;
+  _fptFailNoticeShown = true;
+  const d = document.createElement("div");
+  d.textContent = "南部腔語音失敗（" + (err && err.message ? err.message : err) + "），先改用原本語音唸。";
+  d.style.cssText = "position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:99999;max-width:90vw;padding:10px 14px;border-radius:10px;background:#7a3b00;color:#fff;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.4)";
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 7000);
+}
 async function getWordAudioBlobFor(lang, text){
-  if(fptViActive(lang)) return getFptViAudioBlob(text);
+  if(fptViActive(lang)){
+    try{ return await getFptViAudioBlob(text); }
+    catch(e){ showFptFallbackNotice(e); }
+  }
   return getTTSAudioBlob(respellForTTS(lang, text), (LANG_INFO[lang] || {}).ttsInstructions);
 }
 function prefetchWordAudio(lang, text){
