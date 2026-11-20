@@ -10989,9 +10989,14 @@ async function applyClassAudio(){
     }
     return bufCache.get(file);
   };
+  // 標了 🧑‍🏫 的字只用 manifest 裡最後（最新）一筆：不然還沒接過的舊老師音檔會先被換上、
+  // 把標記清掉，最新挑的那筆反而被當成「已經是老師的」跳過。
+  const lastIdOfKey = new Map();
+  for(const it of list){ if(it && it.lang === currentLang && it.id) lastIdOfKey.set(keyOf(it.text), it.id); }
   for(const it of list){
     if(!it || it.lang !== currentLang || !it.id) continue;
     for(const w of byText.get(keyOf(it.text)) || []){
+      if(teacherAudioWant[w.text] && lastIdOfKey.get(keyOf(it.text)) !== it.id) continue;
       // 每張卡各記一筆「接過了」；舊版只記 it.id，那種的只在卡片還沒有錄音時補接，不再提示。
       const dk = `${it.id}@${w.id}`;
       if(done.has(dk) && !recheck) continue;
