@@ -1,0 +1,320 @@
+{
+ "batches": [
+  {
+   "id": "newwords-vi-20261120",
+   "lang": "vi",
+   "group": "20261120",
+   "title": "20 Nov 新單字",
+   "items": [
+    {
+     "term": "Trái cây",
+     "zh": "水果"
+    },
+    {
+     "term": "gà nướng",
+     "zh": "烤雞"
+    },
+    {
+     "term": "bia",
+     "zh": "啤酒"
+    },
+    {
+     "term": "Dâu",
+     "zh": "草莓"
+    },
+    {
+     "term": "hồng",
+     "zh": "粉紅"
+    },
+    {
+     "term": "màu hồng",
+     "zh": "粉紅色"
+    },
+    {
+     "term": "Khoai lang",
+     "zh": "地瓜"
+    },
+    {
+     "term": "nhãn",
+     "zh": "龍眼"
+    },
+    {
+     "term": "vải",
+     "zh": "荔枝"
+    },
+    {
+     "term": "Cà chua",
+     "zh": "番茄"
+    },
+    {
+     "term": "cà chua bi",
+     "zh": "小番茄"
+    },
+    {
+     "term": "Ngon hơn",
+     "zh": "比較好吃"
+    },
+    {
+     "term": "hơi mắc",
+     "zh": "有點貴"
+    },
+    {
+     "term": "Sau đó",
+     "zh": "之後、然後"
+    },
+    {
+     "term": "Sau khi",
+     "zh": "在……之後（+動詞）"
+    },
+    {
+     "term": "Đi ngủ",
+     "zh": "去睡覺"
+    },
+    {
+     "term": "Ngủ dậy",
+     "zh": "起床"
+    },
+    {
+     "term": "Có thể",
+     "zh": "可以、可能"
+    },
+    {
+     "term": "bắt đầu",
+     "zh": "開始"
+    },
+    {
+     "term": "lúc nào",
+     "zh": "什麼時候"
+    },
+    {
+     "term": "lúc",
+     "zh": "時候；在（幾點）"
+    },
+    {
+     "term": "nào",
+     "zh": "哪、哪個"
+    },
+    {
+     "term": "đúng",
+     "zh": "對、正確"
+    },
+    {
+     "term": "từ",
+     "zh": "從"
+    },
+    {
+     "term": "xe",
+     "zh": "車"
+    },
+    {
+     "term": "cho",
+     "zh": "給；為了（讓…）"
+    },
+    {
+     "term": "mỗi",
+     "zh": "每"
+    },
+    {
+     "term": "dậy",
+     "zh": "起來"
+    },
+    {
+     "term": "tập",
+     "zh": "練習"
+    },
+    {
+     "term": "đồ",
+     "zh": "東西"
+    },
+    {
+     "term": "giờ sáng",
+     "zh": "早上／凌晨…點"
+    },
+    {
+     "term": "ba mươi",
+     "zh": "三十"
+    },
+    {
+     "term": "cả",
+     "zh": "整個、全部"
+    },
+    {
+     "term": "cả ngày",
+     "zh": "整天"
+    },
+    {
+     "term": "lúc nào cũng được",
+     "zh": "什麼時候都可以"
+    },
+    {
+     "term": "Thể",
+     "zh": "（có thể 的 thể，上唇上、下唇下）"
+    },
+    {
+     "term": "trả thẻ",
+     "zh": "刷卡付款"
+    },
+    {
+     "term": "trả tiền",
+     "zh": "付錢"
+    },
+    {
+     "term": "Tiền mặt",
+     "zh": "現金"
+    },
+    {
+     "term": "từ ... tới",
+     "zh": "從……到"
+    },
+    {
+     "term": "đi xe máy",
+     "zh": "騎機車"
+    },
+    {
+     "term": "cho nhanh",
+     "zh": "為了快"
+    },
+    {
+     "term": "cho tiện",
+     "zh": "為了方便"
+    },
+    {
+     "term": "Thuê",
+     "zh": "租、雇"
+    },
+    {
+     "term": "thuê xe máy",
+     "zh": "租機車"
+    },
+    {
+     "term": "Trả xe",
+     "zh": "還車"
+    },
+    {
+     "term": "hết",
+     "zh": "完、沒了"
+    },
+    {
+     "term": "Hết mưa rồi.",
+     "zh": "雨停了。"
+    },
+    {
+     "term": "chân gà",
+     "zh": "雞腳"
+    },
+    {
+     "term": "Hàng xóm",
+     "zh": "鄰居"
+    },
+    {
+     "term": "Hát",
+     "zh": "唱歌"
+    },
+    {
+     "term": "Khi anh đi siêu thị, anh thường mua gì?",
+     "zh": "你去超市的時候通常買什麼？"
+    },
+    {
+     "term": "Anh thường mua sữa, sữa đậu nành, nước, chuối, dưa hấu, đu đủ, táo, sầu riêng và bánh mì.",
+     "zh": "我通常買牛奶、豆漿、水、香蕉、西瓜、木瓜、蘋果、榴槤和麵包。"
+    },
+    {
+     "term": "Thỉnh thoảng anh mua gà nướng và bia.",
+     "zh": "有時候我買烤雞和啤酒。"
+    },
+    {
+     "term": "Sau khi đi gym, anh đi Starbucks.",
+     "zh": "去完健身房後，我去星巴克。"
+    },
+    {
+     "term": "Anh đi ngủ trễ, khoảng 1 hay 2 giờ sáng.",
+     "zh": "我很晚睡，大約凌晨一兩點。"
+    },
+    {
+     "term": "Anh ngủ dậy khoảng 9 giờ.",
+     "zh": "我大約九點起床。"
+    },
+    {
+     "term": "Anh có thể bắt đầu làm lúc nào cũng được đúng không?",
+     "zh": "你什麼時候開始工作都可以，對吧？"
+    },
+    {
+     "term": "Ở gym, anh trả thẻ được không?",
+     "zh": "在健身房可以刷卡嗎？"
+    },
+    {
+     "term": "Được. Chỉ trả thẻ thôi.",
+     "zh": "可以。只能刷卡。"
+    },
+    {
+     "term": "Anh mua đồ ăn ở gym phải trả tiền đúng không?",
+     "zh": "你在健身房買東西吃要付錢，對吧？"
+    },
+    {
+     "term": "Anh có thể đi bộ từ gym tới Starbucks được không?",
+     "zh": "你可以從健身房走路到星巴克嗎？"
+    },
+    {
+     "term": "Được. Đi bộ 30 phút.",
+     "zh": "可以。走路 30 分鐘。"
+    },
+    {
+     "term": "Nên là anh đi xe máy cho nhanh.",
+     "zh": "所以我騎機車比較快。"
+    },
+    {
+     "term": "Trả thẻ nhanh.",
+     "zh": "刷卡很快。"
+    },
+    {
+     "term": "Trả thẻ cho nhanh.",
+     "zh": "刷卡比較快（為了快就刷卡）。"
+    },
+    {
+     "term": "Ăn bánh mì cho nhanh.",
+     "zh": "吃麵包比較快（因為快所以吃麵包）。"
+    },
+    {
+     "term": "Đi xe máy tiện.",
+     "zh": "騎機車很方便。"
+    },
+    {
+     "term": "Đi xe máy cho tiện.",
+     "zh": "騎機車比較方便（為了方便騎機車）。"
+    },
+    {
+     "term": "Anh thuê xe máy 3 tuần thôi.",
+     "zh": "我只租機車三個星期。"
+    },
+    {
+     "term": "Anh phải trả xe ngày mai.",
+     "zh": "我明天得還車。"
+    },
+    {
+     "term": "Hôm nay anh tập gym mất khoảng một tiếng ba mươi phút.",
+     "zh": "今天我在健身房練了大約一個半小時。"
+    },
+    {
+     "term": "Anh thích ăn đồ nướng ở Việt Nam, ví dụ chân gà nướng ở Việt Nam.",
+     "zh": "我喜歡越南的燒烤，例如越南的烤雞腳。"
+    },
+    {
+     "term": "Anh thường ăn sáng nấm, gà và bơ ở gym hay quán cà phê.",
+     "zh": "我早餐通常在健身房或咖啡店吃菇、雞肉和酪梨。"
+    },
+    {
+     "term": "Thỉnh thoảng anh ăn bắp nướng ở biển ở Bali.",
+     "zh": "有時候我在峇里島的海邊吃烤玉米。"
+    },
+    {
+     "term": "Anh coi Netflix hay Apple TV mỗi tối.",
+     "zh": "我每天晚上看 Netflix 或 Apple TV。"
+    },
+    {
+     "term": "Anh nghe em không?",
+     "zh": "你聽得到我嗎？"
+    }
+   ]
+  }
+ ]
+}

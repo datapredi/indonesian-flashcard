@@ -10845,6 +10845,8 @@ async function importYtInboxBatch(batch){
   markInboxDone(batch.id);
   renderList();
   showYtInboxBanner();
+  // 每堂課的新單字：匯入完馬上接老師上課錄音。
+  if(String(batch.id).startsWith("newwords-") && typeof applyClassAudio === "function") applyClassAudio();
   return true;
 }
 // 一次匯入收件匣裡同一個語言的所有批次（第一次匯入講義會有二十幾批）。
@@ -10897,6 +10899,8 @@ function showYtInboxBanner(){
   msg.style.cssText = "flex:1 1 220px;";
   const what = batch.rawText
     ? `📥 ${batch.title || "講義"}：${batch.count || batch.rawText.split("\n").length} 行${langLabel}新內容`
+    : String(batch.id).startsWith("newwords-")
+      ? `📥 ${batch.title || "上課新單字"}：${batch.items.length} 個${langLabel}單字／例句（中文已經整理好，有老師發音的會自動接上）`
     : String(batch.id).startsWith("mnemonic-")
       ? `💡 有 ${batch.items.length} 個已經想好諧音、但還不在單字表裡的${langLabel}單字，按「匯入」加進來`
       : `📥 從逐字稿送來 ${batch.items.length} 個${langLabel}單字／片語（${batch.title || "影片"}）`;
@@ -10958,6 +10962,24 @@ document.addEventListener("visibilitychange", () => { if(document.visibilityStat
 // 字還沒匯入的先跳過，之後匯入了，下次開頁會補上。
 const CLASS_AUDIO_DONE_LS = "flashcard_class_audio_done_v1";
 const CLASS_AUDIO_SKIP_LS = "flashcard_class_audio_skip_v1";
+// ================= 每堂課整理好的新單字（new_words/feed.json） =================
+// Claude 從老師講義整理出每堂課的新單字／例句（附中文），放在這個檔案。開頁時
+// 沒處理過的批次放進匯入收件匣，上方會出現「匯入」通知，按下去就用檔案給的中文加進單字表，
+// 分組用那堂課的日期；匯入完馬上接老師上課錄音（class_audio/manifest.json）。
+async function applyNewWordsFeed(){
+  let data;
+  try{
+    const r = await fetch("new_words/feed.json?r=" + Date.now(), { cache: "no-store" });
+    if(!r.ok) return;
+    data = await r.json();
+  }catch(e){ return; }
+  const done = inboxDoneIds(), inbox = readYtInbox();
+  const fresh = (data && Array.isArray(data.batches) ? data.batches : [])
+    .filter(b => b && b.id && b.lang && Array.isArray(b.items) && !done.has(b.id) && !inbox.some(x => x.id === b.id));
+  if(!fresh.length) return;
+  writeYtInbox(inbox.concat(fresh));
+  showYtInboxBanner();
+}
 async function applyClassAudio(){
   let list;
   try{
@@ -11047,11 +11069,14 @@ async function applyClassAudio(){
   let skip;
   try{ skip = new Set(JSON.parse(kvStore.getItem(lsKey(CLASS_AUDIO_SKIP_LS))) || []); }catch(e){ skip = new Set(); }
   // 同一個字在好幾堂課都有錄音的，只列一次，但「不用了」要把每一筆都記起來。
+  // 還在匯入收件匣裡等著匯入的字（例如每堂課的新單字），匯入後就會接上，不用再問。
+  const pendingInbox = new Set();
+  readYtInbox().forEach(b => { if(b.lang === currentLang) (b.items || []).forEach(x => pendingInbox.add(keyOf(x.term))); });
   const missing = [], missingByKey = new Map();
   for(const it of list){
     if(!it || it.lang !== currentLang || !it.id || skip.has(it.id)) continue;
     const k = keyOf(it.text);
-    if(!k || (byText.get(k) || []).length) continue;
+    if(!k || (byText.get(k) || []).length || pendingInbox.has(k)) continue;
     if(missingByKey.has(k)){ missingByKey.get(k).ids.push(it.id); continue; }
     const m = { text: it.text, group: it.group || "", ids: [it.id] };
     missingByKey.set(k, m); missing.push(m);
@@ -11096,7 +11121,7 @@ async function applyClassAudio(){
   const anchor = document.getElementById("wordList");
   anchor.parentNode.insertBefore(bar, anchor);
 }
-applyClassAudio();
+applyNewWordsFeed().finally(applyClassAudio);
 
 // ================= 自動分類（word_tags/） =================
 // word_tags/<語言>.json 列出 { text, cat, gr:[文法…] }，開頁時自動套用：
