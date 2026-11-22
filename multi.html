@@ -10803,7 +10803,13 @@ function removeYtInboxBatch(id){ writeYtInbox(readYtInbox().filter(b => b.id !==
 const INBOX_DONE_LS = "flashcard_inbox_done_v1";
 function inboxDoneIds(){ try{ return new Set(JSON.parse(kvStore.getItem(INBOX_DONE_LS)) || []); }catch(e){ return new Set(); } }
 function markInboxDone(id){ const d = inboxDoneIds(); d.add(id); kvStore.setItem(INBOX_DONE_LS, JSON.stringify([...d])); }
+let inboxImporting = false;   // 匯入中：切出去再回來重畫提示時，不能再按第二次（會兩批同時跑、分組欄位被還原成今天日期）
 async function importYtInboxBatch(batch){
+  if(inboxImporting) return false;
+  inboxImporting = true;
+  try{ return await importYtInboxBatchInner(batch); }finally{ inboxImporting = false; showYtInboxBanner(); }
+}
+async function importYtInboxBatchInner(batch){
   if(!getApiKey()){ alert("匯入需要 AI 生成資料，請先在上面輸入並儲存 Anthropic API Key。"); return false; }
   const groupEl = document.getElementById("convertGroupName");
   const zhEl = document.getElementById("useProvidedZh");
@@ -10853,17 +10859,19 @@ async function importYtInboxBatch(batch){
 // 每批的結果先收起來，最後只跳一次總結。
 async function importAllYtInbox(){
   const todo = readYtInbox().filter(b => b.lang === currentLang);
-  if(!todo.length) return;
+  if(!todo.length || inboxImporting) return;
+  inboxImporting = true;
   convertResultSink = [];
   let done = 0;
   try{
     for(const b of todo){
       const banner = document.querySelector("#ytInboxBanner div");
       if(banner) banner.textContent = `📥 匯入中… ${done + 1} / ${todo.length}：${b.title || b.group || ""}`;
-      if(!(await importYtInboxBatch(b))) break;
+      if(!(await importYtInboxBatchInner(b))) break;
       done++;
     }
   }finally{
+    inboxImporting = false; showYtInboxBanner();
     const results = convertResultSink;
     convertResultSink = null;
     showConvertResult(`已匯入 ${done} / ${todo.length} 批。\n\n` + results.map((r, i) => `${i + 1}. ${r.split("\n")[0]}`).join("\n"));
@@ -10907,7 +10915,8 @@ function showYtInboxBanner(){
   msg.textContent = what + (batch.group ? `，會加入分組「${batch.group}」` : "") + (inbox.length > 1 ? `　（另外還有 ${inbox.length - 1} 批）` : "");
   const go = document.createElement("button");
   go.className = "primary";
-  go.textContent = currentLang === batch.lang ? "匯入" : `切到${langLabel}並匯入`;
+  go.textContent = inboxImporting ? "匯入中…" : (currentLang === batch.lang ? "匯入" : `切到${langLabel}並匯入`);
+  go.disabled = inboxImporting;
   go.addEventListener("click", () => {
     if(currentLang !== batch.lang){
       try{ sessionStorage.setItem(YT_INBOX_PENDING_SS, batch.id); }catch(e){}
@@ -11121,6 +11130,19 @@ async function applyClassAudio(){
   const anchor = document.getElementById("wordList");
   anchor.parentNode.insertBefore(bar, anchor);
 }
+// 一次性修正（2026-11-22）：16 Nov 新單字匯入時被按了兩次，同一批字多了今天的分組 20261122。
+// 同時有 20261116 和 20261122 的字，拿掉 20261122。
+(function(){
+  const FIX = "flashcard_fix_dup_group_20261122";
+  if(kvStore.getItem(lsKey(FIX))) return;
+  let n = 0;
+  Object.keys(wordGroups).forEach(id => {
+    const g = getWordGroups(id);
+    if(g.includes("20261116") && g.includes("20261122")){ setWordGroups(id, g.filter(x => x !== "20261122")); n++; }
+  });
+  if(n){ saveWordGroups(); if(typeof updateGroupFilterOptions === "function") updateGroupFilterOptions(); if(typeof refreshAllGroupSelects === "function") refreshAllGroupSelects(); renderList(); }
+  kvStore.setItem(lsKey(FIX), String(n));
+})();
 applyNewWordsFeed().finally(applyClassAudio);
 
 // ================= 自動分類（word_tags/） =================
