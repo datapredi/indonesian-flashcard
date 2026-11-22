@@ -315,6 +315,54 @@
      "zh": "你聽得到我嗎？"
     }
    ]
+  },
+  {
+   "id": "newwords-vi-20261116",
+   "lang": "vi",
+   "group": "20261116",
+   "title": "16 Nov 新單字",
+   "items": [
+    {
+     "term": "cái gì",
+     "zh": "什麼"
+    },
+    {
+     "term": "dừa xiêm",
+     "zh": "暹羅椰子（小椰子）"
+    },
+    {
+     "term": "rất là",
+     "zh": "非常、很"
+    },
+    {
+     "term": "miền",
+     "zh": "地區、區域"
+    },
+    {
+     "term": "bị",
+     "zh": "遭受（不好的事）"
+    },
+    {
+     "term": "bụng",
+     "zh": "肚子"
+    },
+    {
+     "term": "ở ngoài",
+     "zh": "在外面"
+    },
+    {
+     "term": "vỏ",
+     "zh": "殼、外皮"
+    },
+    {
+     "term": "rẻ hơn nhiều",
+     "zh": "便宜很多"
+    },
+    {
+     "term": "Anh chỉ thấy sầu riêng ở trong siêu thị thôi. Ở ngoài không thấy.",
+     "zh": "我只在超市裡看到榴槤，外面看不到。"
+    }
+   ]
   }
  ]
 }
