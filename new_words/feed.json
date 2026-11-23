@@ -475,6 +475,278 @@
      "zh": "天氣熱的時候你通常去哪裡？"
     }
    ]
+  },
+  {
+   "id": "newwords-vi-20261123",
+   "lang": "vi",
+   "group": "20261123",
+   "title": "23 Nov 新單字",
+   "items": [
+    {
+     "term": "mực nước biển",
+     "zh": "海平面"
+    },
+    {
+     "term": "buổi tối",
+     "zh": "晚上"
+    },
+    {
+     "term": "độ",
+     "zh": "度（溫度）"
+    },
+    {
+     "term": "xung quanh",
+     "zh": "周圍"
+    },
+    {
+     "term": "cây",
+     "zh": "樹、植物"
+    },
+    {
+     "term": "may mắn",
+     "zh": "幸運"
+    },
+    {
+     "term": "may mắn là",
+     "zh": "幸好、幸運的是"
+    },
+    {
+     "term": "bị mắc mưa",
+     "zh": "被雨淋到"
+    },
+    {
+     "term": "mùa",
+     "zh": "季節"
+    },
+    {
+     "term": "mùa đông",
+     "zh": "冬天"
+    },
+    {
+     "term": "mùa mưa",
+     "zh": "雨季"
+    },
+    {
+     "term": "mùa khô",
+     "zh": "乾季"
+    },
+    {
+     "term": "khô",
+     "zh": "乾"
+    },
+    {
+     "term": "mát",
+     "zh": "涼爽"
+    },
+    {
+     "term": "chiều nay",
+     "zh": "今天下午"
+    },
+    {
+     "term": "bay đi",
+     "zh": "飛往"
+    },
+    {
+     "term": "sân bay",
+     "zh": "機場"
+    },
+    {
+     "term": "máy bay",
+     "zh": "飛機"
+    },
+    {
+     "term": "vé",
+     "zh": "票"
+    },
+    {
+     "term": "vé máy bay",
+     "zh": "機票"
+    },
+    {
+     "term": "xe buýt",
+     "zh": "公車"
+    },
+    {
+     "term": "đêm",
+     "zh": "夜晚"
+    },
+    {
+     "term": "chờ",
+     "zh": "等"
+    },
+    {
+     "term": "ngày mấy",
+     "zh": "幾號"
+    },
+    {
+     "term": "mỗi lần",
+     "zh": "每次"
+    },
+    {
+     "term": "đô Mỹ",
+     "zh": "美金"
+    },
+    {
+     "term": "sai",
+     "zh": "錯"
+    },
+    {
+     "term": "sai tên",
+     "zh": "名字錯了"
+    },
+    {
+     "term": "làm lại",
+     "zh": "重做"
+    },
+    {
+     "term": "kỳ",
+     "zh": "奇怪"
+    },
+    {
+     "term": "Kỳ quá vậy!",
+     "zh": "好奇怪喔！"
+    },
+    {
+     "term": "nghĩa",
+     "zh": "意思"
+    },
+    {
+     "term": "có nghĩa là gì",
+     "zh": "是什麼意思"
+    },
+    {
+     "term": "thầy bói",
+     "zh": "算命師"
+    },
+    {
+     "term": "còn nhỏ",
+     "zh": "小時候"
+    },
+    {
+     "term": "cũ",
+     "zh": "舊的、二手的"
+    },
+    {
+     "term": "tên cũ",
+     "zh": "舊名字"
+    },
+    {
+     "term": "số",
+     "zh": "號碼、數字"
+    },
+    {
+     "term": "nhiều thứ",
+     "zh": "很多東西"
+    },
+    {
+     "term": "Ở Phan Thiết buổi tối 28 độ C.",
+     "zh": "潘切晚上 28 度。"
+    },
+    {
+     "term": "Ở đây là 18 độ C.",
+     "zh": "這裡是 18 度。"
+    },
+    {
+     "term": "Em không ở trung tâm thành phố Bảo Lộc.",
+     "zh": "我不住在保祿市中心。"
+    },
+    {
+     "term": "Xung quanh là cây.",
+     "zh": "周圍都是樹。"
+    },
+    {
+     "term": "May mắn là wifi rất tốt.",
+     "zh": "幸好 wifi 很好。"
+    },
+    {
+     "term": "Mùa đông đang tới.",
+     "zh": "冬天快到了。"
+    },
+    {
+     "term": "Tháng 12 tới tháng 2 trời mát hơn.",
+     "zh": "12 月到 2 月天氣比較涼。"
+    },
+    {
+     "term": "Ở Phan Thiết có 2 mùa thôi: mùa mưa và mùa khô.",
+     "zh": "潘切只有兩個季節：雨季和乾季。"
+    },
+    {
+     "term": "Anh tới Jakarta chiều nay.",
+     "zh": "我今天下午到雅加達。"
+    },
+    {
+     "term": "Giống Sài Gòn bay đi Hà Nội.",
+     "zh": "就像從西貢飛河內一樣。"
+    },
+    {
+     "term": "Sân bay xa khách sạn.",
+     "zh": "機場離飯店很遠。"
+    },
+    {
+     "term": "Đi taxi hơn 1 tiếng, mắc.",
+     "zh": "搭計程車要一個多小時，很貴。"
+    },
+    {
+     "term": "Sau đó anh phải đi taxi từ khách sạn tới sân bay.",
+     "zh": "之後我得從飯店搭計程車到機場。"
+    },
+    {
+     "term": "Anh định đi Việt Nam ngày mấy?",
+     "zh": "你打算幾號去越南？"
+    },
+    {
+     "term": "Khi có visa anh sẽ mua vé máy bay đi Việt Nam.",
+     "zh": "拿到簽證後我會買去越南的機票。"
+    },
+    {
+     "term": "Anh trả bao nhiêu tiền cho visa Việt Nam?",
+     "zh": "你的越南簽證付了多少錢？"
+    },
+    {
+     "term": "Mỗi lần 25 đô Mỹ nhưng mà anh trả 2 lần vì lần đầu bị sai tên nên anh phải làm lại.",
+     "zh": "每次 25 美金，但我付了兩次，因為第一次名字錯了，所以得重辦。"
+    },
+    {
+     "term": "Tên của anh có 3 từ.",
+     "zh": "我的名字有三個字。"
+    },
+    {
+     "term": "Tên của anh có nghĩa là gì?",
+     "zh": "你的名字是什麼意思？"
+    },
+    {
+     "term": "Ba mẹ anh hỏi thầy bói và thầy bói nói 3 cái tên và ba mẹ chọn một cái.",
+     "zh": "我爸媽去問算命師，算命師給了三個名字，爸媽選了一個。"
+    },
+    {
+     "term": "Anh có thấy anh may mắn không?",
+     "zh": "你覺得自己幸運嗎？"
+    },
+    {
+     "term": "Em đổi tên khi còn nhỏ, 7 tuổi.",
+     "zh": "我小時候改了名字，七歲。"
+    },
+    {
+     "term": "Một lý do khác làm em đổi tên là vì em là số 1.",
+     "zh": "我改名的另一個原因是因為我是一號。"
+    },
+    {
+     "term": "Ngày mai anh sẽ đổi khách sạn vì anh muốn ở gần một mall khác.",
+     "zh": "明天我要換飯店，因為我想住在另一間 mall 附近。"
+    },
+    {
+     "term": "Anh không muốn đổi tên vì anh phải đổi nhiều thứ.",
+     "zh": "我不想改名，因為得改很多東西。"
+    },
+    {
+     "term": "Vì sao anh muốn đi mall đó?",
+     "zh": "你為什麼想去那間 mall？"
+    },
+    {
+     "term": "Có một quán Hongkong ở trong mall đó và anh muốn đi ăn ở đó.",
+     "zh": "那間 mall 裡有一家港式餐廳，我想去那裡吃。"
+    }
+   ]
   }
  ]
 }
