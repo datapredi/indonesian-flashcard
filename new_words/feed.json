@@ -375,14 +375,6 @@
      "zh": "半小時前"
     },
     {
-     "term": "jam",
-     "zh": "小時；鐘點"
-    },
-    {
-     "term": "lalu",
-     "zh": "以前；（接在時間長度後）……前"
-    },
-    {
      "term": "putusin",
      "zh": "決定（口語，標準說法 memutuskan）"
     },
@@ -393,14 +385,6 @@
     {
      "term": "hujan deras",
      "zh": "大雨；下大雨（講義寫 hujan besar）"
-    },
-    {
-     "term": "dari",
-     "zh": "從；來自"
-    },
-    {
-     "term": "makan",
-     "zh": "吃"
     },
     {
      "term": "barang",
@@ -419,26 +403,6 @@
      "zh": "享受；欣賞"
     },
     {
-     "term": "mana",
-     "zh": "哪裡；哪一個"
-    },
-    {
-     "term": "di",
-     "zh": "在（表示地點）"
-    },
-    {
-     "term": "apa",
-     "zh": "什麼"
-    },
-    {
-     "term": "kamu",
-     "zh": "你"
-    },
-    {
-     "term": "suka",
-     "zh": "喜歡"
-    },
-    {
      "term": "Kapan cuaca terdingin di kota kamu?",
      "zh": "你住的城市什麼時候最冷？"
     },
@@ -453,6 +417,62 @@
     {
      "term": "Kamu lebih suka hujan di pagi atau di sore?",
      "zh": "你比較喜歡早上下雨還是傍晚下雨？"
+    }
+   ]
+  },
+  {
+   "id": "newwords-id-20261123b",
+   "lang": "id",
+   "group": "20261123",
+   "title": "23 Nov 新單字（補漏）",
+   "items": [
+    {
+     "term": "masker",
+     "zh": "口罩"
+    },
+    {
+     "term": "petani",
+     "zh": "農夫"
+    },
+    {
+     "term": "suhu",
+     "zh": "溫度"
+    },
+    {
+     "term": "kehujanan",
+     "zh": "被雨淋到"
+    },
+    {
+     "term": "main hujan",
+     "zh": "玩雨（＝hujan-hujanan）"
+    },
+    {
+     "term": "di rumah aja",
+     "zh": "就待在家裡"
+    },
+    {
+     "term": "waktu saya kecil",
+     "zh": "我小時候"
+    },
+    {
+     "term": "marahin",
+     "zh": "罵（某人）（口語，marah = 生氣）"
+    },
+    {
+     "term": "Berapa suhu di kota kamu sekarang?",
+     "zh": "你的城市現在幾度？"
+    },
+    {
+     "term": "Kapan terakhir kali kamu kehujanan?",
+     "zh": "你上次被雨淋是什麼時候？"
+    },
+    {
+     "term": "Kamu pernah main di hujan? Kapan?",
+     "zh": "你玩過雨嗎？什麼時候？"
+    },
+    {
+     "term": "Di mana kamu biasanya pergi waktu cuaca panas?",
+     "zh": "天氣熱的時候你通常去哪裡？"
     }
    ]
   }
