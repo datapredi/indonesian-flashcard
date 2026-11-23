@@ -363,6 +363,98 @@
      "zh": "我只在超市裡看到榴槤，外面看不到。"
     }
    ]
+  },
+  {
+   "id": "newwords-id-20261123",
+   "lang": "id",
+   "group": "20261123",
+   "title": "23 Nov 新單字",
+   "items": [
+    {
+     "term": "setengah jam lalu",
+     "zh": "半小時前"
+    },
+    {
+     "term": "jam",
+     "zh": "小時；鐘點"
+    },
+    {
+     "term": "lalu",
+     "zh": "以前；（接在時間長度後）……前"
+    },
+    {
+     "term": "putusin",
+     "zh": "決定（口語，標準說法 memutuskan）"
+    },
+    {
+     "term": "tahun ini",
+     "zh": "今年"
+    },
+    {
+     "term": "hujan deras",
+     "zh": "大雨；下大雨（講義寫 hujan besar）"
+    },
+    {
+     "term": "dari",
+     "zh": "從；來自"
+    },
+    {
+     "term": "makan",
+     "zh": "吃"
+    },
+    {
+     "term": "barang",
+     "zh": "東西；物品"
+    },
+    {
+     "term": "lembap",
+     "zh": "潮濕（講義拼作 lembab）"
+    },
+    {
+     "term": "terdingin",
+     "zh": "最冷的"
+    },
+    {
+     "term": "menikmati",
+     "zh": "享受；欣賞"
+    },
+    {
+     "term": "mana",
+     "zh": "哪裡；哪一個"
+    },
+    {
+     "term": "di",
+     "zh": "在（表示地點）"
+    },
+    {
+     "term": "apa",
+     "zh": "什麼"
+    },
+    {
+     "term": "kamu",
+     "zh": "你"
+    },
+    {
+     "term": "suka",
+     "zh": "喜歡"
+    },
+    {
+     "term": "Kapan cuaca terdingin di kota kamu?",
+     "zh": "你住的城市什麼時候最冷？"
+    },
+    {
+     "term": "Di mana tempat terbaik untuk menikmati cuaca cerah?",
+     "zh": "哪裡最適合享受晴天？"
+    },
+    {
+     "term": "Kamu buat apa waktu cuaca dingin banget?",
+     "zh": "天氣很冷時，你會做什麼？"
+    },
+    {
+     "term": "Kamu lebih suka hujan di pagi atau di sore?",
+     "zh": "你比較喜歡早上下雨還是傍晚下雨？"
+    }
+   ]
   }
  ]
 }
