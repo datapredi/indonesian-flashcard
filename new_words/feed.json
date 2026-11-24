@@ -747,6 +747,58 @@
      "zh": "那間 mall 裡有一家港式餐廳，我想去那裡吃。"
     }
    ]
+  },
+  {
+   "id": "newwords-id-20261118",
+   "lang": "id",
+   "group": "20261118",
+   "title": "18 Nov 新單字",
+   "items": [
+    {
+     "term": "setengah sepuluh",
+     "zh": "九點半"
+    },
+    {
+     "term": "beras biasa",
+     "zh": "一般的米"
+    },
+    {
+     "term": "kilo",
+     "zh": "公斤"
+    },
+    {
+     "term": "lima belas ribu",
+     "zh": "一萬五"
+    },
+    {
+     "term": "dua ratus ribu",
+     "zh": "二十萬"
+    },
+    {
+     "term": "porang",
+     "zh": "魔芋"
+    },
+    {
+     "term": "beras porang",
+     "zh": "魔芋米"
+    },
+    {
+     "term": "kuning",
+     "zh": "黃色"
+    },
+    {
+     "term": "lama",
+     "zh": "久"
+    },
+    {
+     "term": "belum",
+     "zh": "還沒"
+    },
+    {
+     "term": "tau",
+     "zh": "知道（口語）"
+    }
+   ]
   }
  ]
 }
