@@ -799,6 +799,366 @@
      "zh": "知道（口語）"
     }
    ]
+  },
+  {
+   "id": "newwords-vi-20261126",
+   "lang": "vi",
+   "group": "20261126",
+   "title": "26 Nov 新單字",
+   "items": [
+    {
+     "term": "gọi điện",
+     "zh": "打電話"
+    },
+    {
+     "term": "alo",
+     "zh": "喂（接電話）"
+    },
+    {
+     "term": "tới rồi",
+     "zh": "到了"
+    },
+    {
+     "term": "nha",
+     "zh": "喔、囉（語氣詞，軟化語氣）"
+    },
+    {
+     "term": "xuống",
+     "zh": "下去、下來"
+    },
+    {
+     "term": "xuống lầu",
+     "zh": "下樓"
+    },
+    {
+     "term": "vội",
+     "zh": "急、匆忙"
+    },
+    {
+     "term": "không vội",
+     "zh": "不急"
+    },
+    {
+     "term": "hơi lâu",
+     "zh": "有點久"
+    },
+    {
+     "term": "tên gì",
+     "zh": "叫什麼名字"
+    },
+    {
+     "term": "quên rồi",
+     "zh": "忘了"
+    },
+    {
+     "term": "để em",
+     "zh": "讓我（來）"
+    },
+    {
+     "term": "bếp",
+     "zh": "廚房"
+    },
+    {
+     "term": "chợ",
+     "zh": "市場"
+    },
+    {
+     "term": "không chắc",
+     "zh": "不確定"
+    },
+    {
+     "term": "chắc",
+     "zh": "確定；大概、應該"
+    },
+    {
+     "term": "đi nha",
+     "zh": "走吧、去囉"
+    },
+    {
+     "term": "rõ",
+     "zh": "清楚"
+    },
+    {
+     "term": "nghe rõ",
+     "zh": "聽得清楚"
+    },
+    {
+     "term": "vậy",
+     "zh": "呢（問句語氣詞）；這樣"
+    },
+    {
+     "term": "cao hơn",
+     "zh": "比較高"
+    },
+    {
+     "term": "lạnh quá",
+     "zh": "好冷"
+    },
+    {
+     "term": "ha",
+     "zh": "齁、吧（語氣詞）"
+    },
+    {
+     "term": "ngay",
+     "zh": "就在、正好"
+    },
+    {
+     "term": "xa lắm",
+     "zh": "很遠"
+    },
+    {
+     "term": "hồi chiều",
+     "zh": "今天下午稍早"
+    },
+    {
+     "term": "ướt",
+     "zh": "濕"
+    },
+    {
+     "term": "ướt hết",
+     "zh": "全濕了"
+    },
+    {
+     "term": "luôn",
+     "zh": "完全、直接（強調）"
+    },
+    {
+     "term": "chỗ khác",
+     "zh": "別的地方"
+    },
+    {
+     "term": "quận",
+     "zh": "區（行政區）"
+    },
+    {
+     "term": "thứ",
+     "zh": "東西、種類"
+    },
+    {
+     "term": "không mua gì",
+     "zh": "什麼都沒買"
+    },
+    {
+     "term": "ngoài",
+     "zh": "外面"
+    },
+    {
+     "term": "vali",
+     "zh": "行李箱"
+    },
+    {
+     "term": "balo",
+     "zh": "背包"
+    },
+    {
+     "term": "ký",
+     "zh": "公斤"
+    },
+    {
+     "term": "hành lý",
+     "zh": "行李"
+    },
+    {
+     "term": "nặng",
+     "zh": "重"
+    },
+    {
+     "term": "đi lâu",
+     "zh": "去很久"
+    },
+    {
+     "term": "bàn",
+     "zh": "桌子"
+    },
+    {
+     "term": "ghế",
+     "zh": "椅子"
+    },
+    {
+     "term": "cái bàn",
+     "zh": "一張桌子"
+    },
+    {
+     "term": "ra",
+     "zh": "出（往外移動）"
+    },
+    {
+     "term": "đi ra ngoài",
+     "zh": "出去外面"
+    },
+    {
+     "term": "lối ra",
+     "zh": "出口"
+    },
+    {
+     "term": "ma",
+     "zh": "鬼"
+    },
+    {
+     "term": "sợ ma",
+     "zh": "怕鬼"
+    },
+    {
+     "term": "muỗi",
+     "zh": "蚊子"
+    },
+    {
+     "term": "phiền",
+     "zh": "煩、打擾"
+    },
+    {
+     "term": "lên",
+     "zh": "上（往上移動）"
+    },
+    {
+     "term": "đi lên",
+     "zh": "上去"
+    },
+    {
+     "term": "lên núi",
+     "zh": "上山"
+    },
+    {
+     "term": "trước khi",
+     "zh": "在…之前"
+    },
+    {
+     "term": "bột đậu",
+     "zh": "豆粉"
+    },
+    {
+     "term": "Alo? Em nghe anh không?",
+     "zh": "喂？你聽得到我嗎？"
+    },
+    {
+     "term": "Xe tới rồi.",
+     "zh": "車到了。"
+    },
+    {
+     "term": "Chờ chút nha!",
+     "zh": "等一下喔！"
+    },
+    {
+     "term": "Em đang xuống lầu.",
+     "zh": "我正在下樓。"
+    },
+    {
+     "term": "Không vội.",
+     "zh": "不急。"
+    },
+    {
+     "term": "Xin lỗi anh, em xuống hơi lâu.",
+     "zh": "抱歉，我下來有點久。"
+    },
+    {
+     "term": "Nhà hàng này tên gì?",
+     "zh": "這家餐廳叫什麼名字？"
+    },
+    {
+     "term": "Em quên rồi!",
+     "zh": "我忘了！"
+    },
+    {
+     "term": "Để em coi điện thoại.",
+     "zh": "讓我看一下手機。"
+    },
+    {
+     "term": "Quán này gần chợ Bến Thành phải không?",
+     "zh": "這家店在濱城市場附近對吧？"
+    },
+    {
+     "term": "Em nghĩ là vậy… À không, em không chắc!",
+     "zh": "我想是吧…啊不，我不確定！"
+    },
+    {
+     "term": "Vậy mình đi nha!",
+     "zh": "那我們走吧！"
+    },
+    {
+     "term": "Em đang ở đâu vậy?",
+     "zh": "你現在在哪裡呀？"
+    },
+    {
+     "term": "Dạ nghe rõ!",
+     "zh": "聽得很清楚！"
+    },
+    {
+     "term": "Bảo Lộc cao hơn mực nước biển nhiều lắm.",
+     "zh": "保祿比海平面高很多。"
+    },
+    {
+     "term": "Chắc là lạnh hả em?",
+     "zh": "應該很冷吧？"
+    },
+    {
+     "term": "Lạnh quá ha!",
+     "zh": "好冷喔！"
+    },
+    {
+     "term": "Em ở ngay trung tâm thành phố hả?",
+     "zh": "你就住在市中心嗎？"
+    },
+    {
+     "term": "Em ở homestay xa lắm.",
+     "zh": "我住在很遠的民宿。"
+    },
+    {
+     "term": "Xung quanh là cây thôi.",
+     "zh": "周圍只有樹。"
+    },
+    {
+     "term": "Ở xa vậy có internet không?",
+     "zh": "住那麼遠有網路嗎？"
+    },
+    {
+     "term": "Hồi chiều em đi chơi và bị mắc mưa.",
+     "zh": "今天下午我出去玩，被雨淋到。"
+    },
+    {
+     "term": "Ướt hết luôn!",
+     "zh": "全身都濕透了！"
+    },
+    {
+     "term": "Hôm nay em đang ở chỗ khác.",
+     "zh": "今天我在別的地方。"
+    },
+    {
+     "term": "Chợ Bến Thành bán nhiều thứ.",
+     "zh": "濱城市場賣很多東西。"
+    },
+    {
+     "term": "Anh không mua gì ở trong chợ nhưng mà mua đồ ăn ở ngoài chợ.",
+     "zh": "我在市場裡什麼都沒買，但在市場外面買了吃的。"
+    },
+    {
+     "term": "3 ngày 2 đêm",
+     "zh": "三天兩夜"
+    },
+    {
+     "term": "Chỉ 7 km thôi nhưng mà đi 50 phút.",
+     "zh": "只有 7 公里，但要走 50 分鐘。"
+    },
+    {
+     "term": "Hành lý của anh nặng vì anh đi lâu.",
+     "zh": "我的行李很重，因為我要去很久。"
+    },
+    {
+     "term": "Vì sao anh muốn đi như vậy?",
+     "zh": "你為什麼想這樣去？"
+    },
+    {
+     "term": "Có một cái bàn ở ngoài.",
+     "zh": "外面有一張桌子。"
+    },
+    {
+     "term": "Em không sợ ma vì em đang nói chuyện với anh.",
+     "zh": "我不怕鬼，因為我正在跟你講話。"
+    },
+    {
+     "term": "Em mua đồ ăn ở ngoài trước khi check in.",
+     "zh": "我 check in 之前在外面買吃的。"
+    }
+   ]
   }
  ]
 }
