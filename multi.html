@@ -468,6 +468,7 @@
       <button class="secondary" id="btnStartWrite">✍️ 中翻印尼文（AI 出句、AI 批改）</button>
       <button class="secondary" id="btnStartListen">🏃 跑步聽力模式</button>
       <button class="secondary hidden" id="btnResumeListen">▶️ 繼續上次跑步進度</button>
+      <button class="secondary" id="btnStartTriage">🗂️ 快速分類（看中文說出來：已會／模糊／不會）</button>
       <button class="secondary hidden" id="btnStartSpellCards">🔤 埃及拼字 Flash Card（給單字，回想怎麼拼）</button>
     </div>
   </div>
@@ -535,6 +536,61 @@
     </div>
     <div class="actions" style="margin-top:16px;">
       <button id="btnBackFromSpellCards">返回清單</button>
+    </div>
+  </div>
+
+  <!-- ===== 快速分類：看中文說出外語，分成已會／模糊／不會；已會的最後再聽寫驗證 ===== -->
+  <div id="screen-triage" class="hidden">
+    <div id="triageSetup">
+      <h3 style="margin:4px 0 8px;">🗂️ 快速分類</h3>
+      <div class="usage-note" style="margin-bottom:10px; line-height:1.6;">看中文，3 秒內說出來 → 翻面對答案 → 自己分「已會／模糊／不會」。<br>標「已會」的字，這一輪最後會再聽寫一次：寫對（聲調也要對）才算已熟練，寫錯改成模糊。</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+        <select id="triageGroup"></select>
+        <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="triageOnlyNew" checked> 只做還沒分類的</label>
+      </div>
+      <div class="actions">
+        <button class="primary" id="btnTriageGo">開始分類</button>
+        <button id="btnTriageBack">返回清單</button>
+      </div>
+      <div id="triageStats" style="margin-top:14px; line-height:1.7;"></div>
+      <div class="actions" style="margin-top:10px;">
+        <button class="secondary" id="btnTriageSelectWeak">☑️ 把「模糊＋不會」設成勾選（拿去一般 Flash Card 複習）</button>
+        <button class="secondary" id="btnTriageCopyWeak">📋 複製「模糊＋不會」清單</button>
+      </div>
+    </div>
+    <div id="triagePlay" class="hidden">
+      <div class="progress" id="triageProgress"></div>
+      <div class="card-area" id="triageCard">
+        <div class="usage-note" id="triageGroupLabel"></div>
+        <div class="front" id="triageFront" style="font-size:1.9rem;"></div>
+        <div class="back hidden" id="triageBack" style="font-size:1.9rem; font-weight:700;"></div>
+        <div class="usage-note" id="triageHint">點卡片（或空白鍵）翻面</div>
+      </div>
+      <div class="nav" id="triageRateRow" style="visibility:hidden;">
+        <button id="btnTriageKnown" style="background:#2e7d32; color:#fff;">✅ 已會 (1)</button>
+        <button id="btnTriageFuzzy" style="background:#f9a825; color:#000;">🟡 模糊 (2)</button>
+        <button id="btnTriageUnknown" style="background:#c62828; color:#fff;">❌ 不會 (3)</button>
+      </div>
+      <div class="actions" style="margin-top:12px;">
+        <button id="btnTriageSpeak">🔊 再聽一次</button>
+        <button id="btnTriageUndo">↩️ 上一張</button>
+        <button id="btnTriageStop">結束這一輪</button>
+      </div>
+    </div>
+    <div id="triageDict" class="hidden">
+      <div class="progress" id="triageDictProgress"></div>
+      <div class="card-area" style="cursor:default;">
+        <div class="usage-note">聽寫驗證：聽完打出來（聲調要打）</div>
+        <button type="button" class="listen-btn" id="btnTriageDictSpeak">🔊 播放</button>
+        <input type="text" id="triageDictInput" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:90%; font-size:1.4rem; margin-top:10px;">
+        <div id="triageDictResult" style="margin-top:12px; font-size:1.3rem; line-height:1.6;"></div>
+      </div>
+      <div class="actions" style="margin-top:12px;">
+        <button class="primary" id="btnTriageDictCheck">檢查 (Enter)</button>
+        <button id="btnTriageDictHint">💡 看中文</button>
+        <button class="hidden" id="btnTriageDictOverride">算我對（只是打錯字）</button>
+        <button id="btnTriageDictSkip">跳過聽寫，直接結束</button>
+      </div>
     </div>
   </div>
 
@@ -1821,6 +1877,9 @@ function saveWordList(list){
 const MASTERED_CARDS_LS = "flashcard_mastered_cards_v1";
 const MASTERED_QUIZ_LS = "flashcard_mastered_quiz_v1";
 const MASTERED_LEGACY_LS = "flashcard_mastered_v1";
+// 快速分類（🗂️）的結果：{ 單字文字: { s: "known"|"fuzzy"|"unknown", t: 時間, d: "pass"|"fail" } }。
+// 用文字當 key（不是編號），重新編號／刪字都不會對錯字。定義在這裡是因為備份清單在載入時就會用到。
+const TRIAGE_LS = "flashcard_triage_v1";
 function loadMasteredSet(key){
   try{ return new Set(JSON.parse(kvStore.getItem(key)) || []); }catch(e){ return new Set(); }
 }
@@ -10131,7 +10190,7 @@ const BACKUP_PER_LANG_BASES = [
   INFLECTIONS_CACHE_LS, AR_BREAKDOWN_CACHE_LS, ALIGN_CACHE_LS, ID_MORPH_CACHE_LS, COLOR_FLAG_LS,
   THAI_TONE_RULE_CACHE_LS, WORD_GROUP_LS, WORD_CATEGORY_LS, WORD_GRAMMAR_LS,
   ANTONYMS_CACHE_LS, CHUNKS_CACHE_LS, GRAMMAR_BREAKDOWN_CACHE_LS, MINIMAL_PAIRS_CACHE_LS, WORD_IN_CONTEXT_CACHE_LS,
-  VI_TONE_MARKS_CACHE_LS, VI_NATIVE_TONE_MARKS_CACHE_LS, USE_RECORDING_LS
+  VI_TONE_MARKS_CACHE_LS, VI_NATIVE_TONE_MARKS_CACHE_LS, USE_RECORDING_LS, TRIAGE_LS
 ];
 // 寫成函式、匯出時才取值：ALPHA_MASTERED_LS 定義在後面（字母練習那段），在這裡直接
 // 放進陣列會在載入時就丟 ReferenceError，整個主程式停在這一行。
@@ -11663,6 +11722,279 @@ document.getElementById("btnSpellShuffle").onclick = () => {
 };
 document.getElementById("btnBackFromSpellCards").onclick = () => showScreen("select");
 
+// ================= 🗂️ 快速分類 =================
+// 舊字補課第一步：看中文說出外語，翻面後自己分「已會／模糊／不會」。標已會的
+// 字在這一輪最後聽寫一次，寫對（含聲調）才記成已熟練（加進 Flash Card 的已學會），
+// 寫錯改成模糊。結果存在 TRIAGE_LS（用文字當 key）。
+let triageData = {};
+try{ triageData = JSON.parse(kvStore.getItem(lsKey(TRIAGE_LS))) || {}; }catch(e){ triageData = {}; }
+function saveTriage(){ kvStore.setItem(lsKey(TRIAGE_LS), JSON.stringify(triageData)); }
+const TRIAGE_LABEL = { known: "✅ 已會", fuzzy: "🟡 模糊", unknown: "❌ 不會" };
+let triageSession = [], triageIdx = 0, triageFlipped = false, triageHistory = [];
+let triageDictList = [], triageDictIdx = 0, triageDictChecked = false;
+let triageResult = { known: 0, fuzzy: 0, unknown: 0, pass: 0, fail: 0 };
+
+function triageAnswer(w){
+  const d = lookup(w.text);
+  return ((L().hasScript && d && d.nativeScript) || w.text).trim();
+}
+function triageMeaning(w){
+  const d = lookup(w.text);
+  return (d && (d.zh || d.en)) || "";
+}
+function triageWordsInGroup(g){
+  return allWords.filter(w => !hiddenIds.has(w.id)).filter(w => {
+    const gs = getWordGroups(w.id);
+    if(g === "") return true;
+    if(g === "__none") return gs.length === 0;
+    return gs.indexOf(g) !== -1;
+  });
+}
+function triageCounts(list){
+  const c = { known: 0, fuzzy: 0, unknown: 0, none: 0, total: list.length };
+  list.forEach(w => { const r = triageData[w.text]; c[r ? r.s : "none"]++; });
+  return c;
+}
+function triageFillGroups(){
+  const sel = document.getElementById("triageGroup");
+  const cur = sel.value;
+  sel.innerHTML = "";
+  const add = (v, label) => { const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o); };
+  const groups = distinctGroups();
+  add("", `全部（${triageWordsInGroup("").length}）`);
+  groups.forEach(g => add(g, `${g}（${triageWordsInGroup(g).length}）`));
+  const none = triageWordsInGroup("__none").length;
+  if(none) add("__none", `未分組（${none}）`);
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : (groupFilter && groups.indexOf(groupFilter) !== -1 ? groupFilter : "");
+}
+function triageRenderStats(){
+  const el = document.getElementById("triageStats");
+  const groups = distinctGroups();
+  const rows = [["全部", ""]].concat(groups.map(g => [g, g]));
+  if(triageWordsInGroup("__none").length) rows.push(["未分組", "__none"]);
+  el.innerHTML = "";
+  rows.forEach(([label, g]) => {
+    const c = triageCounts(triageWordsInGroup(g));
+    if(!c.total) return;
+    const div = document.createElement("div");
+    if(g === "") div.style.fontWeight = "700";
+    div.textContent = `${label}：${c.total} 張｜✅ ${c.known}　🟡 ${c.fuzzy}　❌ ${c.unknown}　未分類 ${c.none}`;
+    el.appendChild(div);
+  });
+}
+function triageShowPart(part){
+  ["triageSetup", "triagePlay", "triageDict"].forEach(id => document.getElementById(id).classList.toggle("hidden", id !== part));
+}
+function triageOpenSetup(){
+  triageFillGroups();
+  triageRenderStats();
+  triageShowPart("triageSetup");
+}
+document.getElementById("btnStartTriage").onclick = () => { showScreen("triage"); triageOpenSetup(); };
+document.getElementById("btnTriageBack").onclick = () => showScreen("select");
+document.getElementById("btnTriageGo").onclick = () => {
+  const g = document.getElementById("triageGroup").value;
+  const onlyNew = document.getElementById("triageOnlyNew").checked;
+  let list = triageWordsInGroup(g).filter(w => triageMeaning(w));
+  if(onlyNew) list = list.filter(w => !triageData[w.text]);
+  if(!list.length){ alert(onlyNew ? "這一組的字都分類過了（取消「只做還沒分類的」可以重新分類）。" : "這一組沒有字。"); return; }
+  triageSession = shuffleArr(list);
+  triageIdx = 0; triageHistory = []; triageDictList = [];
+  triageResult = { known: 0, fuzzy: 0, unknown: 0, pass: 0, fail: 0 };
+  triageShowPart("triagePlay");
+  triageRenderCard();
+};
+function triageRenderCard(){
+  const w = triageSession[triageIdx];
+  triageFlipped = false;
+  document.getElementById("triageProgress").textContent = `第 ${triageIdx + 1} / ${triageSession.length} 張　（✅ ${triageResult.known}　🟡 ${triageResult.fuzzy}　❌ ${triageResult.unknown}）`;
+  document.getElementById("triageGroupLabel").textContent = wordGroupsLabel(w.id);
+  document.getElementById("triageFront").textContent = triageMeaning(w);
+  const back = document.getElementById("triageBack");
+  back.textContent = triageAnswer(w);
+  back.classList.add("hidden");
+  document.getElementById("triageHint").classList.remove("hidden");
+  document.getElementById("triageRateRow").style.visibility = "hidden";
+}
+function triageSpeak(w, btn){
+  speak(getSpeechText(w), btn || null, null, recKeyFor(w.text));
+}
+function triageFlip(){
+  if(triageFlipped) return;
+  triageFlipped = true;
+  document.getElementById("triageBack").classList.remove("hidden");
+  document.getElementById("triageHint").classList.add("hidden");
+  document.getElementById("triageRateRow").style.visibility = "visible";
+  triageSpeak(triageSession[triageIdx]);
+}
+document.getElementById("triageCard").addEventListener("click", triageFlip);
+document.getElementById("btnTriageSpeak").onclick = (e) => { const w = triageSession[triageIdx]; if(w) triageSpeak(w, e.currentTarget); };
+function triageRate(s){
+  if(!triageFlipped) return;
+  const w = triageSession[triageIdx];
+  triageHistory.push({ text: w.text, prev: triageData[w.text] || null, s, wasMastered: cardMasteredIds.has(w.id) });
+  triageData[w.text] = { s, t: Date.now() };
+  // 重新分類成模糊／不會：之前的「已熟練」拿掉，讓它回到 Flash Card 複習裡
+  if(s !== "known" && cardMasteredIds.has(w.id)){ cardMasteredIds.delete(w.id); saveCardMastered(); }
+  saveTriage();
+  triageResult[s]++;
+  if(s === "known") triageDictList.push(w);
+  triageIdx++;
+  if(triageIdx >= triageSession.length) triageStartDict();
+  else triageRenderCard();
+}
+document.getElementById("btnTriageKnown").onclick = () => triageRate("known");
+document.getElementById("btnTriageFuzzy").onclick = () => triageRate("fuzzy");
+document.getElementById("btnTriageUnknown").onclick = () => triageRate("unknown");
+document.getElementById("btnTriageUndo").onclick = () => {
+  const h = triageHistory.pop();
+  if(!h) return;
+  if(h.prev) triageData[h.text] = h.prev; else delete triageData[h.text];
+  saveTriage();
+  const w = triageSession[triageIdx - 1];
+  if(w && h.wasMastered && !cardMasteredIds.has(w.id)){ cardMasteredIds.add(w.id); saveCardMastered(); }
+  triageResult[h.s]--;
+  if(h.s === "known") triageDictList = triageDictList.filter(x => x.text !== h.text);
+  triageIdx--;
+  triageRenderCard();
+};
+document.getElementById("btnTriageStop").onclick = () => {
+  // 中途結束：已經分過的照樣存著，已會的照樣去聽寫
+  triageStartDict();
+};
+
+// ---- 聽寫驗證 ----
+function triageNorm(s){
+  return String(s || "").normalize("NFC").toLowerCase()
+    .replace(/\s*\(\d+\)\s*$/, "")
+    .replace(/[.,!?;:…"'“”‘’()（）\[\]\-–—\/。，！？、]/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+function triageStartDict(){
+  if(!triageDictList.length){ triageFinish(); return; }
+  triageDictList = shuffleArr(triageDictList);
+  triageDictIdx = 0;
+  triageShowPart("triageDict");
+  triageRenderDict();
+}
+function triageRenderDict(){
+  const w = triageDictList[triageDictIdx];
+  triageDictChecked = false;
+  document.getElementById("triageDictProgress").textContent = `聽寫 ${triageDictIdx + 1} / ${triageDictList.length}　（對 ${triageResult.pass}　錯 ${triageResult.fail}）`;
+  const input = document.getElementById("triageDictInput");
+  input.value = "";
+  input.disabled = false;
+  document.getElementById("triageDictResult").innerHTML = "";
+  document.getElementById("btnTriageDictCheck").textContent = "檢查 (Enter)";
+  document.getElementById("btnTriageDictOverride").classList.add("hidden");
+  setTimeout(() => input.focus(), 50);
+  triageSpeak(w);
+}
+function triageMarkDiff(typed, answer){
+  // 一個音節一個音節比，打錯的音節標紅
+  const a = answer.split(/\s+/), t = triageNorm(typed).split(" ");
+  return a.map((syl, i) => {
+    const ok = triageNorm(syl) === (t[i] || "");
+    return `<span style="${ok ? "" : "color:#e53935; text-decoration:underline;"}">${escapeHtmlTriage(syl)}</span>`;
+  }).join(" ");
+}
+function escapeHtmlTriage(s){ return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+function triageSetDict(w, pass){
+  const r = triageData[w.text] || { s: "known", t: Date.now() };
+  if(pass){
+    triageData[w.text] = Object.assign({}, r, { s: "known", d: "pass" });
+    if(!cardMasteredIds.has(w.id)){ cardMasteredIds.add(w.id); saveCardMastered(); }
+  }else{
+    triageData[w.text] = Object.assign({}, r, { s: "fuzzy", d: "fail" });
+    if(cardMasteredIds.has(w.id)){ cardMasteredIds.delete(w.id); saveCardMastered(); }
+  }
+  saveTriage();
+}
+function triageDictCheck(){
+  const w = triageDictList[triageDictIdx];
+  if(triageDictChecked){
+    triageDictIdx++;
+    if(triageDictIdx >= triageDictList.length) triageFinish(); else triageRenderDict();
+    return;
+  }
+  const input = document.getElementById("triageDictInput");
+  const typed = input.value;
+  if(!typed.trim()){ input.focus(); return; }
+  triageDictChecked = true;
+  input.disabled = true;
+  const answer = triageAnswer(w);
+  const pass = triageNorm(typed) === triageNorm(answer);
+  const res = document.getElementById("triageDictResult");
+  if(pass){
+    triageResult.pass++;
+    res.innerHTML = `✅ 對了：<b>${escapeHtmlTriage(answer)}</b><div class="usage-note">${escapeHtmlTriage(triageMeaning(w))}　→ 已熟練</div>`;
+  }else{
+    triageResult.fail++;
+    res.innerHTML = `❌ 你打：${escapeHtmlTriage(typed)}<br>正確：<b>${triageMarkDiff(typed, answer)}</b><div class="usage-note">${escapeHtmlTriage(triageMeaning(w))}　→ 改成模糊</div>`;
+    document.getElementById("btnTriageDictOverride").classList.remove("hidden");
+  }
+  triageSetDict(w, pass);
+  document.getElementById("btnTriageDictCheck").textContent = "下一個 (Enter)";
+  document.getElementById("btnTriageDictCheck").focus();
+}
+document.getElementById("btnTriageDictCheck").onclick = triageDictCheck;
+document.getElementById("triageDictInput").addEventListener("keydown", (e) => {
+  if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); triageDictCheck(); }
+});
+document.getElementById("btnTriageDictSpeak").onclick = (e) => { const w = triageDictList[triageDictIdx]; if(w) triageSpeak(w, e.currentTarget); };
+document.getElementById("btnTriageDictHint").onclick = () => {
+  const w = triageDictList[triageDictIdx];
+  if(!w || triageDictChecked) return;
+  const res = document.getElementById("triageDictResult");
+  res.innerHTML = `<div class="usage-note">${escapeHtmlTriage(triageMeaning(w))}</div>`;
+};
+document.getElementById("btnTriageDictOverride").onclick = () => {
+  const w = triageDictList[triageDictIdx];
+  if(!w) return;
+  triageResult.fail--; triageResult.pass++;
+  triageSetDict(w, true);
+  document.getElementById("btnTriageDictOverride").classList.add("hidden");
+  document.getElementById("triageDictResult").innerHTML += `<div>↪︎ 改成算對，已熟練</div>`;
+};
+document.getElementById("btnTriageDictSkip").onclick = () => {
+  if(!confirm("跳過剩下的聽寫？沒聽寫的字維持「已會」，但不會記成已熟練。")) return;
+  triageFinish();
+};
+function triageFinish(){
+  const r = triageResult;
+  triageOpenSetup();
+  const done = r.known + r.fuzzy + r.unknown;
+  if(done) alert(`這一輪分了 ${done} 張：\n✅ 已會 ${r.known}（聽寫對 ${r.pass}、錯 ${r.fail}）\n🟡 模糊 ${r.fuzzy}\n❌ 不會 ${r.unknown}`);
+}
+function triageWeakWords(){
+  const g = document.getElementById("triageGroup").value;
+  return triageWordsInGroup(g).filter(w => { const r = triageData[w.text]; return r && (r.s === "fuzzy" || r.s === "unknown"); });
+}
+document.getElementById("btnTriageSelectWeak").onclick = () => {
+  const list = triageWeakWords();
+  if(!list.length){ alert("這一組目前沒有「模糊＋不會」的字。"); return; }
+  if(!confirm(`把目前的勾選換成這 ${list.length} 個「模糊＋不會」的字？`)) return;
+  selected = new Set(list.map(w => w.id));
+  saveSelected();
+  alert(`已勾選 ${list.length} 個字，回清單按「開始 Flash Card 複習」就是這些字。`);
+};
+document.getElementById("btnTriageCopyWeak").onclick = async () => {
+  const list = triageWeakWords();
+  if(!list.length){ alert("這一組目前沒有「模糊＋不會」的字。"); return; }
+  const txt = `${L().label}「模糊＋不會」（${list.length} 個）：\n` + list.map(w => `${triageAnswer(w)} = ${triageMeaning(w)}（${TRIAGE_LABEL[triageData[w.text].s]}）`).join("\n");
+  try{ await navigator.clipboard.writeText(txt); alert(`已複製 ${list.length} 個字。`); }
+  catch(e){ prompt("複製失敗，請手動複製：", txt); }
+};
+document.addEventListener("keydown", (e) => {
+  if(document.getElementById("screen-triage").classList.contains("hidden")) return;
+  if(document.getElementById("triagePlay").classList.contains("hidden")) return;
+  if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(e.key === " "){ e.preventDefault(); triageFlip(); }
+  else if(e.key === "1") triageRate("known");
+  else if(e.key === "2") triageRate("fuzzy");
+  else if(e.key === "3") triageRate("unknown");
+});
+
 // ================= 測驗 =================
 let quizSession = [];
 let quizIndex = 0;
@@ -12209,7 +12541,7 @@ function shuffleArr(arr){
 }
 function showScreen(name){
   if(typeof stopListAutoplay === "function") stopListAutoplay(); // 離開/切換畫面就停掉首頁的依序播放，不要跟卡片/測驗/跑步的聲音打架
-  ["select","cards","alpha-cards","spell-cards","quiz","write","listen","result"].forEach(s => {
+  ["select","cards","alpha-cards","spell-cards","triage","quiz","write","listen","result"].forEach(s => {
     document.getElementById("screen-" + s).classList.toggle("hidden", s !== name);
   });
   if(name === "select"){
