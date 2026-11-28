@@ -1159,6 +1159,174 @@
      "zh": "我 check in 之前在外面買吃的。"
     }
    ]
+  },
+  {
+   "id": "newwords-vi-20261128",
+   "lang": "vi",
+   "group": "20261128",
+   "title": "28 Nov 新單字",
+   "items": [
+    {
+     "term": "xong",
+     "zh": "完、完成"
+    },
+    {
+     "term": "học xong",
+     "zh": "上完課、學完"
+    },
+    {
+     "term": "đi xuống lầu",
+     "zh": "下樓去"
+    },
+    {
+     "term": "buffet",
+     "zh": "自助餐"
+    },
+    {
+     "term": "buffet sáng",
+     "zh": "早餐自助餐"
+    },
+    {
+     "term": "món gì",
+     "zh": "什麼菜"
+    },
+    {
+     "term": "có hình",
+     "zh": "有照片"
+    },
+    {
+     "term": "cơm chiên",
+     "zh": "炒飯"
+    },
+    {
+     "term": "đồ chua",
+     "zh": "醃菜、泡菜"
+    },
+    {
+     "term": "gừng",
+     "zh": "薑"
+    },
+    {
+     "term": "gà kho gừng",
+     "zh": "薑燉雞"
+    },
+    {
+     "term": "nhìn giống",
+     "zh": "看起來像"
+    },
+    {
+     "term": "dưa",
+     "zh": "瓜"
+    },
+    {
+     "term": "dưa chuột",
+     "zh": "小黃瓜"
+    },
+    {
+     "term": "chuột",
+     "zh": "老鼠"
+    },
+    {
+     "term": "dưa leo",
+     "zh": "小黃瓜（南部說法）"
+    },
+    {
+     "term": "leo",
+     "zh": "爬"
+    },
+    {
+     "term": "leo núi",
+     "zh": "爬山"
+    },
+    {
+     "term": "đi leo núi",
+     "zh": "去爬山"
+    },
+    {
+     "term": "dưa lưới",
+     "zh": "哈密瓜"
+    },
+    {
+     "term": "lưới",
+     "zh": "網"
+    },
+    {
+     "term": "thanh long",
+     "zh": "火龍果"
+    },
+    {
+     "term": "ổi",
+     "zh": "芭樂"
+    },
+    {
+     "term": "hết rồi",
+     "zh": "沒了、就這樣"
+    },
+    {
+     "term": "ăn hết rồi",
+     "zh": "吃光了"
+    },
+    {
+     "term": "hết luôn",
+     "zh": "完全…、全都…"
+    },
+    {
+     "term": "ngay bây giờ",
+     "zh": "現在馬上"
+    },
+    {
+     "term": "đầu đường",
+     "zh": "街頭、路口"
+    },
+    {
+     "term": "Anh chưa ăn sáng.",
+     "zh": "我還沒吃早餐。"
+    },
+    {
+     "term": "Sau khi học xong, anh sẽ đi xuống lầu ăn sáng.",
+     "zh": "上完課後，我會下樓吃早餐。"
+    },
+    {
+     "term": "Anh sẽ ăn buffet ở khách sạn.",
+     "zh": "我會在飯店吃自助餐。"
+    },
+    {
+     "term": "Có buffet sáng nhưng mà không ngon.",
+     "zh": "有早餐自助餐，但是不好吃。"
+    },
+    {
+     "term": "Buffet sáng ở khách sạn bây giờ ngon không?",
+     "zh": "飯店的早餐自助餐現在好吃嗎？"
+    },
+    {
+     "term": "Anh có hình.",
+     "zh": "我有照片。"
+    },
+    {
+     "term": "Nhìn giống cái này không?",
+     "zh": "看起來像這個嗎？"
+    },
+    {
+     "term": "Nhìn giống cái này.",
+     "zh": "看起來像這個。"
+    },
+    {
+     "term": "Anh thích đi leo núi không?",
+     "zh": "你喜歡去爬山嗎？"
+    },
+    {
+     "term": "Ăn hết rồi!",
+     "zh": "吃光了！"
+    },
+    {
+     "term": "Khách sạn này ở ngay trung tâm Bali.",
+     "zh": "這間飯店就在峇里島市中心。"
+    },
+    {
+     "term": "Nhà em ở ngay đầu đường.",
+     "zh": "我家就在路口。"
+    }
+   ]
   }
  ]
 }
